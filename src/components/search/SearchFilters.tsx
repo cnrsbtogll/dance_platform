@@ -1,26 +1,45 @@
-// src/components/search/SearchFilters.jsx
-import React, { useState } from 'react';
+import React, { useState, FormEvent, ChangeEvent } from 'react';
 
-function SearchFilters({ onFilterChange }) {
-  const [seviye, setSeviye] = useState('');
-  const [fiyatAralik, setFiyatAralik] = useState('');
-  const [arama, setArama] = useState('');
-  const [dansTuru, setDansTuru] = useState('');
-  const [gun, setGun] = useState('');
+// Props için interface tanımı
+interface SearchFiltersProps {
+  onFilterChange: (filters: FilterValues) => void;
+}
+
+// Filtre değerleri için interface tanımı
+interface FilterValues {
+  seviye: string;
+  fiyatAralik: string;
+  arama: string;
+  dansTuru: string;
+  gun: string;
+}
+
+// Fiyat aralığı seçenekleri için interface tanımı
+interface FiyatAralik {
+  label: string;
+  value: string;
+}
+
+function SearchFilters({ onFilterChange }: SearchFiltersProps): JSX.Element {
+  const [seviye, setSeviye] = useState<string>('');
+  const [fiyatAralik, setFiyatAralik] = useState<string>('');
+  const [arama, setArama] = useState<string>('');
+  const [dansTuru, setDansTuru] = useState<string>('');
+  const [gun, setGun] = useState<string>('');
 
   // Dans türleri
-  const dansTurleri = [
+  const dansTurleri: string[] = [
     'Salsa', 'Bachata', 'Tango', 'Vals', 'Hip Hop', 'Modern Dans', 
     'Bale', 'Flamenko', 'Zeybek', 'Jazz', 'Breakdance'
   ];
 
   // Günler
-  const gunler = [
+  const gunler: string[] = [
     'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar', 'Hafta İçi', 'Hafta Sonu'
   ];
 
   // Fiyat aralıkları
-  const fiyatAraliklari = [
+  const fiyatAraliklari: FiyatAralik[] = [
     { label: '0 - 1000 TL', value: '0-1000' },
     { label: '1000 - 1500 TL', value: '1000-1500' },
     { label: '1500 - 2000 TL', value: '1500-2000' },
@@ -28,9 +47,9 @@ function SearchFilters({ onFilterChange }) {
   ];
 
   // Seviye seçenekleri
-  const seviyeler = ['Başlangıç', 'Orta', 'İleri', 'Tüm Seviyeler'];
+  const seviyeler: string[] = ['Başlangıç', 'Orta', 'İleri', 'Tüm Seviyeler'];
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
     onFilterChange({
       seviye,
@@ -41,13 +60,19 @@ function SearchFilters({ onFilterChange }) {
     });
   };
 
-  const filterTemizle = () => {
+  const filterTemizle = (): void => {
     setSeviye('');
     setFiyatAralik('');
     setArama('');
     setDansTuru('');
     setGun('');
-    onFilterChange({});
+    onFilterChange({
+      seviye: '',
+      fiyatAralik: '',
+      arama: '',
+      dansTuru: '',
+      gun: ''
+    });
   };
 
   return (
@@ -61,7 +86,7 @@ function SearchFilters({ onFilterChange }) {
             type="text"
             id="arama"
             value={arama}
-            onChange={(e) => setArama(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setArama(e.target.value)}
             placeholder="Kurs adı veya tanımı ile ara..."
             className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
           />
@@ -75,7 +100,7 @@ function SearchFilters({ onFilterChange }) {
             <select
               id="dansTuru"
               value={dansTuru}
-              onChange={(e) => setDansTuru(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setDansTuru(e.target.value)}
               className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
             >
               <option value="">Tümü</option>
@@ -92,7 +117,7 @@ function SearchFilters({ onFilterChange }) {
             <select
               id="seviye"
               value={seviye}
-              onChange={(e) => setSeviye(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setSeviye(e.target.value)}
               className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
             >
               <option value="">Tümü</option>
@@ -109,7 +134,7 @@ function SearchFilters({ onFilterChange }) {
             <select
               id="fiyatAralik"
               value={fiyatAralik}
-              onChange={(e) => setFiyatAralik(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setFiyatAralik(e.target.value)}
               className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
             >
               <option value="">Tümü</option>
@@ -128,7 +153,7 @@ function SearchFilters({ onFilterChange }) {
             <select
               id="gun"
               value={gun}
-              onChange={(e) => setGun(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setGun(e.target.value)}
               className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
             >
               <option value="">Tümü</option>
@@ -160,4 +185,4 @@ function SearchFilters({ onFilterChange }) {
   );
 }
 
-export default SearchFilters;
+export default SearchFilters; 
