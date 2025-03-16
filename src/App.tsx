@@ -6,6 +6,7 @@ import PartnerMatching from './components/partners/PartnerMatching';
 import BadgeSystem from './components/progress/BadgeSystem';
 import AdminPanel from './components/admin/AdminPanel';
 import Navbar from './components/layout/Navbar';
+import SignIn from './components/auth/SignIn';
 
 interface UserType {
   id: string;
@@ -58,6 +59,7 @@ function App(): JSX.Element {
                 isAuthenticated ? <AdminPanel /> : <Navigate to="/" />
               } 
             />
+            <Route path="/signin" element={<SignIn />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>

@@ -1,10 +1,26 @@
-// src/components/profile/UserProfile.jsx
 import { useState } from 'react';
 import Button from '../common/Button';
 
-function UserProfile({ user }) {
+interface User {
+  displayName?: string;
+  photoURL?: string;
+  email?: string;
+}
+
+interface UserProfileProps {
+  user: User | null;
+}
+
+interface ProfileState {
+  name: string;
+  bio: string;
+  danceStyles: string[];
+  level: 'Beginner' | 'Intermediate' | 'Advanced';
+}
+
+function UserProfile({ user }: UserProfileProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [profile, setProfile] = useState({
+  const [profile, setProfile] = useState<ProfileState>({
     name: user?.displayName || '',
     bio: '',
     danceStyles: [],
@@ -19,7 +35,7 @@ function UserProfile({ user }) {
     );
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Update profile logic here
     setIsEditing(false);
@@ -58,14 +74,14 @@ function UserProfile({ user }) {
                   value={profile.bio}
                   onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                  rows="3"
+                  rows={3}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Level</label>
                 <select
                   value={profile.level}
-                  onChange={(e) => setProfile({ ...profile, level: e.target.value })}
+                  onChange={(e) => setProfile({ ...profile, level: e.target.value as ProfileState['level'] })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
                 >
                   <option>Beginner</option>
@@ -91,4 +107,4 @@ function UserProfile({ user }) {
   );
 }
 
-export default UserProfile;
+export default UserProfile; 

@@ -1,6 +1,5 @@
-// src/components/auth/SignIn.jsx
 import { useState } from 'react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, AuthError } from 'firebase/auth';
 import { auth } from '../../firebase/config';
 import Button from '../common/Button';
 
@@ -10,7 +9,7 @@ function SignIn() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     
@@ -21,7 +20,8 @@ function SignIn() {
         await createUserWithEmailAndPassword(auth, email, password);
       }
     } catch (err) {
-      setError(err.message);
+      const authError = err as AuthError;
+      setError(authError.message);
     }
   };
 
@@ -79,4 +79,4 @@ function SignIn() {
   );
 }
 
-export default SignIn;
+export default SignIn; 
