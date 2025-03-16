@@ -6,8 +6,8 @@ A modern React template for web applications and games, featuring React 18, Vite
 
 ```
 ├── src/
-│   ├── App.jsx          # Main application component
-│   ├── main.jsx         # Application entry point
+│   ├── App.tsx          # Main application component
+│   ├── main.tsx         # Application entry point
 │   └── index.css        # Global styles (Tailwind)
 ├── public/              # Static assets
 ├── index.html           # HTML template
@@ -19,11 +19,11 @@ A modern React template for web applications and games, featuring React 18, Vite
 
 ## Development Guidelines
 
-- Modify `index.html` and `src/App.jsx` as needed
+- Modify `index.html` and `src/App.tsx` as needed
 - Create new folders or files in `src/` directory as needed
 - Style components using TailwindCSS utility classes
-- Avoid modifying `src/main.jsx` and `src/index.css`
-- Only modify `vite.config.js` if absolutely necessary
+- Avoid modifying `src/main.tsx` and `src/index.css`
+- Only modify `vite.config.ts` if absolutely necessary
 
 ## Available Scripts
 - `pnpm install` - Install dependencies
@@ -36,4 +36,4 @@ A modern React template for web applications and games, featuring React 18, Vite
 - Vite
 - TailwindCSS
 - ESLint
-- Javascript
+- TypeScript

@@ -3,14 +3,21 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import ClassList from './components/classes/ClassList';
 import ClassDetails from './components/classes/ClassDetails';
 import PartnerMatching from './components/partners/PartnerMatching';
-import BadgeSystem from './components/progress/BadgeSystem.jsx';
+import BadgeSystem from './components/progress/BadgeSystem';
 import AdminPanel from './components/admin/AdminPanel';
 import Navbar from './components/layout/Navbar';
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
+interface UserType {
+  id: string;
+  name: string;
+  email: string;
+  photoURL: string;
+}
+
+function App(): JSX.Element {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [user, setUser] = useState<UserType | null>(null);
 
   useEffect(() => {
     // Gerçek bir uygulamada burada Firebase auth dinleyicisi olurdu
