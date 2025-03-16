@@ -1,6 +1,7 @@
 // src/components/partners/PartnerMatching.tsx
 import React, { useState, useEffect, Fragment, ChangeEvent, FormEvent } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
+import { Link } from 'react-router-dom';
 
 // Partner veri tipi
 interface Partner {
@@ -116,6 +117,12 @@ function PartnerMatching(): JSX.Element {
     }
   ];
 
+  // Sayfa ilk yüklendiğinde tüm partnerleri listeleme
+  useEffect(() => {
+    setPartnerler(mockPartnerler);
+    setAramaTamamlandi(true);
+  }, []);
+
   // Dans partneri arama fonksiyonu
   const partnerAra = (e: FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
@@ -170,13 +177,6 @@ function PartnerMatching(): JSX.Element {
         : [...prev, saat]
     );
   };
-
-  // Debug fonksiyonu - state değişikliklerini izlemek için
-  useEffect(() => {
-    console.log("Dans Türü:", dansTuru);
-    console.log("Cinsiyet:", cinsiyet);
-    console.log("Seviye:", seviye);
-  }, [dansTuru, cinsiyet, seviye]);
 
   // Özel Select Bileşeni
   const CustomSelect: React.FC<CustomSelectProps> = ({ label, options, value, onChange, placeholder = "Seçiniz" }) => {
@@ -265,55 +265,81 @@ function PartnerMatching(): JSX.Element {
     );
   };
 
-  // Partner kartı bileşeni
+  // Partner kartı bileşeni (ClassCard tarzında)
   const PartnerKarti: React.FC<PartnerKartiProps> = ({ partner }) => (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-      <div className="flex">
-        <div className="w-1/3 h-48 flex items-center justify-center">
-          <img 
-            src={partner.foto || 'https://via.placeholder.com/150'} 
-            alt={partner.ad} 
-            className="h-full w-full object-cover"
-            onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = 'https://via.placeholder.com/150?text=Dans+Partner';
-            }}
-          />
+    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col h-full">
+      <div className="relative h-56 bg-gray-50 flex items-center justify-center overflow-hidden p-2">
+        <img 
+          src={partner.foto || 'https://via.placeholder.com/400x250?text=Dans+Partner'} 
+          alt={partner.ad} 
+          className="max-h-full max-w-full object-contain rounded-md"
+          style={{ maxHeight: '200px' }}
+          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = 'https://via.placeholder.com/400x250?text=Dans+Partner';
+          }}
+        />
+        <div className="absolute top-2 right-2 bg-indigo-600 text-white px-2 py-1 text-sm rounded-md">
+          {partner.seviye}
         </div>
-        <div className="w-2/3 p-4">
-          <div className="flex justify-between items-start">
-            <h3 className="text-lg font-bold text-gray-800">{partner.ad}</h3>
-            <div className="flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-              <span className="ml-1 text-sm font-semibold text-gray-700">{partner.puan}</span>
-            </div>
+      </div>
+      
+      <div className="p-5 flex-grow flex flex-col">
+        <h2 className="text-xl font-bold mb-2 text-gray-800">{partner.ad}</h2>
+        
+        <div className="flex items-center text-gray-600 mb-2">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+          </svg>
+          <span>{partner.yas} yaşında</span>
+        </div>
+        
+        <div className="flex items-center text-gray-600 mb-3">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+          </svg>
+          <span>{partner.konum}</span>
+        </div>
+        
+        <div className="flex flex-wrap mb-3">
+          {partner.dans.map((dansTuru, index) => (
+            <span 
+              key={index} 
+              className="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded mr-1 mb-1"
+            >
+              {dansTuru}
+            </span>
+          ))}
+        </div>
+
+        <div className="flex items-center mb-3">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div className="flex flex-wrap">
+            {partner.saatler.map((saat, index) => (
+              <span 
+                key={index}
+                className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded mr-1 mb-1"
+              >
+                {saat}
+              </span>
+            ))}
           </div>
-          
-          <div className="mt-2 space-y-2">
-            <p className="text-sm text-gray-600">
-              <span className="font-medium">Yaş:</span> {partner.yas}
-            </p>
-            <p className="text-sm text-gray-600">
-              <span className="font-medium">Seviye:</span> {partner.seviye}
-            </p>
-            <p className="text-sm text-gray-600">
-              <span className="font-medium">Dans Türleri:</span> {partner.dans.join(', ')}
-            </p>
-            <p className="text-sm text-gray-600">
-              <span className="font-medium">Konum:</span> {partner.konum}
-            </p>
-            <p className="text-sm text-gray-600">
-              <span className="font-medium">Uygun Saatler:</span> {partner.saatler.join(', ')}
-            </p>
+        </div>
+        
+        <div className="flex justify-between items-center mt-auto">
+          <div className="flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+            </svg>
+            <span className="ml-1 text-sm font-semibold text-gray-700">{partner.puan}</span>
           </div>
-          
-          <div className="mt-4 flex justify-end">
-            <button className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors">
-              İletişime Geç
-            </button>
-          </div>
+          <button 
+            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+          >
+            İletişime Geç
+          </button>
         </div>
       </div>
     </div>
@@ -413,9 +439,11 @@ function PartnerMatching(): JSX.Element {
           </h2>
         )}
         
-        {partnerler.map(partner => (
-          <PartnerKarti key={partner.id} partner={partner} />
-        ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {partnerler.map(partner => (
+            <PartnerKarti key={partner.id} partner={partner} />
+          ))}
+        </div>
         
         {aramaTamamlandi && partnerler.length === 0 && (
           <div className="bg-gray-50 p-8 rounded-lg text-center">
