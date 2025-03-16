@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 // User için tip tanımı
 interface User {
@@ -18,6 +18,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState<boolean>(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = (): void => {
     // Gerçek uygulamada burada bir Firebase logout işlemi olurdu
@@ -31,6 +32,19 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
 
   const toggleProfileMenu = (): void => {
     setIsProfileMenuOpen(!isProfileMenuOpen);
+  };
+
+  // Aktif sayfayı belirlemek için yardımcı fonksiyon
+  const isActive = (path: string): boolean => {
+    // Ana sayfa (/) için partner bul sayfasını aktif göster
+    if (location.pathname === '/') {
+      return path === '/partners';
+    }
+    // Diğer sayfalar için normal kontrol
+    if (path === '/') {
+      return false; // Ana sayfa hiçbir zaman aktif gösterilmeyecek
+    }
+    return location.pathname.startsWith(path);
   };
 
   return (
@@ -54,19 +68,25 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               <Link 
                 to="/partners" 
-                className="border-transparent text-gray-500 hover:border-indigo-500 hover:text-indigo-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                className={`${isActive('/partners') 
+                  ? 'border-indigo-500 text-indigo-700' 
+                  : 'border-transparent text-gray-500 hover:border-indigo-500 hover:text-indigo-700'} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
               >
                 Partner Bul
               </Link>
               <Link 
                 to="/classes" 
-                className="border-transparent text-gray-500 hover:border-indigo-500 hover:text-indigo-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                className={`${isActive('/classes') 
+                  ? 'border-indigo-500 text-indigo-700' 
+                  : 'border-transparent text-gray-500 hover:border-indigo-500 hover:text-indigo-700'} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
               >
                 Dans Kursları
               </Link>
               <Link 
                 to="/progress" 
-                className="border-transparent text-gray-500 hover:border-indigo-500 hover:text-indigo-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                className={`${isActive('/progress') 
+                  ? 'border-indigo-500 text-indigo-700' 
+                  : 'border-transparent text-gray-500 hover:border-indigo-500 hover:text-indigo-700'} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
               >
                 İlerleme Durumum
               </Link>
@@ -152,21 +172,27 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
           <div className="pt-2 pb-3 space-y-1">
             <Link
               to="/partners"
-              className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-gray-600 hover:bg-gray-50 hover:border-indigo-500 hover:text-indigo-700 text-base font-medium"
+              className={`block pl-3 pr-4 py-2 border-l-4 ${isActive('/partners') 
+                ? 'border-indigo-500 text-indigo-700 bg-indigo-50' 
+                : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-indigo-500 hover:text-indigo-700'} text-base font-medium`}
               onClick={() => setIsMenuOpen(false)}
             >
               Partner Bul
             </Link>
             <Link
               to="/classes"
-              className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-gray-600 hover:bg-gray-50 hover:border-indigo-500 hover:text-indigo-700 text-base font-medium"
+              className={`block pl-3 pr-4 py-2 border-l-4 ${isActive('/classes') 
+                ? 'border-indigo-500 text-indigo-700 bg-indigo-50' 
+                : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-indigo-500 hover:text-indigo-700'} text-base font-medium`}
               onClick={() => setIsMenuOpen(false)}
             >
               Dans Kursları
             </Link>
             <Link
               to="/progress"
-              className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-gray-600 hover:bg-gray-50 hover:border-indigo-500 hover:text-indigo-700 text-base font-medium"
+              className={`block pl-3 pr-4 py-2 border-l-4 ${isActive('/progress') 
+                ? 'border-indigo-500 text-indigo-700 bg-indigo-50' 
+                : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-indigo-500 hover:text-indigo-700'} text-base font-medium`}
               onClick={() => setIsMenuOpen(false)}
             >
               İlerleme Durumum
