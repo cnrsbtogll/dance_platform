@@ -1,4 +1,5 @@
 import React, { useState, FormEvent, ChangeEvent } from 'react';
+import CustomSelect from '../common/CustomSelect';
 
 // Props için interface tanımı
 interface SearchFiltersProps {
@@ -93,75 +94,37 @@ function SearchFilters({ onFilterChange }: SearchFiltersProps): JSX.Element {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label htmlFor="dansTuru" className="block text-sm font-medium text-gray-700 mb-1">
-              Dans Türü
-            </label>
-            <select
-              id="dansTuru"
-              value={dansTuru}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) => setDansTuru(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              <option value="">Tümü</option>
-              {dansTurleri.map((tur) => (
-                <option key={tur} value={tur}>{tur}</option>
-              ))}
-            </select>
-          </div>
+          <CustomSelect
+            label="Dans Türü"
+            options={dansTurleri}
+            value={dansTuru}
+            onChange={setDansTuru}
+            placeholder="Tüm dans türleri"
+          />
 
-          <div>
-            <label htmlFor="seviye" className="block text-sm font-medium text-gray-700 mb-1">
-              Seviye
-            </label>
-            <select
-              id="seviye"
-              value={seviye}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) => setSeviye(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              <option value="">Tümü</option>
-              {seviyeler.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
+          <CustomSelect
+            label="Seviye"
+            options={seviyeler}
+            value={seviye}
+            onChange={setSeviye}
+            placeholder="Tüm seviyeler"
+          />
 
-          <div>
-            <label htmlFor="fiyatAralik" className="block text-sm font-medium text-gray-700 mb-1">
-              Fiyat Aralığı
-            </label>
-            <select
-              id="fiyatAralik"
-              value={fiyatAralik}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) => setFiyatAralik(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              <option value="">Tümü</option>
-              {fiyatAraliklari.map((aralik) => (
-                <option key={aralik.value} value={aralik.value}>
-                  {aralik.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <CustomSelect
+            label="Fiyat Aralığı"
+            options={fiyatAraliklari}
+            value={fiyatAralik}
+            onChange={setFiyatAralik}
+            placeholder="Tüm fiyatlar"
+          />
 
-          <div>
-            <label htmlFor="gun" className="block text-sm font-medium text-gray-700 mb-1">
-              Ders Günü
-            </label>
-            <select
-              id="gun"
-              value={gun}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) => setGun(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              <option value="">Tümü</option>
-              {gunler.map((g) => (
-                <option key={g} value={g}>{g}</option>
-              ))}
-            </select>
-          </div>
+          <CustomSelect
+            label="Ders Günü"
+            options={gunler}
+            value={gun}
+            onChange={setGun}
+            placeholder="Tüm günler"
+          />
         </div>
 
         <div className="mt-6 flex justify-between">
@@ -185,4 +148,4 @@ function SearchFilters({ onFilterChange }: SearchFiltersProps): JSX.Element {
   );
 }
 
-export default SearchFilters; 
+export default SearchFilters;
