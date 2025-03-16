@@ -1,22 +1,35 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-function Navbar({ isAuthenticated, user }) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+// User için tip tanımı
+interface User {
+  photoURL?: string;
+  name?: string;
+  email?: string;
+}
+
+// Navbar bileşeni için prop tipleri
+interface NavbarProps {
+  isAuthenticated: boolean;
+  user?: User;
+}
+
+function Navbar({ isAuthenticated, user }: NavbarProps) {
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState<boolean>(false);
   const navigate = useNavigate();
 
-  const handleLogout = () => {
+  const handleLogout = (): void => {
     // Gerçek uygulamada burada bir Firebase logout işlemi olurdu
     console.log('Çıkış yapıldı');
     navigate('/');
   };
 
-  const toggleMenu = () => {
+  const toggleMenu = (): void => {
     setIsMenuOpen(!isMenuOpen);
   };
 
-  const toggleProfileMenu = () => {
+  const toggleProfileMenu = (): void => {
     setIsProfileMenuOpen(!isProfileMenuOpen);
   };
 
