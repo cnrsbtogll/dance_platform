@@ -1,17 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-
-// User için tip tanımı
-interface User {
-  photoURL?: string;
-  name?: string;
-  email?: string;
-}
+import { signOut } from '../../services/authService';
+import { User as UserType } from '../../types';
 
 // Navbar bileşeni için prop tipleri
 interface NavbarProps {
   isAuthenticated: boolean;
-  user?: User;
+  user?: UserType | null;
 }
 
 function Navbar({ isAuthenticated, user }: NavbarProps) {
@@ -20,10 +15,13 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleLogout = (): void => {
-    // Gerçek uygulamada burada bir Firebase logout işlemi olurdu
-    console.log('Çıkış yapıldı');
-    navigate('/');
+  const handleLogout = async (): Promise<void> => {
+    try {
+      await signOut();
+      navigate('/signin');
+    } catch (error) {
+      console.error('Çıkış yapılırken hata oluştu:', error);
+    }
   };
 
   const toggleMenu = (): void => {
@@ -210,7 +208,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                     />
                   </div>
                   <div className="ml-3">
-                    <div className="text-base font-medium leading-none text-gray-800">{user?.name || 'Kullanıcı'}</div>
+                    <div className="text-base font-medium leading-none text-gray-800">{user?.displayName || 'Kullanıcı'}</div>
                     <div className="text-sm font-medium leading-none text-gray-500">{user?.email || ''}</div>
                   </div>
                 </div>
