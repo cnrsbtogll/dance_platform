@@ -1,31 +1,59 @@
-// src/components/partners/PartnerMatching.jsx
-import React, { useState, useEffect, Fragment } from 'react';
+// src/components/partners/PartnerMatching.tsx
+import React, { useState, useEffect, Fragment, ChangeEvent, FormEvent } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
 
-function PartnerMatching() {
-  const [dansTuru, setDansTuru] = useState('');
-  const [cinsiyet, setCinsiyet] = useState('');
-  const [seviye, setSeviye] = useState('');
-  const [yas, setYas] = useState('');
-  const [konum, setKonum] = useState('');
-  const [uygunSaatler, setUygunSaatler] = useState([]);
-  const [partnerler, setPartnerler] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [aramaTamamlandi, setAramaTamamlandi] = useState(false);
+// Partner veri tipi
+interface Partner {
+  id: number;
+  ad: string;
+  yas: number;
+  cinsiyet: string;
+  seviye: string;
+  dans: string[];
+  konum: string;
+  saatler: string[];
+  foto: string;
+  puan: number;
+}
+
+// CustomSelect bileşeni için prop tipi
+interface CustomSelectProps {
+  label: string;
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}
+
+// PartnerKarti bileşeni için prop tipi
+interface PartnerKartiProps {
+  partner: Partner;
+}
+
+function PartnerMatching(): JSX.Element {
+  const [dansTuru, setDansTuru] = useState<string>('');
+  const [cinsiyet, setCinsiyet] = useState<string>('');
+  const [seviye, setSeviye] = useState<string>('');
+  const [yas, setYas] = useState<string>('');
+  const [konum, setKonum] = useState<string>('');
+  const [uygunSaatler, setUygunSaatler] = useState<string[]>([]);
+  const [partnerler, setPartnerler] = useState<Partner[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [aramaTamamlandi, setAramaTamamlandi] = useState<boolean>(false);
 
   // Dans türü seçenekleri
-  const dansTurleri = [
+  const dansTurleri: string[] = [
     'Salsa', 'Bachata', 'Tango', 'Vals', 'Hip Hop', 'Modern Dans', 'Bale', 'Flamenko', 'Zeybek', 'Jazz'
   ];
 
   // Seviye seçenekleri
-  const seviyeler = ['Başlangıç', 'Orta', 'İleri'];
+  const seviyeler: string[] = ['Başlangıç', 'Orta', 'İleri'];
 
   // Cinsiyet seçenekleri
-  const cinsiyetler = ['Kadın', 'Erkek'];
+  const cinsiyetler: string[] = ['Kadın', 'Erkek'];
 
   // Placeholder sahte partner verileri
-  const mockPartnerler = [
+  const mockPartnerler: Partner[] = [
     {
       id: 1,
       ad: 'Elif Yılmaz',
@@ -89,7 +117,7 @@ function PartnerMatching() {
   ];
 
   // Dans partneri arama fonksiyonu
-  const partnerAra = (e) => {
+  const partnerAra = (e: FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
     setLoading(true);
 
@@ -135,7 +163,7 @@ function PartnerMatching() {
   };
 
   // Uygun saatleri işleme fonksiyonu
-  const handleSaatChange = (saat) => {
+  const handleSaatChange = (saat: string): void => {
     setUygunSaatler(prev => 
       prev.includes(saat) 
         ? prev.filter(s => s !== saat) 
@@ -151,7 +179,7 @@ function PartnerMatching() {
   }, [dansTuru, cinsiyet, seviye]);
 
   // Özel Select Bileşeni
-  const CustomSelect = ({ label, options, value, onChange, placeholder = "Seçiniz" }) => {
+  const CustomSelect: React.FC<CustomSelectProps> = ({ label, options, value, onChange, placeholder = "Seçiniz" }) => {
     return (
       <div className="w-full">
         <Listbox value={value} onChange={onChange}>
@@ -238,7 +266,7 @@ function PartnerMatching() {
   };
 
   // Partner kartı bileşeni
-  const PartnerKarti = ({ partner }) => (
+  const PartnerKarti: React.FC<PartnerKartiProps> = ({ partner }) => (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
       <div className="flex">
         <div className="w-1/3 h-48 flex items-center justify-center">
@@ -246,9 +274,9 @@ function PartnerMatching() {
             src={partner.foto || 'https://via.placeholder.com/150'} 
             alt={partner.ad} 
             className="h-full w-full object-cover"
-            onError={(e) => {
-              e.target.onerror = null;
-              e.target.src = 'https://via.placeholder.com/150?text=Dans+Partner';
+            onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = 'https://via.placeholder.com/150?text=Dans+Partner';
             }}
           />
         </div>
@@ -330,7 +358,7 @@ function PartnerMatching() {
                 type="text"
                 id="konum"
                 value={konum}
-                onChange={(e) => setKonum(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setKonum(e.target.value)}
                 placeholder="Şehir veya semt"
                 className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
               />
