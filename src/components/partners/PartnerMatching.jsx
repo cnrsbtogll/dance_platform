@@ -1,5 +1,6 @@
 // src/components/partners/PartnerMatching.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
+import { Listbox, Transition } from '@headlessui/react';
 
 function PartnerMatching() {
   const [dansTuru, setDansTuru] = useState('');
@@ -16,6 +17,12 @@ function PartnerMatching() {
   const dansTurleri = [
     'Salsa', 'Bachata', 'Tango', 'Vals', 'Hip Hop', 'Modern Dans', 'Bale', 'Flamenko', 'Zeybek', 'Jazz'
   ];
+
+  // Seviye seçenekleri
+  const seviyeler = ['Başlangıç', 'Orta', 'İleri'];
+
+  // Cinsiyet seçenekleri
+  const cinsiyetler = ['Kadın', 'Erkek'];
 
   // Placeholder sahte partner verileri
   const mockPartnerler = [
@@ -136,11 +143,105 @@ function PartnerMatching() {
     );
   };
 
+  // Debug fonksiyonu - state değişikliklerini izlemek için
+  useEffect(() => {
+    console.log("Dans Türü:", dansTuru);
+    console.log("Cinsiyet:", cinsiyet);
+    console.log("Seviye:", seviye);
+  }, [dansTuru, cinsiyet, seviye]);
+
+  // Özel Select Bileşeni
+  const CustomSelect = ({ label, options, value, onChange, placeholder = "Seçiniz" }) => {
+    return (
+      <div className="w-full">
+        <Listbox value={value} onChange={onChange}>
+          {({ open }) => (
+            <>
+              <Listbox.Label className="block text-sm font-medium text-gray-700 mb-1">
+                {label}
+              </Listbox.Label>
+              <div className="relative mt-1">
+                <Listbox.Button className="relative w-full cursor-default rounded-md bg-white py-2 pl-3 pr-10 text-left border border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                  <span className="block truncate">{value || placeholder}</span>
+                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                    <svg className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M10 3a.75.75 0 01.55.24l3.25 3.5a.75.75 0 11-1.1 1.02L10 4.852 7.3 7.76a.75.75 0 01-1.1-1.02l3.25-3.5A.75.75 0 0110 3zm-3.76 9.2a.75.75 0 011.06.04l2.7 2.908 2.7-2.908a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 01.04-1.06z" clipRule="evenodd" />
+                    </svg>
+                  </span>
+                </Listbox.Button>
+                <Transition
+                  show={open}
+                  as={Fragment}
+                  leave="transition ease-in duration-100"
+                  leaveFrom="opacity-100"
+                  leaveTo="opacity-0"
+                >
+                  <Listbox.Options className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                    <Listbox.Option
+                      key="empty"
+                      value=""
+                      className={({ active }) =>
+                        `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                          active ? 'bg-indigo-100 text-indigo-900' : 'text-gray-900'
+                        }`
+                      }
+                    >
+                      {({ selected, active }) => (
+                        <>
+                          <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
+                            Tümü
+                          </span>
+                          {selected ? (
+                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-indigo-600">
+                              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                              </svg>
+                            </span>
+                          ) : null}
+                        </>
+                      )}
+                    </Listbox.Option>
+                    {options.map((option) => (
+                      <Listbox.Option
+                        key={option}
+                        value={option}
+                        className={({ active }) =>
+                          `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                            active ? 'bg-indigo-100 text-indigo-900' : 'text-gray-900'
+                          }`
+                        }
+                      >
+                        {({ selected, active }) => (
+                          <>
+                            <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
+                              {option}
+                            </span>
+                            {selected ? (
+                              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-indigo-600">
+                                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                  <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                                </svg>
+                              </span>
+                            ) : null}
+                          </>
+                        )}
+                      </Listbox.Option>
+                    ))}
+                  </Listbox.Options>
+                </Transition>
+              </div>
+            </>
+          )}
+        </Listbox>
+      </div>
+    );
+  };
+
   // Partner kartı bileşeni
   const PartnerKarti = ({ partner }) => (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
       <div className="flex">
-        <div className="w-1/3">
+        <div className="w-1/3 h-48 flex items-center justify-center">
           <img 
             src={partner.foto || 'https://via.placeholder.com/150'} 
             alt={partner.ad} 
@@ -197,55 +298,29 @@ function PartnerMatching() {
       <div className="bg-white p-6 rounded-lg shadow-md mb-8">
         <form onSubmit={partnerAra}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div>
-              <label htmlFor="dansTuru" className="block text-sm font-medium text-gray-700 mb-1">
-                Dans Türü
-              </label>
-              <select
-                id="dansTuru"
-                value={dansTuru}
-                onChange={(e) => setDansTuru(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option value="">Tümü</option>
-                {dansTurleri.map((tur) => (
-                  <option key={tur} value={tur}>{tur}</option>
-                ))}
-              </select>
-            </div>
+            <CustomSelect 
+              label="Dans Türü"
+              options={dansTurleri}
+              value={dansTuru}
+              onChange={setDansTuru}
+              placeholder="Tüm dans türleri"
+            />
             
-            <div>
-              <label htmlFor="cinsiyet" className="block text-sm font-medium text-gray-700 mb-1">
-                Partner Cinsiyeti
-              </label>
-              <select
-                id="cinsiyet"
-                value={cinsiyet}
-                onChange={(e) => setCinsiyet(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option value="">Tümü</option>
-                <option value="Kadın">Kadın</option>
-                <option value="Erkek">Erkek</option>
-              </select>
-            </div>
+            <CustomSelect 
+              label="Partner Cinsiyeti"
+              options={cinsiyetler}
+              value={cinsiyet}
+              onChange={setCinsiyet}
+              placeholder="Tüm cinsiyetler"
+            />
             
-            <div>
-              <label htmlFor="seviye" className="block text-sm font-medium text-gray-700 mb-1">
-                Dans Seviyesi
-              </label>
-              <select
-                id="seviye"
-                value={seviye}
-                onChange={(e) => setSeviye(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option value="">Tümü</option>
-                <option value="Başlangıç">Başlangıç</option>
-                <option value="Orta">Orta</option>
-                <option value="İleri">İleri</option>
-              </select>
-            </div>
+            <CustomSelect 
+              label="Dans Seviyesi"
+              options={seviyeler}
+              value={seviye}
+              onChange={setSeviye}
+              placeholder="Tüm seviyeler"
+            />
             
             <div>
               <label htmlFor="konum" className="block text-sm font-medium text-gray-700 mb-1">
