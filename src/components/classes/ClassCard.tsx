@@ -1,9 +1,45 @@
-// src/components/classes/ClassCard.jsx
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { dansEgitmenleri, dansOkullari } from '../../data/dansVerileri';
 
-function ClassCard({ kurs }) {
+// Tip tanımlamaları
+interface Kurs {
+  id: number;
+  baslik: string;
+  aciklama: string;
+  seviye: string;
+  fiyat: string;
+  egitmen_id: number;
+  okul_id: number;
+  gorsel: string;
+  gun: string;
+  saat: string;
+}
+
+interface Egitmen {
+  id: number;
+  ad: string;
+  uzmanlık: string;
+  tecrube: string;
+  biyografi: string;
+  gorsel: string;
+}
+
+interface Okul {
+  id: number;
+  ad: string;
+  konum: string;
+  aciklama: string;
+  iletisim: string;
+  telefon: string;
+  gorsel: string;
+}
+
+interface ClassCardProps {
+  kurs: Kurs;
+}
+
+function ClassCard({ kurs }: ClassCardProps): JSX.Element {
   // Eğitmen ve okul bilgilerini bul
   const egitmen = dansEgitmenleri.find(egitmen => egitmen.id === kurs.egitmen_id);
   const okul = dansOkullari.find(okul => okul.id === kurs.okul_id);
@@ -15,9 +51,10 @@ function ClassCard({ kurs }) {
           src={kurs.gorsel} 
           alt={kurs.baslik} 
           className="w-full h-full object-cover"
-          onError={(e) => {
-            e.target.onerror = null;
-            e.target.src = 'https://via.placeholder.com/400x250?text=Dans+Kursu';
+          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+            const target = e.currentTarget;
+            target.onerror = null;
+            target.src = 'https://via.placeholder.com/400x250?text=Dans+Kursu';
           }}
         />
         <div className="absolute top-0 right-0 bg-indigo-600 text-white px-2 py-1 text-sm">
@@ -71,4 +108,4 @@ function ClassCard({ kurs }) {
   );
 }
 
-export default ClassCard;
+export default ClassCard; 

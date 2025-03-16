@@ -1,14 +1,53 @@
-// src/components/classes/ClassDetails.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { dansKurslari, dansEgitmenleri, dansOkullari } from '../../data/dansVerileri';
 
-function ClassDetails() {
-  const { id } = useParams();
-  const [kurs, setKurs] = useState(null);
-  const [egitmen, setEgitmen] = useState(null);
-  const [okul, setOkul] = useState(null);
-  const [loading, setLoading] = useState(true);
+// Tip tanımlamaları
+interface Kurs {
+  id: number;
+  baslik: string;
+  aciklama: string;
+  seviye: string;
+  fiyat: string;
+  egitmen_id: number;
+  okul_id: number;
+  gorsel: string;
+  gun: string;
+  saat: string;
+  kapasite: number;
+  süre: string;
+}
+
+interface Egitmen {
+  id: number;
+  ad: string;
+  uzmanlık: string;
+  tecrube: string;
+  biyografi: string;
+  gorsel: string;
+}
+
+interface Okul {
+  id: number;
+  ad: string;
+  konum: string;
+  aciklama: string;
+  iletisim: string;
+  telefon: string;
+  gorsel: string;
+}
+
+interface RouteParams {
+  [key: string]: string | undefined;
+  id: string;
+}
+
+function ClassDetails(): JSX.Element {
+  const { id } = useParams<RouteParams>();
+  const [kurs, setKurs] = useState<Kurs | null>(null);
+  const [egitmen, setEgitmen] = useState<Egitmen | null>(null);
+  const [okul, setOkul] = useState<Okul | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     // Gerçek uygulamada bu verileri bir API'dan çekerdiniz
@@ -19,8 +58,8 @@ function ClassDetails() {
       const kursEgitmeni = dansEgitmenleri.find(e => e.id === selectedKurs.egitmen_id);
       const kursOkulu = dansOkullari.find(o => o.id === selectedKurs.okul_id);
       
-      setEgitmen(kursEgitmeni);
-      setOkul(kursOkulu);
+      setEgitmen(kursEgitmeni || null);
+      setOkul(kursOkulu || null);
     }
     
     setLoading(false);
@@ -54,9 +93,10 @@ function ClassDetails() {
               src={kurs.gorsel} 
               alt={kurs.baslik} 
               className="w-full h-full object-cover"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = 'https://via.placeholder.com/800x600?text=Dans+Kursu';
+              onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                const target = e.currentTarget;
+                target.onerror = null;
+                target.src = 'https://via.placeholder.com/800x600?text=Dans+Kursu';
               }}
             />
           </div>
@@ -114,9 +154,10 @@ function ClassDetails() {
                 src={egitmen.gorsel} 
                 alt={egitmen.ad} 
                 className="w-16 h-16 rounded-full object-cover mr-4"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = 'https://via.placeholder.com/150?text=Eğitmen';
+                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                  const target = e.currentTarget;
+                  target.onerror = null;
+                  target.src = 'https://via.placeholder.com/150?text=Eğitmen';
                 }}
               />
               <div>
@@ -137,9 +178,10 @@ function ClassDetails() {
                 src={okul.gorsel} 
                 alt={okul.ad} 
                 className="w-20 h-20 object-cover mr-4 rounded-md"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = 'https://via.placeholder.com/150?text=Dans+Okulu';
+                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                  const target = e.currentTarget;
+                  target.onerror = null;
+                  target.src = 'https://via.placeholder.com/150?text=Dans+Okulu';
                 }}
               />
               <div>
@@ -194,9 +236,10 @@ function ClassDetails() {
                   src={benzerKurs.gorsel} 
                   alt={benzerKurs.baslik} 
                   className="w-full h-48 object-cover"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = 'https://via.placeholder.com/400x250?text=Dans+Kursu';
+                  onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                    const target = e.currentTarget;
+                    target.onerror = null;
+                    target.src = 'https://via.placeholder.com/400x250?text=Dans+Kursu';
                   }}
                 />
                 <div className="p-4">
@@ -220,4 +263,4 @@ function ClassDetails() {
   );
 }
 
-export default ClassDetails;
+export default ClassDetails; 

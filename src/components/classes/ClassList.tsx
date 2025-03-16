@@ -1,13 +1,34 @@
-// src/components/classes/ClassList.jsx
 import React, { useState, useEffect } from 'react';
 import ClassCard from './ClassCard';
 import { dansKurslari } from '../../data/dansVerileri';
 import SearchFilters from '../search/SearchFilters';
 
-function ClassList() {
-  const [kurslar, setKurslar] = useState([]);
-  const [filteredKurslar, setFilteredKurslar] = useState([]);
-  const [loading, setLoading] = useState(true);
+// Tip tanımlamaları
+interface Kurs {
+  id: number;
+  baslik: string;
+  aciklama: string;
+  seviye: string;
+  fiyat: string;
+  egitmen_id: number;
+  okul_id: number;
+  gorsel: string;
+  gun: string;
+  saat: string;
+  kapasite: number;
+  süre: string;
+}
+
+interface FiltersType {
+  seviye?: string;
+  fiyatAralik?: string;
+  arama?: string;
+}
+
+function ClassList(): JSX.Element {
+  const [kurslar, setKurslar] = useState<Kurs[]>([]);
+  const [filteredKurslar, setFilteredKurslar] = useState<Kurs[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     // Gerçek uygulamada bu verileri bir API'dan çekerdiniz
@@ -16,12 +37,12 @@ function ClassList() {
     setLoading(false);
   }, []);
 
-  const handleFilterChange = (filters) => {
+  const handleFilterChange = (filters: FiltersType): void => {
     let filtered = [...kurslar];
 
     // Seviye filtresi
     if (filters.seviye && filters.seviye !== 'Tümü') {
-      filtered = filtered.filter(kurs => kurs.seviye.includes(filters.seviye));
+      filtered = filtered.filter(kurs => kurs.seviye.includes(filters.seviye as string));
     }
 
     // Fiyat aralığı filtresi
@@ -76,4 +97,4 @@ function ClassList() {
   );
 }
 
-export default ClassList;
+export default ClassList; 
