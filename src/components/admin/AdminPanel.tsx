@@ -1,10 +1,11 @@
-// src/components/admin/AdminPanel.jsx
 import React, { useState } from 'react';
 import SchoolManagement from './SchoolManagement';
 import InstructorManagement from './InstructorManagement';
 
-function AdminPanel() {
-  const [activeTab, setActiveTab] = useState('okullar');
+type TabType = 'okullar' | 'egitmenler' | 'kurslar' | 'kullanicilar';
+
+function AdminPanel(): JSX.Element {
+  const [activeTab, setActiveTab] = useState<TabType>('okullar');
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -87,4 +88,4 @@ function AdminPanel() {
   );
 }
 
-export default AdminPanel;
+export default AdminPanel; 

@@ -1,13 +1,32 @@
-// src/components/admin/SchoolManagement.jsx
 import React, { useState, useEffect } from 'react';
 import { dansOkullari } from '../../data/dansVerileri';
 
-function SchoolManagement() {
-  const [okullar, setOkullar] = useState([]);
-  const [duzenlemeModu, setDuzenlemeModu] = useState(false);
-  const [seciliOkul, setSeciliOkul] = useState(null);
-  const [aramaTerimi, setAramaTerimi] = useState('');
-  const [formVeri, setFormVeri] = useState({
+// Tip tanımlamaları
+interface Okul {
+  id: number;
+  ad: string;
+  aciklama: string;
+  konum: string;
+  iletisim: string;
+  telefon: string;
+  gorsel: string;
+}
+
+interface FormData {
+  ad: string;
+  aciklama: string;
+  konum: string;
+  iletisim: string;
+  telefon: string;
+  gorsel: string;
+}
+
+function SchoolManagement(): JSX.Element {
+  const [okullar, setOkullar] = useState<Okul[]>([]);
+  const [duzenlemeModu, setDuzenlemeModu] = useState<boolean>(false);
+  const [seciliOkul, setSeciliOkul] = useState<Okul | null>(null);
+  const [aramaTerimi, setAramaTerimi] = useState<string>('');
+  const [formVeri, setFormVeri] = useState<FormData>({
     ad: '',
     aciklama: '',
     konum: '',
@@ -23,7 +42,7 @@ function SchoolManagement() {
   }, []);
 
   // Okul düzenleme
-  const okulDuzenle = (okul) => {
+  const okulDuzenle = (okul: Okul): void => {
     setSeciliOkul(okul);
     setFormVeri({
       ad: okul.ad,
@@ -37,7 +56,7 @@ function SchoolManagement() {
   };
 
   // Yeni okul ekleme
-  const yeniOkulEkle = () => {
+  const yeniOkulEkle = (): void => {
     setSeciliOkul(null);
     setFormVeri({
       ad: '',
@@ -51,7 +70,7 @@ function SchoolManagement() {
   };
 
   // Form alanı değişikliği
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
     const { name, value } = e.target;
     setFormVeri(prev => ({
       ...prev,
@@ -60,7 +79,7 @@ function SchoolManagement() {
   };
 
   // Form gönderimi
-  const formGonder = (e) => {
+  const formGonder = (e: React.FormEvent): void => {
     e.preventDefault();
     
     if (seciliOkul) {
@@ -72,7 +91,7 @@ function SchoolManagement() {
       // Gerçek uygulamada burada Firebase/Supabase güncelleme olurdu
     } else {
       // Yeni okul ekle
-      const yeniOkul = {
+      const yeniOkul: Okul = {
         ...formVeri,
         id: okullar.length > 0 ? Math.max(...okullar.map(o => o.id)) + 1 : 1
       };
@@ -86,7 +105,7 @@ function SchoolManagement() {
   };
 
   // Okul silme
-  const okulSil = (id) => {
+  const okulSil = (id: number): void => {
     if (window.confirm('Bu okulu silmek istediğinizden emin misiniz?')) {
       const filtrelenmisOkullar = okullar.filter(okul => okul.id !== id);
       setOkullar(filtrelenmisOkullar);
@@ -187,7 +206,7 @@ function SchoolManagement() {
                 <textarea
                   id="aciklama"
                   name="aciklama"
-                  rows="3"
+                  rows={3}
                   value={formVeri.aciklama}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
@@ -267,9 +286,10 @@ function SchoolManagement() {
                               className="h-10 w-10 rounded-full object-cover" 
                               src={okul.gorsel}
                               alt={okul.ad}
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.src = 'https://via.placeholder.com/40?text=Okul';
+                              onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                const target = e.currentTarget;
+                                target.onerror = null;
+                                target.src = 'https://via.placeholder.com/40?text=Okul';
                               }}
                             />
                           </div>
@@ -303,7 +323,7 @@ function SchoolManagement() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
+                    <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
                       {aramaTerimi ? 'Aramanıza uygun okul bulunamadı.' : 'Henüz hiç okul kaydı bulunmamaktadır.'}
                     </td>
                   </tr>
@@ -317,4 +337,4 @@ function SchoolManagement() {
   );
 }
 
-export default SchoolManagement;
+export default SchoolManagement; 

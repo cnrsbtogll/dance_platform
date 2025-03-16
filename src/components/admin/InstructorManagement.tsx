@@ -1,13 +1,42 @@
-// src/components/admin/InstructorManagement.jsx
 import React, { useState, useEffect } from 'react';
 import { dansEgitmenleri, dansOkullari } from '../../data/dansVerileri';
 
-function InstructorManagement() {
-  const [egitmenler, setEgitmenler] = useState([]);
-  const [duzenlemeModu, setDuzenlemeModu] = useState(false);
-  const [seciliEgitmen, setSeciliEgitmen] = useState(null);
-  const [aramaTerimi, setAramaTerimi] = useState('');
-  const [formVeri, setFormVeri] = useState({
+// Tip tanımlamaları
+interface Egitmen {
+  id: number;
+  ad: string;
+  uzmanlık: string;
+  tecrube: string;
+  biyografi: string;
+  okul_id: number;
+  gorsel: string;
+}
+
+interface Okul {
+  id: number;
+  ad: string;
+  konum: string;
+  aciklama: string;
+  iletisim: string;
+  telefon: string;
+  gorsel: string;
+}
+
+interface FormData {
+  ad: string;
+  uzmanlık: string;
+  tecrube: string;
+  biyografi: string;
+  okul_id: number | string;
+  gorsel: string;
+}
+
+function InstructorManagement(): JSX.Element {
+  const [egitmenler, setEgitmenler] = useState<Egitmen[]>([]);
+  const [duzenlemeModu, setDuzenlemeModu] = useState<boolean>(false);
+  const [seciliEgitmen, setSeciliEgitmen] = useState<Egitmen | null>(null);
+  const [aramaTerimi, setAramaTerimi] = useState<string>('');
+  const [formVeri, setFormVeri] = useState<FormData>({
     ad: '',
     uzmanlık: '',
     tecrube: '',
@@ -23,7 +52,7 @@ function InstructorManagement() {
   }, []);
 
   // Eğitmen düzenleme
-  const egitmenDuzenle = (egitmen) => {
+  const egitmenDuzenle = (egitmen: Egitmen): void => {
     setSeciliEgitmen(egitmen);
     setFormVeri({
       ad: egitmen.ad,
@@ -37,7 +66,7 @@ function InstructorManagement() {
   };
 
   // Yeni eğitmen ekleme
-  const yeniEgitmenEkle = () => {
+  const yeniEgitmenEkle = (): void => {
     setSeciliEgitmen(null);
     setFormVeri({
       ad: '',
@@ -51,7 +80,7 @@ function InstructorManagement() {
   };
 
   // Form alanı değişikliği
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>): void => {
     const { name, value } = e.target;
     setFormVeri(prev => ({
       ...prev,
@@ -60,22 +89,28 @@ function InstructorManagement() {
   };
 
   // Form gönderimi
-  const formGonder = (e) => {
+  const formGonder = (e: React.FormEvent): void => {
     e.preventDefault();
     
     if (seciliEgitmen) {
       // Mevcut eğitmeni güncelle
       const guncellenenEgitmenler = egitmenler.map(egitmen => 
-        egitmen.id === seciliEgitmen.id ? { ...egitmen, ...formVeri } : egitmen
+        egitmen.id === seciliEgitmen.id ? { 
+          ...egitmen, 
+          ...formVeri,
+          okul_id: typeof formVeri.okul_id === 'string' ? parseInt(formVeri.okul_id) : formVeri.okul_id
+        } : egitmen
       );
       setEgitmenler(guncellenenEgitmenler);
       // Gerçek uygulamada burada Firebase/Supabase güncelleme olurdu
     } else {
       // Yeni eğitmen ekle
-      const yeniEgitmen = {
+      const yeniEgitmen: Egitmen = {
         ...formVeri,
-        id: egitmenler.length > 0 ? Math.max(...egitmenler.map(e => e.id)) + 1 : 1
-      };
+        id: egitmenler.length > 0 ? Math.max(...egitmenler.map(e => e.id)) + 1 : 1,
+        okul_id: typeof formVeri.okul_id === 'string' ? parseInt(formVeri.okul_id) : formVeri.okul_id
+      } as Egitmen;
+      
       setEgitmenler([...egitmenler, yeniEgitmen]);
       // Gerçek uygulamada burada Firebase/Supabase ekleme olurdu
     }
@@ -86,7 +121,7 @@ function InstructorManagement() {
   };
 
   // Eğitmen silme
-  const egitmenSil = (id) => {
+  const egitmenSil = (id: number): void => {
     if (window.confirm('Bu eğitmeni silmek istediğinizden emin misiniz?')) {
       const filtrelenmisEgitmenler = egitmenler.filter(egitmen => egitmen.id !== id);
       setEgitmenler(filtrelenmisEgitmenler);
@@ -101,7 +136,7 @@ function InstructorManagement() {
   );
 
   // Okul adını ID'ye göre getir
-  const getOkulAdi = (okul_id) => {
+  const getOkulAdi = (okul_id: number): string => {
     const okul = dansOkullari.find(okul => okul.id === okul_id);
     return okul ? okul.ad : 'Bilinmeyen Okul';
   };
@@ -200,7 +235,7 @@ function InstructorManagement() {
                 <textarea
                   id="biyografi"
                   name="biyografi"
-                  rows="4"
+                  rows={4}
                   value={formVeri.biyografi}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
@@ -283,9 +318,10 @@ function InstructorManagement() {
                               className="h-10 w-10 rounded-full object-cover" 
                               src={egitmen.gorsel}
                               alt={egitmen.ad}
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.src = 'https://via.placeholder.com/40?text=Eğitmen';
+                              onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                const target = e.currentTarget;
+                                target.onerror = null;
+                                target.src = 'https://via.placeholder.com/40?text=Eğitmen';
                               }}
                             />
                           </div>
@@ -321,7 +357,7 @@ function InstructorManagement() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
+                    <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
                       {aramaTerimi ? 'Aramanıza uygun eğitmen bulunamadı.' : 'Henüz hiç eğitmen kaydı bulunmamaktadır.'}
                     </td>
                   </tr>
@@ -335,4 +371,4 @@ function InstructorManagement() {
   );
 }
 
-export default InstructorManagement;
+export default InstructorManagement; 
