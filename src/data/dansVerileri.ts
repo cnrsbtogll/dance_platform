@@ -1,5 +1,57 @@
-// src/data/dansVerileri.js
-const dansOkullari = [
+// src/data/dansVerileri.ts
+
+// Tip tanımlamaları
+interface DansOkulu {
+  id: number;
+  ad: string;
+  aciklama: string;
+  konum: string;
+  iletisim: string;
+  telefon: string;
+  gorsel: string;
+}
+
+interface DansEgitmeni {
+  id: number;
+  ad: string;
+  uzmanlık: string;
+  tecrube: string;
+  biyografi: string;
+  okul_id: number;
+  gorsel: string;
+}
+
+interface DansKursu {
+  id: number;
+  baslik: string;
+  aciklama: string;
+  seviye: string;
+  süre: string;
+  fiyat: string;
+  kapasite: number;
+  gun: string;
+  saat: string;
+  egitmen_id: number;
+  okul_id: number;
+  gorsel: string;
+}
+
+interface DansRozeti {
+  id: number;
+  ad: string;
+  aciklama: string;
+  seviye: number;
+  gorsel: string;
+}
+
+interface DansTip {
+  id: number;
+  baslik: string;
+  aciklama: string;
+}
+
+// Dansçı verisi objesi
+const dansOkullari: DansOkulu[] = [
   {
     id: 1,
     ad: "Salsa Ankara Dans Akademi",
@@ -47,7 +99,7 @@ const dansOkullari = [
   }
 ];
 
-const dansEgitmenleri = [
+const dansEgitmenleri: DansEgitmeni[] = [
   {
     id: 1,
     ad: "Seçil & Yunus",
@@ -113,7 +165,7 @@ const dansEgitmenleri = [
   }
 ];
 
-const dansKurslari = [
+const dansKurslari: DansKursu[] = [
   {
     id: 1,
     baslik: "Başlangıç Seviye Salsa",
@@ -270,7 +322,7 @@ const dansKurslari = [
   }
 ];
 
-const dansRozet = [
+const dansRozet: DansRozeti[] = [
   {
     id: 1,
     ad: "Dans Başlangıç",
@@ -308,7 +360,7 @@ const dansRozet = [
   }
 ];
 
-const danceTips = [
+const danceTips: DansTip[] = [
   {
     id: 1,
     baslik: "Doğru Dans Ayakkabısı Seçimi",
@@ -336,4 +388,4 @@ const danceTips = [
   }
 ];
 
-export { dansOkullari, dansEgitmenleri, dansKurslari, dansRozet, danceTips };
+export { dansOkullari, dansEgitmenleri, dansKurslari, dansRozet, danceTips }; 

@@ -1,9 +1,17 @@
-// src/api/calendar.js
 import { google } from 'googleapis';
 
 const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 
-export const addClassToCalendar = async (classDetails) => {
+interface ClassDetails {
+  title: string;
+  description?: string;
+  startTime: string | Date;
+  endTime: string | Date;
+  location?: string;
+  attendees?: string[];
+}
+
+export const addClassToCalendar = async (classDetails: ClassDetails): Promise<any> => {
   try {
     const response = await fetch('/api/calendar', {
       method: 'POST',
@@ -22,4 +30,4 @@ export const addClassToCalendar = async (classDetails) => {
     console.error('Calendar API Error:', error);
     throw error;
   }
-};
+}; 
