@@ -1,10 +1,39 @@
-// src/components/progress/BadgeSystem.jsx
 import React, { useState, useEffect } from 'react';
 import { dansRozet } from '../../data/dansVerileri';
 
-function BadgeSystem() {
+// Tip tanımlamaları
+interface UserProgress {
+  tamamlananKurslar: number;
+  tamamlananDersler: number;
+  toplamDansSuresi: number; // saat
+  kazanilanRozetler: number[]; // rozet id'leri
+  ilerlemeYuzdesi: number;
+  seviye: number;
+  puanlar: number;
+}
+
+interface Rozet {
+  id: number;
+  ad: string;
+  aciklama: string;
+  gorsel: string;
+  seviye: number;
+}
+
+interface IlerlemeBarProps {
+  yuzde: number;
+  etiket: string;
+  renk?: string;
+}
+
+interface RozetKartiProps {
+  rozet: Rozet;
+  kazanildi?: boolean;
+}
+
+function BadgeSystem(): JSX.Element {
   // Kullanıcı ilerleme durumu (gerçek uygulamada bu Firebase/Supabase'den gelirdi)
-  const [userProgress, setUserProgress] = useState({
+  const [userProgress, setUserProgress] = useState<UserProgress>({
     tamamlananKurslar: 3,
     tamamlananDersler: 24,
     toplamDansSuresi: 36, // saat
@@ -15,8 +44,8 @@ function BadgeSystem() {
   });
 
   // Tüm rozetler
-  const [rozetler, setRozetler] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [rozetler, setRozetler] = useState<Rozet[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   
   useEffect(() => {
     // Gerçek uygulamada bu API'dan çekilirdi
@@ -25,7 +54,7 @@ function BadgeSystem() {
   }, []);
 
   // İlerleme çubuğu bileşeni
-  const IlerlemeBar = ({ yuzde, etiket, renk = 'indigo' }) => (
+  const IlerlemeBar: React.FC<IlerlemeBarProps> = ({ yuzde, etiket, renk = 'indigo' }) => (
     <div className="mt-4 mb-2">
       <div className="flex justify-between items-center">
         <span className="text-sm font-medium text-gray-700">{etiket}</span>
@@ -41,7 +70,7 @@ function BadgeSystem() {
   );
 
   // Rozet kartı bileşeni
-  const RozetKarti = ({ rozet, kazanildi = false }) => (
+  const RozetKarti: React.FC<RozetKartiProps> = ({ rozet, kazanildi = false }) => (
     <div 
       className={`bg-white border rounded-lg p-4 flex flex-col items-center ${kazanildi ? 'border-green-500 shadow-md' : 'border-gray-300 opacity-70'}`}
     >
@@ -50,9 +79,10 @@ function BadgeSystem() {
           src={rozet.gorsel} 
           alt={rozet.ad} 
           className="w-full h-full object-contain"
-          onError={(e) => {
-            e.target.onerror = null;
-            e.target.src = 'https://via.placeholder.com/150?text=Rozet';
+          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+            const target = e.currentTarget;
+            target.onerror = null;
+            target.src = 'https://via.placeholder.com/150?text=Rozet';
           }}
         />
         {kazanildi && (
@@ -186,4 +216,4 @@ function BadgeSystem() {
   );
 }
 
-export default BadgeSystem;
+export default BadgeSystem; 
