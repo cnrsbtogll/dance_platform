@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { dansOkullari } from '../../data/dansVerileri';
+// import { dansOkullari } from '../../data/dansVerileri'; // Artık buna ihtiyacımız yok
 import { 
   collection, 
   getDocs, 
@@ -29,19 +29,19 @@ interface Egitmen {
   uzmanlık: string;
   tecrube: string;
   biyografi: string;
-  okul_id: number;
+  okul_id: string; // Firestore'dan gelen okul ID'leri string olacak
   gorsel: string;
-  userId?: string;
+  userId?: string | null; // null olabilir
   email?: string;
   displayName?: string;
   phoneNumber?: string;
-  createdBy?: string;
+  createdBy?: string | null; // null olabilir
   createdAt?: any;
   updatedAt?: any;
 }
 
 interface Okul {
-  id: number;
+  id: string; // Firestore document ID'si string olacak
   ad: string;
   konum: string;
   aciklama: string;
@@ -62,7 +62,7 @@ interface FormData {
   uzmanlık: string;
   tecrube: string;
   biyografi: string;
-  okul_id: number | string;
+  okul_id: string;
   gorsel: string;
   email?: string;
   phoneNumber?: string;
@@ -72,6 +72,7 @@ interface FormData {
 
 function InstructorManagement(): JSX.Element {
   const [egitmenler, setEgitmenler] = useState<Egitmen[]>([]);
+  const [dansOkullari, setDansOkullari] = useState<Okul[]>([]); // Okulları depolamak için state ekliyoruz
   const [duzenlemeModu, setDuzenlemeModu] = useState<boolean>(false);
   const [seciliEgitmen, setSeciliEgitmen] = useState<Egitmen | null>(null);
   const [aramaTerimi, setAramaTerimi] = useState<string>('');
@@ -85,7 +86,7 @@ function InstructorManagement(): JSX.Element {
     email: '',
     phoneNumber: '',
     password: '',
-    createAccount: false
+    createAccount: true // Varsayılan olarak hesap oluşturma aktif
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -200,6 +201,32 @@ function InstructorManagement(): JSX.Element {
     }
   };
 
+  // Dans okullarını Firestore'dan çek
+  useEffect(() => {
+    const fetchDansOkullari = async () => {
+      try {
+        const okullarRef = collection(db, 'dansOkullari');
+        const q = query(okullarRef, orderBy('ad'));
+        const querySnapshot = await getDocs(q);
+        
+        const okullarData: Okul[] = [];
+        querySnapshot.forEach((doc) => {
+          okullarData.push({
+            id: doc.id,
+            ...doc.data()
+          } as Okul);
+        });
+        
+        setDansOkullari(okullarData);
+      } catch (err) {
+        console.error('Dans okulları yüklenirken hata oluştu:', err);
+        setError('Dans okulları yüklenirken bir hata oluştu.');
+      }
+    };
+    
+    fetchDansOkullari();
+  }, []);
+
   // Eğitmen düzenleme
   const egitmenDuzenle = (egitmen: Egitmen): void => {
     setSeciliEgitmen(egitmen);
@@ -231,7 +258,7 @@ function InstructorManagement(): JSX.Element {
       email: '',
       phoneNumber: '',
       password: '',
-      createAccount: isSuperAdmin // Süper admin ise varsayılan olarak hesap oluşturma aktif
+      createAccount: true // Her zaman hesap oluşturulmalı
     });
     setDuzenlemeModu(true);
   };
@@ -261,9 +288,8 @@ function InstructorManagement(): JSX.Element {
     setError(null);
     setSuccess(null);
     
-    const okul_id = typeof formVeri.okul_id === 'string' 
-      ? parseInt(formVeri.okul_id) 
-      : formVeri.okul_id;
+    // parseInt'a gerek yok çünkü okul_id artık string
+    const okul_id = formVeri.okul_id;
     
     try {
       if (seciliEgitmen) {
@@ -300,10 +326,15 @@ function InstructorManagement(): JSX.Element {
         setSuccess('Eğitmen bilgileri başarıyla güncellendi.');
         
       } else {
-        // Süper admin ve kullanıcı hesabı oluşturma seçeneği işaretliyse
+        // Kullanıcı hesabı oluşturma kısmı (artık her zaman yapılacak)
         let userId = '';
+        let geciciSifre = '';
         
-        if (isSuperAdmin && formVeri.createAccount && formVeri.email && formVeri.password) {
+        if (formVeri.createAccount && formVeri.email) {
+          if (!formVeri.email) {
+            throw new Error('Eğitmen hesabı oluşturmak için geçerli bir e-posta adresi gereklidir.');
+          }
+          
           // Email'in zaten kullanılıp kullanılmadığını kontrol et
           const usersRef = collection(db, 'users');
           const emailQuery = query(usersRef, where('email', '==', formVeri.email));
@@ -313,18 +344,22 @@ function InstructorManagement(): JSX.Element {
             throw new Error('Bu e-posta adresi zaten kullanılıyor.');
           }
           
+          // Geçici şifre oluştur - eğitmen ismine göre basit bir şifre
+          geciciSifre = formVeri.password || `${formVeri.ad.replace(/\s+/g, '').toLowerCase()}${new Date().getFullYear()}`;
+          
           // Firebase Auth ile yeni kullanıcı oluştur
           const userCredential = await createUserWithEmailAndPassword(
             auth, 
             formVeri.email, 
-            formVeri.password
+            geciciSifre
           );
           
           userId = userCredential.user.uid;
           
           // Kullanıcı profilini güncelle
           await updateProfile(userCredential.user, {
-            displayName: formVeri.ad
+            displayName: formVeri.ad,
+            photoURL: formVeri.gorsel || null
           });
           
           // E-posta doğrulama gönder
@@ -337,8 +372,11 @@ function InstructorManagement(): JSX.Element {
             displayName: formVeri.ad,
             phoneNumber: formVeri.phoneNumber || '',
             role: ['instructor'], // Eğitmen rolü ekle
+            level: 'advanced', // Eğitmenler için varsayılan seviye 
+            photoURL: formVeri.gorsel || '',
             createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
+            updatedAt: serverTimestamp(),
+            schoolId: okul_id // Eğitmenin bağlı olduğu okul
           });
         }
         
@@ -363,11 +401,24 @@ function InstructorManagement(): JSX.Element {
         // State'i güncelle
         const yeniEgitmen: Egitmen = {
           id: docRef.id,
-          ...newInstructorData
-        } as Egitmen;
+          ...newInstructorData,
+          okul_id: okul_id // Tip hatası için açıkça string olarak belirtiyoruz
+        };
         
         setEgitmenler([yeniEgitmen, ...egitmenler]);
-        setSuccess('Yeni eğitmen başarıyla eklendi' + (userId ? ' ve kullanıcı hesabı oluşturuldu.' : '.'));
+        
+        // Başarı mesajı
+        if (userId) {
+          setSuccess(
+            `Yeni eğitmen ve hesabı başarıyla oluşturuldu!\n\n` +
+            `Eğitmen Giriş Bilgileri:\n` +
+            `E-posta: ${formVeri.email}\n` +
+            `Geçici Şifre: ${geciciSifre}\n\n` +
+            `ÖNEMLİ: Lütfen bu şifreyi not alın, daha sonra görüntüleyemeyeceksiniz.`
+          );
+        } else {
+          setSuccess('Yeni eğitmen başarıyla eklendi.');
+        }
       }
       
       // Formu kapat
@@ -404,17 +455,17 @@ function InstructorManagement(): JSX.Element {
     }
   };
 
-  // Arama sonuçları
-  const filtrelenmisEgitmenler = egitmenler.filter(egitmen => 
-    egitmen.ad.toLowerCase().includes(aramaTerimi.toLowerCase()) ||
-    egitmen.uzmanlık.toLowerCase().includes(aramaTerimi.toLowerCase())
-  );
-
   // Okul adını ID'ye göre getir
-  const getOkulAdi = (okul_id: number): string => {
+  const getOkulAdi = (okul_id: string): string => {
     const okul = dansOkullari.find(okul => okul.id === okul_id);
     return okul ? okul.ad : 'Bilinmeyen Okul';
   };
+  
+  // Filtrelenmiş eğitmenler
+  const filtrelenmisEgitmenler = egitmenler.filter(egitmen => 
+    egitmen.ad.toLowerCase().includes(aramaTerimi.toLowerCase()) ||
+    getOkulAdi(egitmen.okul_id).toLowerCase().includes(aramaTerimi.toLowerCase())
+  );
 
   if (loading && egitmenler.length === 0) {
     return (
@@ -435,7 +486,7 @@ function InstructorManagement(): JSX.Element {
       )}
       
       {success && (
-        <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4" role="alert">
+        <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4 whitespace-pre-line" role="alert">
           <p>{success}</p>
         </div>
       )}
@@ -530,84 +581,87 @@ function InstructorManagement(): JSX.Element {
                     <option key={okul.id} value={okul.id}>{okul.ad}</option>
                   ))}
                 </select>
+                {dansOkullari.length === 0 && (
+                  <p className="mt-1 text-xs text-red-500">
+                    Henüz hiç dans okulu bulunmamaktadır. Önce dans okulu eklemelisiniz.
+                  </p>
+                )}
               </div>
               
-              {/* Süper Admin ise e-posta ve telefon alanları */}
-              {isSuperAdmin && (
-                <>
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                      E-posta {!seciliEgitmen && formVeri.createAccount && '*'}
-                    </label>
+              {/* E-posta ve şifre alanları - tüm kullanıcılar görür */}
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                  E-posta {!seciliEgitmen && formVeri.createAccount && '*'}
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  required={!seciliEgitmen && formVeri.createAccount}
+                  value={formVeri.email}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border border-gray-300 rounded-md"
+                />
+                {!seciliEgitmen && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Bu e-posta adresi, eğitmen için otomatik olarak oluşturulacak kullanıcı hesabı için kullanılacaktır.
+                  </p>
+                )}
+              </div>
+              
+              <div>
+                <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
+                  Telefon
+                </label>
+                <input
+                  type="text"
+                  id="phoneNumber"
+                  name="phoneNumber"
+                  value={formVeri.phoneNumber}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border border-gray-300 rounded-md"
+                />
+              </div>
+              
+              {!seciliEgitmen && (
+                <div className="md:col-span-2">
+                  <div className="flex items-center mb-2">
                     <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      required={!seciliEgitmen && formVeri.createAccount}
-                      value={formVeri.email}
+                      type="checkbox"
+                      id="createAccount"
+                      name="createAccount"
+                      checked={formVeri.createAccount}
                       onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 rounded-md"
+                      className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                     />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
-                      Telefon
+                    <label htmlFor="createAccount" className="ml-2 block text-sm text-gray-700">
+                      Eğitmen için giriş yapabilen kullanıcı hesabı oluştur
                     </label>
-                    <input
-                      type="text"
-                      id="phoneNumber"
-                      name="phoneNumber"
-                      value={formVeri.phoneNumber}
-                      onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
                   </div>
+                  <p className="text-xs text-gray-500">
+                    Bu seçenek işaretlendiğinde, eğitmen için otomatik olarak bir kullanıcı hesabı oluşturulur ve "instructor" rolü atanır.
+                  </p>
                   
-                  {/* Kullanıcı hesabı oluşturma seçeneği */}
-                  {!seciliEgitmen && (
-                    <div className="md:col-span-2">
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="createAccount"
-                          name="createAccount"
-                          checked={formVeri.createAccount}
-                          onChange={handleInputChange}
-                          className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
-                        />
-                        <label htmlFor="createAccount" className="ml-2 block text-sm text-gray-700">
-                          Eğitmen için kullanıcı hesabı oluştur
-                        </label>
-                      </div>
-                      <p className="mt-1 text-xs text-gray-500">
-                        Bu seçeneği işaretlerseniz, eğitmen için otomatik olarak kullanıcı hesabı oluşturulacak ve eğitmen rolü atanacaktır.
-                      </p>
-                    </div>
-                  )}
-                  
-                  {/* Şifre alanı - hesap oluşturma işaretliyse */}
-                  {!seciliEgitmen && formVeri.createAccount && (
-                    <div className="md:col-span-2">
+                  {formVeri.createAccount && (
+                    <div className="mt-3">
                       <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                        Şifre*
+                        Şifre
                       </label>
                       <input
                         type="password"
                         id="password"
                         name="password"
-                        required
                         value={formVeri.password}
                         onChange={handleInputChange}
                         className="w-full p-2 border border-gray-300 rounded-md"
-                        minLength={6}
+                        placeholder="Boş bırakırsanız otomatik şifre oluşturulur"
                       />
                       <p className="mt-1 text-xs text-gray-500">
-                        Şifre en az 6 karakter uzunluğunda olmalıdır.
+                        Şifre belirtilmezse, eğitmenin adına göre otomatik bir şifre oluşturulacaktır.
                       </p>
                     </div>
                   )}
-                </>
+                </div>
               )}
               
               <div className="md:col-span-2">
@@ -706,11 +760,6 @@ function InstructorManagement(): JSX.Element {
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Tecrübe
                   </th>
-                  {isSuperAdmin && (
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Kullanıcı
-                    </th>
-                  )}
                   <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     İşlemler
                   </th>
@@ -754,19 +803,6 @@ function InstructorManagement(): JSX.Element {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">{egitmen.tecrube}</div>
                       </td>
-                      {isSuperAdmin && (
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {egitmen.userId ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              Hesap Var
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                              Hesap Yok
-                            </span>
-                          )}
-                        </td>
-                      )}
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
                           onClick={() => egitmenDuzenle(egitmen)}
@@ -785,7 +821,7 @@ function InstructorManagement(): JSX.Element {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={isSuperAdmin ? 6 : 5} className="px-6 py-4 text-center text-sm text-gray-500">
+                    <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
                       {aramaTerimi ? 'Aramanıza uygun eğitmen bulunamadı.' : 'Henüz hiç eğitmen kaydı bulunmuyor.'}
                     </td>
                   </tr>
