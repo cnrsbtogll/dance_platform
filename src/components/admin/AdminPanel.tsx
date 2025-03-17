@@ -10,7 +10,7 @@ import { db } from '../../config/firebase';
 import { User } from '../../types';
 import { motion } from 'framer-motion';
 
-type TabType = 'okullar' | 'egitmenler' | 'egitmen-talepleri' | 'kurslar' | 'ogrenciler' | 'dans-stilleri' | 'ornek-veri';
+type TabType = 'okullar' | 'egitmenler' | 'egitmen-talepleri' | 'kurslar' | 'ogrenciler' | 'dans-stilleri' | 'ornek-veri' | 'okul-basvurulari';
 
 interface AdminPanelProps {
   user?: User | null;
@@ -95,24 +95,14 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
               Eğitmenler
             </button>
             <button
-              onClick={() => setActiveTab('egitmen-talepleri')}
+              onClick={() => setActiveTab('ogrenciler')}
               className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
-                activeTab === 'egitmen-talepleri'
+                activeTab === 'ogrenciler'
                   ? 'border-indigo-500 text-indigo-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Eğitmen Talepleri
-            </button>
-            <button
-              onClick={() => setActiveTab('dans-stilleri')}
-              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
-                activeTab === 'dans-stilleri'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Dans Stilleri
+              Öğrenciler
             </button>
             <button
               onClick={() => setActiveTab('kurslar')}
@@ -125,14 +115,34 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
               Kurslar
             </button>
             <button
-              onClick={() => setActiveTab('ogrenciler')}
+              onClick={() => setActiveTab('egitmen-talepleri')}
               className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
-                activeTab === 'ogrenciler'
+                activeTab === 'egitmen-talepleri'
                   ? 'border-indigo-500 text-indigo-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Öğrenciler
+              Eğitmenlik Başvuruları
+            </button>
+            <button
+              onClick={() => setActiveTab('okul-basvurulari')}
+              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
+                activeTab === 'okul-basvurulari'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Okul Başvuruları
+            </button>
+            <button
+              onClick={() => setActiveTab('dans-stilleri')}
+              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
+                activeTab === 'dans-stilleri'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Dans Stilleri
             </button>
             {isSuperAdmin && (
               <button
@@ -152,15 +162,21 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
         <div className="p-6">
           {activeTab === 'okullar' && <SchoolManagement />}
           {activeTab === 'egitmenler' && <InstructorManagement />}
-          {activeTab === 'egitmen-talepleri' && <InstructorRequests />}
-          {activeTab === 'dans-stilleri' && <DanceStyleManagement />}
+          {activeTab === 'ogrenciler' && <StudentManagement />}
           {activeTab === 'kurslar' && (
             <div className="text-center py-4">
               <h2 className="text-xl font-semibold">Kurs Yönetimi</h2>
               <p className="text-gray-500 mt-2">Bu bölüm henüz yapım aşamasındadır.</p>
             </div>
           )}
-          {activeTab === 'ogrenciler' && <StudentManagement />}
+          {activeTab === 'egitmen-talepleri' && <InstructorRequests />}
+          {activeTab === 'okul-basvurulari' && (
+            <div className="text-center py-4">
+              <h2 className="text-xl font-semibold">Okul Başvuru Yönetimi</h2>
+              <p className="text-gray-500 mt-2">Bu bölüm henüz yapım aşamasındadır.</p>
+            </div>
+          )}
+          {activeTab === 'dans-stilleri' && <DanceStyleManagement />}
           {activeTab === 'ornek-veri' && isSuperAdmin && (
             <div>
               <h2 className="text-xl font-semibold mb-4">Örnek Veri Ekleme</h2>
