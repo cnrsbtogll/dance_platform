@@ -1,15 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { dansEgitmenleri, dansOkullari } from '../../data/dansVerileri';
+import { dansOkullari } from '../../data/dansVerileri';
+import { collection, getDocs, doc, deleteDoc, getDoc, updateDoc, addDoc, query, orderBy, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 
 // Tip tanımlamaları
 interface Egitmen {
-  id: number;
+  id: string;
   ad: string;
   uzmanlık: string;
   tecrube: string;
   biyografi: string;
   okul_id: number;
   gorsel: string;
+  userId?: string;
+  email?: string;
+  displayName?: string;
+  phoneNumber?: string;
+  createdBy?: string;
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 interface Okul {
@@ -29,6 +38,8 @@ interface FormData {
   biyografi: string;
   okul_id: number | string;
   gorsel: string;
+  email?: string;
+  phoneNumber?: string;
 }
 
 function InstructorManagement(): JSX.Element {
@@ -42,14 +53,44 @@ function InstructorManagement(): JSX.Element {
     tecrube: '',
     biyografi: '',
     okul_id: '',
-    gorsel: ''
+    gorsel: '',
+    email: '',
+    phoneNumber: ''
   });
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   // İlk yüklemede verileri çek
   useEffect(() => {
-    // Gerçekte bu veri Supabase/Firebase'den çekilirdi
-    setEgitmenler(dansEgitmenleri);
+    fetchInstructors();
   }, []);
+
+  const fetchInstructors = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Firestore'dan eğitmenleri çek
+      const instructorsRef = collection(db, 'instructors');
+      const q = query(instructorsRef, orderBy('createdAt', 'desc'));
+      const querySnapshot = await getDocs(q);
+      
+      const instructorsData: Egitmen[] = [];
+      querySnapshot.forEach((doc) => {
+        instructorsData.push({
+          id: doc.id,
+          ...doc.data()
+        } as Egitmen);
+      });
+      
+      setEgitmenler(instructorsData);
+      setLoading(false);
+    } catch (err) {
+      console.error('Eğitmenler getirilirken hata oluştu:', err);
+      setError('Eğitmenler yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
+      setLoading(false);
+    }
+  };
 
   // Eğitmen düzenleme
   const egitmenDuzenle = (egitmen: Egitmen): void => {
@@ -60,7 +101,9 @@ function InstructorManagement(): JSX.Element {
       tecrube: egitmen.tecrube,
       biyografi: egitmen.biyografi,
       okul_id: egitmen.okul_id,
-      gorsel: egitmen.gorsel
+      gorsel: egitmen.gorsel,
+      email: egitmen.email || '',
+      phoneNumber: egitmen.phoneNumber || ''
     });
     setDuzenlemeModu(true);
   };
@@ -74,7 +117,9 @@ function InstructorManagement(): JSX.Element {
       tecrube: '',
       biyografi: '',
       okul_id: '',
-      gorsel: '/assets/images/dance/egitmen_default.jpg'
+      gorsel: '/assets/images/dance/egitmen_default.jpg',
+      email: '',
+      phoneNumber: ''
     });
     setDuzenlemeModu(true);
   };
@@ -89,43 +134,91 @@ function InstructorManagement(): JSX.Element {
   };
 
   // Form gönderimi
-  const formGonder = (e: React.FormEvent): void => {
+  const formGonder = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     
-    if (seciliEgitmen) {
-      // Mevcut eğitmeni güncelle
-      const guncellenenEgitmenler = egitmenler.map(egitmen => 
-        egitmen.id === seciliEgitmen.id ? { 
-          ...egitmen, 
-          ...formVeri,
-          okul_id: typeof formVeri.okul_id === 'string' ? parseInt(formVeri.okul_id) : formVeri.okul_id
-        } : egitmen
-      );
-      setEgitmenler(guncellenenEgitmenler);
-      // Gerçek uygulamada burada Firebase/Supabase güncelleme olurdu
-    } else {
-      // Yeni eğitmen ekle
-      const yeniEgitmen: Egitmen = {
-        ...formVeri,
-        id: egitmenler.length > 0 ? Math.max(...egitmenler.map(e => e.id)) + 1 : 1,
-        okul_id: typeof formVeri.okul_id === 'string' ? parseInt(formVeri.okul_id) : formVeri.okul_id
-      } as Egitmen;
-      
-      setEgitmenler([...egitmenler, yeniEgitmen]);
-      // Gerçek uygulamada burada Firebase/Supabase ekleme olurdu
-    }
+    const okul_id = typeof formVeri.okul_id === 'string' 
+      ? parseInt(formVeri.okul_id) 
+      : formVeri.okul_id;
     
-    // Formu kapat
-    setDuzenlemeModu(false);
-    setSeciliEgitmen(null);
+    try {
+      if (seciliEgitmen) {
+        // Mevcut eğitmeni güncelle
+        const egitmenRef = doc(db, 'instructors', seciliEgitmen.id);
+        
+        await updateDoc(egitmenRef, {
+          ad: formVeri.ad,
+          uzmanlık: formVeri.uzmanlık,
+          tecrube: formVeri.tecrube,
+          biyografi: formVeri.biyografi,
+          okul_id: okul_id,
+          gorsel: formVeri.gorsel,
+          updatedAt: serverTimestamp()
+        });
+        
+        // State'i güncelle
+        const guncellenenEgitmenler = egitmenler.map(egitmen => 
+          egitmen.id === seciliEgitmen.id ? { 
+            ...egitmen, 
+            ad: formVeri.ad,
+            uzmanlık: formVeri.uzmanlık,
+            tecrube: formVeri.tecrube,
+            biyografi: formVeri.biyografi,
+            okul_id: okul_id,
+            gorsel: formVeri.gorsel
+          } : egitmen
+        );
+        setEgitmenler(guncellenenEgitmenler);
+        
+      } else {
+        // Yeni eğitmen ekle
+        const newInstructorData = {
+          ad: formVeri.ad,
+          uzmanlık: formVeri.uzmanlık,
+          tecrube: formVeri.tecrube,
+          biyografi: formVeri.biyografi,
+          okul_id: okul_id,
+          gorsel: formVeri.gorsel,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        };
+        
+        const docRef = await addDoc(collection(db, 'instructors'), newInstructorData);
+        
+        // State'i güncelle
+        const yeniEgitmen: Egitmen = {
+          id: docRef.id,
+          ...newInstructorData
+        } as Egitmen;
+        
+        setEgitmenler([yeniEgitmen, ...egitmenler]);
+      }
+      
+      // Formu kapat
+      setDuzenlemeModu(false);
+      setSeciliEgitmen(null);
+      
+    } catch (err) {
+      console.error('Eğitmen kaydedilirken hata oluştu:', err);
+      alert('Eğitmen kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.');
+    }
   };
 
   // Eğitmen silme
-  const egitmenSil = (id: number): void => {
+  const egitmenSil = async (id: string): Promise<void> => {
     if (window.confirm('Bu eğitmeni silmek istediğinizden emin misiniz?')) {
-      const filtrelenmisEgitmenler = egitmenler.filter(egitmen => egitmen.id !== id);
-      setEgitmenler(filtrelenmisEgitmenler);
-      // Gerçek uygulamada burada Firebase/Supabase silme olurdu
+      try {
+        // Firestore'dan sil
+        await deleteDoc(doc(db, 'instructors', id));
+        
+        // State'i güncelle
+        const filtrelenmisEgitmenler = egitmenler.filter(egitmen => egitmen.id !== id);
+        setEgitmenler(filtrelenmisEgitmenler);
+        
+      } catch (err) {
+        console.error('Eğitmen silinirken hata oluştu:', err);
+        alert('Eğitmen silinirken bir hata oluştu. Lütfen tekrar deneyin.');
+      }
     }
   };
 
@@ -140,6 +233,29 @@ function InstructorManagement(): JSX.Element {
     const okul = dansOkullari.find(okul => okul.id === okul_id);
     return okul ? okul.ad : 'Bilinmeyen Okul';
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+        <span className="ml-3 text-gray-700">Yükleniyor...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">
+        <p>{error}</p>
+        <button 
+          onClick={fetchInstructors} 
+          className="mt-2 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-4 rounded"
+        >
+          Yeniden Dene
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -253,80 +369,116 @@ function InstructorManagement(): JSX.Element {
                   value={formVeri.gorsel}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  placeholder="https://ornek.com/foto.jpg"
                 />
+                
+                {formVeri.gorsel && (
+                  <div className="mt-2">
+                    <img 
+                      src={formVeri.gorsel} 
+                      alt="Önizleme" 
+                      className="h-20 w-20 object-cover rounded-md"
+                      onError={(e) => { 
+                        (e.target as HTMLImageElement).src = "/assets/images/dance/egitmen_default.jpg";
+                      }} 
+                    />
+                  </div>
+                )}
               </div>
             </div>
             
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end space-x-3">
               <button
                 type="button"
                 onClick={() => setDuzenlemeModu(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
               >
                 İptal
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
               >
-                {seciliEgitmen ? 'Güncelle' : 'Ekle'}
+                {seciliEgitmen ? 'Güncelle' : 'Kaydet'}
               </button>
             </div>
           </form>
         </div>
       ) : (
         <>
-          <div className="mb-4">
+          <div className="mb-6">
             <input
               type="text"
-              placeholder="Eğitmen adı veya uzmanlık alanı ara..."
+              placeholder="İsim veya uzmanlık alanına göre ara..."
               value={aramaTerimi}
               onChange={(e) => setAramaTerimi(e.target.value)}
               className="w-full p-2 border border-gray-300 rounded-md"
             />
           </div>
           
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Eğitmen
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Uzmanlık
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tecrübe
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Okul
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    İşlemler
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filtrelenmisEgitmenler.length > 0 ? (
-                  filtrelenmisEgitmenler.map((egitmen) => (
-                    <tr key={egitmen.id} className="hover:bg-gray-50">
+          {filtrelenmisEgitmenler.length === 0 ? (
+            <div className="text-center py-8 bg-gray-50 rounded-lg">
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                className="h-12 w-12 mx-auto text-gray-400" 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                stroke="currentColor"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" 
+                />
+              </svg>
+              <p className="mt-2 text-gray-500">Eğitmen bulunamadı.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Eğitmen
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Uzmanlık
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Dans Okulu
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Tecrübe
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      İşlemler
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filtrelenmisEgitmenler.map((egitmen) => (
+                    <tr key={egitmen.id}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10">
                             <img 
                               className="h-10 w-10 rounded-full object-cover" 
-                              src={egitmen.gorsel}
-                              alt={egitmen.ad}
-                              onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                                const target = e.currentTarget;
-                                target.onerror = null;
-                                target.src = 'https://via.placeholder.com/40?text=Eğitmen';
+                              src={egitmen.gorsel} 
+                              alt={egitmen.ad} 
+                              onError={(e) => { 
+                                (e.target as HTMLImageElement).src = "/assets/images/dance/egitmen_default.jpg";
                               }}
                             />
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">{egitmen.ad}</div>
+                            {egitmen.email && (
+                              <div className="text-sm text-gray-500">{egitmen.email}</div>
+                            )}
+                            {egitmen.phoneNumber && (
+                              <div className="text-sm text-gray-500">Tel: {egitmen.phoneNumber}</div>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -334,19 +486,19 @@ function InstructorManagement(): JSX.Element {
                         <div className="text-sm text-gray-900">{egitmen.uzmanlık}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{egitmen.tecrube}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">{getOkulAdi(egitmen.okul_id)}</div>
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{egitmen.tecrube}</div>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button 
+                        <button
                           onClick={() => egitmenDuzenle(egitmen)}
-                          className="text-indigo-600 hover:text-indigo-900 mr-3"
+                          className="text-indigo-600 hover:text-indigo-900 mr-4"
                         >
                           Düzenle
                         </button>
-                        <button 
+                        <button
                           onClick={() => egitmenSil(egitmen.id)}
                           className="text-red-600 hover:text-red-900"
                         >
@@ -354,19 +506,21 @@ function InstructorManagement(): JSX.Element {
                         </button>
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
-                      {aramaTerimi ? 'Aramanıza uygun eğitmen bulunamadı.' : 'Henüz hiç eğitmen kaydı bulunmamaktadır.'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </>
       )}
+      
+      <div className="mt-8 bg-blue-50 p-4 rounded-md">
+        <h3 className="text-blue-800 font-semibold">İpucu</h3>
+        <p className="text-blue-700 text-sm mt-1">
+          Eğitmen fotoğrafları, öğrencilerin eğitmeni tanıması için önemli bir faktördür.
+          Yüksek kaliteli ve profesyonel fotoğraflar tercih edilmelidir.
+        </p>
+      </div>
     </div>
   );
 }

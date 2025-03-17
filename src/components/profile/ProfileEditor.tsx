@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { updateUserProfile } from '../../services/userService';
 import ProfilePhotoUploader from './ProfilePhotoUploader';
 import { DanceLevel, DanceStyle, User } from '../../types';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 
 interface ProfileEditorProps {
   user: User | null;
@@ -14,7 +16,12 @@ interface UserWithProfile extends User {
   bio?: string;
 }
 
-const danceStyleOptions: DanceStyle[] = ['salsa', 'bachata', 'kizomba', 'other'];
+// Define FirestoreDanceStyle interface
+interface FirestoreDanceStyle {
+  id: string;
+  label: string;
+  value: string;
+}
 
 const ProfileEditor: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
   const navigate = useNavigate();
@@ -30,6 +37,53 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [danceStyleOptions, setDanceStyleOptions] = useState<FirestoreDanceStyle[]>([]);
+  const [loadingStyles, setLoadingStyles] = useState(true);
+  
+  // Fetch dance styles from Firestore
+  useEffect(() => {
+    const fetchDanceStyles = async () => {
+      setLoadingStyles(true);
+      try {
+        const danceStylesRef = collection(db, 'danceStyles');
+        const q = query(danceStylesRef, orderBy('label'));
+        const querySnapshot = await getDocs(q);
+        
+        const styles: FirestoreDanceStyle[] = [];
+        querySnapshot.forEach((doc) => {
+          styles.push({
+            id: doc.id,
+            ...doc.data()
+          } as FirestoreDanceStyle);
+        });
+        
+        if (styles.length === 0) {
+          // If no styles in Firestore, use default styles
+          setDanceStyleOptions([
+            { id: 'default-1', label: 'Salsa', value: 'salsa' },
+            { id: 'default-2', label: 'Bachata', value: 'bachata' },
+            { id: 'default-3', label: 'Kizomba', value: 'kizomba' },
+            { id: 'default-4', label: 'Other', value: 'other' }
+          ]);
+        } else {
+          setDanceStyleOptions(styles);
+        }
+      } catch (err) {
+        console.error('Error fetching dance styles:', err);
+        // Fallback to default styles on error
+        setDanceStyleOptions([
+          { id: 'default-1', label: 'Salsa', value: 'salsa' },
+          { id: 'default-2', label: 'Bachata', value: 'bachata' },
+          { id: 'default-3', label: 'Kizomba', value: 'kizomba' },
+          { id: 'default-4', label: 'Other', value: 'other' }
+        ]);
+      } finally {
+        setLoadingStyles(false);
+      }
+    };
+
+    fetchDanceStyles();
+  }, []);
   
   // Initialize form data from user
   useEffect(() => {
@@ -60,21 +114,21 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
     }));
   };
   
-  const handleDanceStyleChange = (style: DanceStyle) => {
+  const handleDanceStyleChange = (style: string) => {
     setFormData(prev => {
       const currentStyles = [...prev.danceStyles];
       
-      if (currentStyles.includes(style)) {
+      if (currentStyles.includes(style as DanceStyle)) {
         // Remove if already selected
         return {
           ...prev,
-          danceStyles: currentStyles.filter(s => s !== style)
+          danceStyles: currentStyles.filter(s => s !== style) as DanceStyle[]
         };
       } else {
         // Add if not selected
         return {
           ...prev,
-          danceStyles: [...currentStyles, style]
+          danceStyles: [...currentStyles, style as DanceStyle]
         };
       }
     });
@@ -132,131 +186,123 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
   }
   
   return (
-    <div className="bg-white shadow rounded-lg overflow-hidden">
-      <div className="px-6 py-5 border-b border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-800">Profil Düzenle</h2>
-      </div>
+    <div className="bg-white shadow-md rounded-lg p-6">
+      <h2 className="text-2xl font-bold mb-6">Profil Bilgilerinizi Düzenleyin</h2>
       
       {error && (
-        <div className="bg-red-50 px-6 py-3 text-red-700">
-          {error}
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6">
+          <p>{error}</p>
         </div>
       )}
       
       {success && (
-        <div className="bg-green-50 px-6 py-3 text-green-700">
-          Profil başarıyla güncellendi.
+        <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6">
+          <p>Profil başarıyla güncellendi!</p>
         </div>
       )}
       
-      <div className="p-6">
-        <div className="flex flex-col md:flex-row md:space-x-6">
-          {/* Profile Photo Section */}
-          <div className="md:w-1/3 flex flex-col items-center mb-6 md:mb-0">
-            <ProfilePhotoUploader 
-              userId={user.id}
-              currentPhotoURL={user.photoURL}
-              onSuccess={handlePhotoUploadSuccess}
-              onError={handlePhotoUploadError}
+      <form onSubmit={handleSubmit}>
+        <div className="grid grid-cols-1 gap-6">
+          
+          <ProfilePhotoUploader 
+            userId={user?.id || ''} 
+            currentPhotoURL={user?.photoURL || ''} 
+            onSuccess={handlePhotoUploadSuccess}
+            onError={handlePhotoUploadError}
+          />
+          
+          <div>
+            <label htmlFor="displayName" className="block text-sm font-medium text-gray-700">Adınız Soyadınız</label>
+            <input
+              type="text"
+              id="displayName"
+              name="displayName"
+              value={formData.displayName}
+              onChange={handleInputChange}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             />
-            <p className="text-sm text-gray-500 text-center mt-2">
-              Profil fotoğrafını değiştirmek için resme tıklayın
-            </p>
           </div>
           
-          {/* Profile Details Form */}
-          <div className="md:w-2/3">
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="displayName" className="block text-sm font-medium text-gray-700">Ad Soyad</label>
-                  <input
-                    type="text"
-                    id="displayName"
-                    name="displayName"
-                    value={formData.displayName}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">Telefon Numarası</label>
-                  <input
-                    type="tel"
-                    id="phoneNumber"
-                    name="phoneNumber"
-                    value={formData.phoneNumber}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="bio" className="block text-sm font-medium text-gray-700">Hakkımda</label>
-                  <textarea
-                    id="bio"
-                    name="bio"
-                    rows={4}
-                    value={formData.bio}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="level" className="block text-sm font-medium text-gray-700">Dans Seviyesi</label>
-                  <select
-                    id="level"
-                    name="level"
-                    value={formData.level}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                  >
-                    <option value="beginner">Başlangıç</option>
-                    <option value="intermediate">Orta Seviye</option>
-                    <option value="advanced">İleri Seviye</option>
-                    <option value="professional">Profesyonel</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Dans Stilleri</label>
-                  <div className="flex flex-wrap gap-2">
-                    {danceStyleOptions.map(style => (
-                      <button
-                        key={style}
-                        type="button"
-                        className={`px-3 py-2 rounded-md text-sm font-medium ${
-                          formData.danceStyles.includes(style)
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-                        }`}
-                        onClick={() => handleDanceStyleChange(style)}
-                      >
-                        {style === 'salsa' ? 'Salsa' :
-                         style === 'bachata' ? 'Bachata' :
-                         style === 'kizomba' ? 'Kizomba' : 'Diğer'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                <div className="pt-4">
-                  <button
-                    type="submit"
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md shadow-sm"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? 'Güncelleniyor...' : 'Profili Güncelle'}
-                  </button>
-                </div>
+          <div>
+            <label htmlFor="bio" className="block text-sm font-medium text-gray-700">Hakkımda</label>
+            <textarea
+              id="bio"
+              name="bio"
+              rows={4}
+              value={formData.bio}
+              onChange={handleInputChange}
+              placeholder="Kendiniz hakkında kısa bir bilgi..."
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            ></textarea>
+          </div>
+          
+          <div>
+            <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">Telefon Numarası</label>
+            <input
+              type="tel"
+              id="phoneNumber"
+              name="phoneNumber"
+              value={formData.phoneNumber}
+              onChange={handleInputChange}
+              placeholder="İsteğe bağlı"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            />
+          </div>
+          
+          <div>
+            <label htmlFor="level" className="block text-sm font-medium text-gray-700">Dans Seviyesi</label>
+            <select
+              id="level"
+              name="level"
+              value={formData.level}
+              onChange={handleInputChange}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            >
+              <option value="beginner">Başlangıç</option>
+              <option value="intermediate">Orta Seviye</option>
+              <option value="advanced">İleri Seviye</option>
+              <option value="professional">Profesyonel</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Dans Stilleri</label>
+            {loadingStyles ? (
+              <div className="bg-gray-100 p-2 rounded-md flex items-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500 mr-2"></div>
+                <span className="text-gray-600">Dans stilleri yükleniyor...</span>
               </div>
-            </form>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {danceStyleOptions.map(style => (
+                  <button
+                    key={style.id}
+                    type="button"
+                    className={`px-3 py-2 rounded-md text-sm font-medium ${
+                      formData.danceStyles.includes(style.value as DanceStyle)
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                    }`}
+                    onClick={() => handleDanceStyleChange(style.value)}
+                  >
+                    {style.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400"
+            >
+              {isSubmitting ? 'Kaydediliyor...' : 'Profili Güncelle'}
+            </button>
           </div>
         </div>
-      </div>
+      </form>
     </div>
   );
 };

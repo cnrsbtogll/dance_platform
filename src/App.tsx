@@ -5,6 +5,8 @@ import ClassDetails from './components/classes/ClassDetails';
 import PartnerMatching from './components/partners/PartnerMatching';
 import BadgeSystem from './components/progress/BadgeSystem';
 import AdminPanel from './components/admin/AdminPanel';
+import InstructorPanel from './components/instructor/InstructorPanel';
+import BecomeInstructor from './components/instructor/BecomeInstructor';
 import Navbar from './components/layout/Navbar';
 import SignIn from './components/auth/SignIn';
 import SignUp from './components/auth/SignUp';
@@ -13,6 +15,7 @@ import Home from './components/home/Home';
 import useAuth from './hooks/useAuth';
 import { auth } from './config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { AuthProvider } from './contexts/AuthContext';
 
 console.log('🔍 App bileşeni yükleniyor');
 console.log('🔍 Firebase auth durumu:', auth ? 'Tanımlı' : 'Tanımsız', auth);
@@ -229,97 +232,110 @@ function App(): JSX.Element {
   }
 
   return (
-    <Router>
-      <div className="min-h-screen bg-gray-50">
-        {isOffline && (
-          <div className="bg-yellow-500 text-white text-center py-2 px-4 fixed top-0 left-0 w-full z-50">
-            ⚠️ Çevrimdışı moddasınız. İnternet bağlantınızı kontrol edin.
-          </div>
-        )}
-        
-        {error && !isOffline && (
-          <div className="bg-orange-500 text-white text-center py-2 px-4 fixed top-0 left-0 w-full z-50">
-            ⚠️ {getUserFriendlyErrorMessage(error)}
-          </div>
-        )}
-        
-        <Navbar isAuthenticated={isAuthenticated} user={user} />
-        
-        <main className={`pt-20 pb-10 ${(isOffline || (error && !isOffline)) ? 'mt-8' : ''}`}>
-          <Routes>
-            <Route path="/" element={<Home isAuthenticated={isAuthenticated} user={user} />} />
-            <Route path="/classes" element={<ClassList />} />
-            <Route path="/class/:id" element={<ClassDetails />} />
-            <Route path="/partners" element={<PartnerMatching />} />
-            <Route path="/progress" element={<BadgeSystem />} />
-            <Route 
-              path="/admin" 
-              element={
-                isAuthenticated ? <AdminPanel /> : <Navigate to="/signin" />
-              } 
-            />
-            <Route 
-              path="/profile" 
-              element={
-                isAuthenticated ? <ProfileEditor user={user} /> : <Navigate to="/signin" />
-              } 
-            />
-            <Route path="/signin" element={isAuthenticated ? <Navigate to="/" /> : <SignIn />} />
-            <Route path="/signup" element={isAuthenticated ? <Navigate to="/" /> : <SignUp />} />
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </main>
-        
-        <footer className="bg-gray-800 text-white py-8">
-          <div className="container mx-auto px-4">
-            <div className="flex flex-col md:flex-row justify-between">
-              <div className="mb-6 md:mb-0">
-                <h2 className="text-xl font-bold mb-4">Dans Platformu</h2>
-                <p className="text-gray-300 max-w-md">
-                  Türkiye'nin en kapsamlı dans platformu. Dans kursları, eğitmenler ve dans partnerleri için tek adres.
-                </p>
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-semibold mb-3">Bağlantılar</h3>
-                <ul className="space-y-2">
-                  <li><a href="/classes" className="text-gray-300 hover:text-white">Dans Kursu Bul</a></li>
-                  <li><a href="/partners" className="text-gray-300 hover:text-white">Partner Bul</a></li>
-                  <li><a href="/progress" className="text-gray-300 hover:text-white">İlerleme</a></li>
-                  {isAuthenticated && (
-                    <li><a href="/profile" className="text-gray-300 hover:text-white">Profilim</a></li>
-                  )}
-                </ul>
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-semibold mb-3">İletişim</h3>
-                <p className="text-gray-300">info@dansplatformu.com</p>
-                <p className="text-gray-300">+90 212 555 1234</p>
-                <div className="flex space-x-4 mt-4">
-                  <a href="#" className="text-gray-300 hover:text-white">
-                    <span className="sr-only">Facebook</span>
-                    <i className="fab fa-facebook-f"></i>
-                  </a>
-                  <a href="#" className="text-gray-300 hover:text-white">
-                    <span className="sr-only">Instagram</span>
-                    <i className="fab fa-instagram"></i>
-                  </a>
-                  <a href="#" className="text-gray-300 hover:text-white">
-                    <span className="sr-only">Twitter</span>
-                    <i className="fab fa-twitter"></i>
-                  </a>
+    <AuthProvider>
+      <Router>
+        <div className="min-h-screen bg-gray-50">
+          {isOffline && (
+            <div className="bg-yellow-500 text-white text-center py-2 px-4 fixed top-0 left-0 w-full z-50">
+              ⚠️ Çevrimdışı moddasınız. İnternet bağlantınızı kontrol edin.
+            </div>
+          )}
+          
+          {error && !isOffline && (
+            <div className="bg-orange-500 text-white text-center py-2 px-4 fixed top-0 left-0 w-full z-50">
+              ⚠️ {getUserFriendlyErrorMessage(error)}
+            </div>
+          )}
+          
+          <Navbar isAuthenticated={isAuthenticated} user={user} />
+          
+          <main className={`pt-20 pb-10 ${(isOffline || (error && !isOffline)) ? 'mt-8' : ''}`}>
+            <Routes>
+              <Route path="/" element={<Home isAuthenticated={isAuthenticated} user={user} />} />
+              <Route path="/classes" element={<ClassList />} />
+              <Route path="/class/:id" element={<ClassDetails />} />
+              <Route path="/partners" element={<PartnerMatching />} />
+              <Route path="/progress" element={<BadgeSystem />} />
+              <Route 
+                path="/admin" 
+                element={
+                  isAuthenticated ? <AdminPanel user={user} /> : <Navigate to="/signin" />
+                } 
+              />
+              <Route 
+                path="/instructor" 
+                element={
+                  isAuthenticated && user?.role?.includes('instructor') ? 
+                  <InstructorPanel user={user} /> : <Navigate to="/signin" />
+                } 
+              />
+              <Route
+                path="/become-instructor"
+                element={<BecomeInstructor />}
+              />
+              <Route 
+                path="/profile" 
+                element={
+                  isAuthenticated ? <ProfileEditor user={user} /> : <Navigate to="/signin" />
+                } 
+              />
+              <Route path="/signin" element={isAuthenticated ? <Navigate to="/" /> : <SignIn />} />
+              <Route path="/signup" element={isAuthenticated ? <Navigate to="/" /> : <SignUp />} />
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </main>
+          
+          <footer className="bg-gray-800 text-white py-8">
+            <div className="container mx-auto px-4">
+              <div className="flex flex-col md:flex-row justify-between">
+                <div className="mb-6 md:mb-0">
+                  <h2 className="text-xl font-bold mb-4">Dans Platformu</h2>
+                  <p className="text-gray-300 max-w-md">
+                    Türkiye'nin en kapsamlı dans platformu. Dans kursları, eğitmenler ve dans partnerleri için tek adres.
+                  </p>
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Bağlantılar</h3>
+                  <ul className="space-y-2">
+                    <li><a href="/classes" className="text-gray-300 hover:text-white">Dans Kursu Bul</a></li>
+                    <li><a href="/partners" className="text-gray-300 hover:text-white">Partner Bul</a></li>
+                    <li><a href="/progress" className="text-gray-300 hover:text-white">İlerleme</a></li>
+                    {isAuthenticated && (
+                      <li><a href="/profile" className="text-gray-300 hover:text-white">Profilim</a></li>
+                    )}
+                  </ul>
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">İletişim</h3>
+                  <p className="text-gray-300">info@dansplatformu.com</p>
+                  <p className="text-gray-300">+90 212 555 1234</p>
+                  <div className="flex space-x-4 mt-4">
+                    <a href="#" className="text-gray-300 hover:text-white">
+                      <span className="sr-only">Facebook</span>
+                      <i className="fab fa-facebook-f"></i>
+                    </a>
+                    <a href="#" className="text-gray-300 hover:text-white">
+                      <span className="sr-only">Instagram</span>
+                      <i className="fab fa-instagram"></i>
+                    </a>
+                    <a href="#" className="text-gray-300 hover:text-white">
+                      <span className="sr-only">Twitter</span>
+                      <i className="fab fa-twitter"></i>
+                    </a>
+                  </div>
                 </div>
               </div>
+              
+              <div className="mt-8 pt-6 border-t border-gray-700 text-gray-400 text-sm text-center">
+                &copy; {new Date().getFullYear()} Dans Platformu. Tüm hakları saklıdır.
+              </div>
             </div>
-            
-            <div className="mt-8 pt-6 border-t border-gray-700 text-gray-400 text-sm text-center">
-              &copy; {new Date().getFullYear()} Dans Platformu. Tüm hakları saklıdır.
-            </div>
-          </div>
-        </footer>
-      </div>
-    </Router>
+          </footer>
+        </div>
+      </Router>
+    </AuthProvider>
   );
 }
 

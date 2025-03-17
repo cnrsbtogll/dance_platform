@@ -179,13 +179,6 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                         >
                           Profilim
                         </Link>
-                        <Link
-                          to="/admin"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => setIsProfileMenuOpen(false)}
-                        >
-                          Yönetim Paneli
-                        </Link>
                         <button
                           onClick={() => {
                             handleLogout();
@@ -228,44 +221,6 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
 
       {isMenuOpen && (
         <div className="sm:hidden">
-          <div className="pt-2 pb-3 space-y-1">
-            <Link
-              to="/"
-              className={`block pl-3 pr-4 py-2 border-l-4 ${isActive('/') 
-                ? 'border-indigo-500 text-indigo-700 bg-indigo-50' 
-                : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-indigo-500 hover:text-indigo-700'} text-base font-medium`}
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Ana Sayfa
-            </Link>
-            <Link
-              to="/partners"
-              className={`block pl-3 pr-4 py-2 border-l-4 ${isActive('/partners') 
-                ? 'border-indigo-500 text-indigo-700 bg-indigo-50' 
-                : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-indigo-500 hover:text-indigo-700'} text-base font-medium`}
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Partner Bul
-            </Link>
-            <Link
-              to="/classes"
-              className={`block pl-3 pr-4 py-2 border-l-4 ${isActive('/classes') 
-                ? 'border-indigo-500 text-indigo-700 bg-indigo-50' 
-                : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-indigo-500 hover:text-indigo-700'} text-base font-medium`}
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Dans Kursu Bul
-            </Link>
-            <Link
-              to="/progress"
-              className={`block pl-3 pr-4 py-2 border-l-4 ${isActive('/progress') 
-                ? 'border-indigo-500 text-indigo-700 bg-indigo-50' 
-                : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-indigo-500 hover:text-indigo-700'} text-base font-medium`}
-              onClick={() => setIsMenuOpen(false)}
-            >
-              İlerleme Durumum
-            </Link>
-          </div>
           <div className="pt-4 pb-3 border-t border-gray-200">
             {isAuthenticated ? (
               <>
@@ -289,13 +244,6 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                     onClick={() => setIsMenuOpen(false)}
                   >
                     Profilim
-                  </Link>
-                  <Link
-                    to="/admin"
-                    className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-indigo-800 hover:bg-gray-100"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Yönetim Paneli
                   </Link>
                   <button
                     onClick={() => {
