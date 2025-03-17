@@ -1,5 +1,7 @@
-import React, { useState, FormEvent, ChangeEvent } from 'react';
+import React, { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import CustomSelect from '../common/CustomSelect';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 
 // Props için interface tanımı
 interface SearchFiltersProps {
@@ -21,18 +23,82 @@ interface FiyatAralik {
   value: string;
 }
 
+// Dans stili interface
+interface DanceStyle {
+  id: string;
+  label: string;
+  value: string;
+}
+
 function SearchFilters({ onFilterChange }: SearchFiltersProps): JSX.Element {
   const [seviye, setSeviye] = useState<string>('');
   const [fiyatAralik, setFiyatAralik] = useState<string>('');
   const [arama, setArama] = useState<string>('');
   const [dansTuru, setDansTuru] = useState<string>('');
   const [gun, setGun] = useState<string>('');
+  const [danceStyles, setDanceStyles] = useState<DanceStyle[]>([]);
+  const [loadingStyles, setLoadingStyles] = useState(true);
 
-  // Dans türleri
-  const dansTurleri: string[] = [
-    'Salsa', 'Bachata', 'Tango', 'Vals', 'Hip Hop', 'Modern Dans', 
-    'Bale', 'Flamenko', 'Zeybek', 'Jazz', 'Breakdance'
-  ];
+  // Fetch dance styles from Firestore
+  useEffect(() => {
+    const fetchDanceStyles = async () => {
+      setLoadingStyles(true);
+      try {
+        const danceStylesRef = collection(db, 'danceStyles');
+        const q = query(danceStylesRef, orderBy('label'));
+        const querySnapshot = await getDocs(q);
+        
+        const styles: DanceStyle[] = [];
+        querySnapshot.forEach((doc) => {
+          styles.push({
+            id: doc.id,
+            ...doc.data()
+          } as DanceStyle);
+        });
+        
+        if (styles.length === 0) {
+          // If no styles in Firestore, use default styles
+          setDanceStyles([
+            { id: 'default-1', label: 'Salsa', value: 'salsa' },
+            { id: 'default-2', label: 'Bachata', value: 'bachata' },
+            { id: 'default-3', label: 'Kizomba', value: 'kizomba' },
+            { id: 'default-4', label: 'Tango', value: 'tango' },
+            { id: 'default-5', label: 'Vals', value: 'vals' },
+            { id: 'default-6', label: 'Hip Hop', value: 'hiphop' },
+            { id: 'default-7', label: 'Modern Dans', value: 'modern-dans' },
+            { id: 'default-8', label: 'Bale', value: 'bale' },
+            { id: 'default-9', label: 'Flamenko', value: 'flamenko' },
+            { id: 'default-10', label: 'Zeybek', value: 'zeybek' },
+            { id: 'default-11', label: 'Jazz', value: 'jazz' },
+            { id: 'default-12', label: 'Breakdance', value: 'breakdance' }
+          ]);
+        } else {
+          setDanceStyles(styles);
+        }
+      } catch (err) {
+        console.error('Error fetching dance styles:', err);
+        // Fallback to default styles on error
+        setDanceStyles([
+          { id: 'default-1', label: 'Salsa', value: 'salsa' },
+          { id: 'default-2', label: 'Bachata', value: 'bachata' },
+          { id: 'default-3', label: 'Kizomba', value: 'kizomba' },
+          { id: 'default-4', label: 'Tango', value: 'tango' },
+          { id: 'default-5', label: 'Vals', value: 'vals' },
+          { id: 'default-6', label: 'Hip Hop', value: 'hiphop' },
+          { id: 'default-7', label: 'Modern Dans', value: 'modern-dans' },
+          { id: 'default-8', label: 'Bale', value: 'bale' },
+          { id: 'default-9', label: 'Flamenko', value: 'flamenko' },
+          { id: 'default-10', label: 'Zeybek', value: 'zeybek' },
+          { id: 'default-11', label: 'Jazz', value: 'jazz' },
+          { id: 'default-12', label: 'Breakdance', value: 'breakdance' }
+        ]);
+      } finally {
+        setLoadingStyles(false);
+      }
+    };
+
+    fetchDanceStyles();
+  }, []);
 
   // Günler
   const gunler: string[] = [
@@ -48,7 +114,7 @@ function SearchFilters({ onFilterChange }: SearchFiltersProps): JSX.Element {
   ];
 
   // Seviye seçenekleri
-  const seviyeler: string[] = ['Başlangıç', 'Orta', 'İleri', 'Tüm Seviyeler'];
+  const seviyeler: string[] = ['Başlangıç', 'Orta', 'İleri'];
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
@@ -94,13 +160,20 @@ function SearchFilters({ onFilterChange }: SearchFiltersProps): JSX.Element {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <CustomSelect
-            label="Dans Türü"
-            options={dansTurleri}
-            value={dansTuru}
-            onChange={setDansTuru}
-            placeholder="Tüm dans türleri"
-          />
+          {loadingStyles ? (
+            <div className="bg-gray-100 p-2 rounded-md flex items-center">
+              <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500 mr-2"></div>
+              <span className="text-gray-600">Dans stilleri yükleniyor...</span>
+            </div>
+          ) : (
+            <CustomSelect
+              label="Dans Türü"
+              options={danceStyles}
+              value={dansTuru}
+              onChange={setDansTuru}
+              placeholder="Tüm dans türleri"
+            />
+          )}
 
           <CustomSelect
             label="Seviye"

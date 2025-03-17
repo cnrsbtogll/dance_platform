@@ -1,7 +1,37 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { 
+  Box, 
+  Typography, 
+  Paper, 
+  Grid, 
+  CircularProgress, 
+  LinearProgress,
+  Container, 
+  Card, 
+  CardContent, 
+  Avatar, 
+  Chip,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Button,
+  useTheme,
+  useMediaQuery
+} from '@mui/material';
+import { 
+  EmojiEvents as TrophyIcon,
+  School as CourseIcon,
+  Timer as TimeIcon,
+  CheckCircle as CheckIcon,
+  ArrowUpward as LevelUpIcon,
+  DirectionsRun as ActivityIcon,
+  Lightbulb as TipIcon
+} from '@mui/icons-material';
 import { dansRozet } from '../../data/dansVerileri';
 
-// Tip tanımlamaları
+// Type definitions
 interface UserProgress {
   tamamlananKurslar: number;
   tamamlananDersler: number;
@@ -20,19 +50,23 @@ interface Rozet {
   seviye: number;
 }
 
-interface IlerlemeBarProps {
-  yuzde: number;
-  etiket: string;
-  renk?: string;
+interface ProgressBarProps {
+  value: number;
+  label: string;
+  color?: string;
 }
 
-interface RozetKartiProps {
-  rozet: Rozet;
-  kazanildi?: boolean;
+interface BadgeCardProps {
+  badge: Rozet;
+  earned?: boolean;
 }
 
-function BadgeSystem(): JSX.Element {
-  // Kullanıcı ilerleme durumu (gerçek uygulamada bu Firebase/Supabase'den gelirdi)
+const BadgeSystem: React.FC = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+  
+  // User progress state (in a real app, this would come from Firebase/Supabase)
   const [userProgress, setUserProgress] = useState<UserProgress>({
     tamamlananKurslar: 3,
     tamamlananDersler: 24,
@@ -43,177 +77,588 @@ function BadgeSystem(): JSX.Element {
     puanlar: 650
   });
 
-  // Tüm rozetler
-  const [rozetler, setRozetler] = useState<Rozet[]>([]);
+  // All badges
+  const [badges, setBadges] = useState<Rozet[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   
   useEffect(() => {
-    // Gerçek uygulamada bu API'dan çekilirdi
-    setRozetler(dansRozet);
+    // In a real app, this would be fetched from an API
+    setBadges(dansRozet);
     setLoading(false);
   }, []);
 
-  // İlerleme çubuğu bileşeni
-  const IlerlemeBar: React.FC<IlerlemeBarProps> = ({ yuzde, etiket, renk = 'indigo' }) => (
-    <div className="mt-4 mb-2">
-      <div className="flex justify-between items-center">
-        <span className="text-sm font-medium text-gray-700">{etiket}</span>
-        <span className="text-sm font-medium text-gray-700">{yuzde}%</span>
-      </div>
-      <div className="mt-2 w-full bg-gray-200 rounded-full h-2.5">
-        <div 
-          className={`bg-${renk}-600 h-2.5 rounded-full`} 
-          style={{ width: `${yuzde}%` }}
-        ></div>
-      </div>
-    </div>
+  // Progress bar component
+  const ProgressBar: React.FC<ProgressBarProps> = ({ value, label, color = 'primary' }) => (
+    <Box sx={{ mb: 3, width: '100%' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+        <Typography variant="body2" color="text.secondary" fontWeight={500}>
+          {label}
+        </Typography>
+        <Typography variant="body2" color="primary" fontWeight={600}>
+          {value}%
+        </Typography>
+      </Box>
+      <LinearProgress
+        variant="determinate"
+        value={value}
+        sx={{ 
+          height: 8, 
+          borderRadius: 4,
+          backgroundColor: 'rgba(99, 102, 241, 0.1)',
+          '& .MuiLinearProgress-bar': {
+            borderRadius: 4,
+            background: 'linear-gradient(90deg, #6366F1, #8B5CF6)'
+          }
+        }}
+      />
+    </Box>
   );
 
-  // Rozet kartı bileşeni
-  const RozetKarti: React.FC<RozetKartiProps> = ({ rozet, kazanildi = false }) => (
-    <div 
-      className={`bg-white border rounded-lg p-4 flex flex-col items-center ${kazanildi ? 'border-green-500 shadow-md' : 'border-gray-300 opacity-70'}`}
+  // Badge card component
+  const BadgeCard: React.FC<BadgeCardProps> = ({ badge, earned = false }) => (
+    <Card
+      component={motion.div}
+      whileHover={{ y: -5, boxShadow: '0 10px 25px rgba(99, 102, 241, 0.2)' }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      sx={{
+        borderRadius: 3,
+        overflow: 'hidden',
+        height: '100%',
+        border: earned ? '2px solid rgba(139, 92, 246, 0.5)' : '1px solid rgba(0, 0, 0, 0.08)',
+        position: 'relative',
+        opacity: earned ? 1 : 0.7,
+        filter: earned ? 'none' : 'grayscale(40%)',
+        transition: 'all 0.3s ease',
+      }}
     >
-      <div className={`relative w-16 h-16 mb-3 ${!kazanildi && 'grayscale'}`}>
-        <img 
-          src={rozet.gorsel} 
-          alt={rozet.ad} 
-          className="w-full h-full object-contain"
-          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-            const target = e.currentTarget;
-            target.onerror = null;
-            target.src = 'https://via.placeholder.com/150?text=Rozet';
+      {earned && (
+        <Box
+          component={motion.div}
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 500, delay: 0.2 }}
+          sx={{
+            position: 'absolute',
+            top: 10,
+            right: 10,
+            zIndex: 2,
+            background: '#10B981',
+            borderRadius: '50%',
+            width: 28,
+            height: 28,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 8px rgba(16, 185, 129, 0.4)'
           }}
-        />
-        {kazanildi && (
-          <div className="absolute -top-2 -right-2 bg-green-500 rounded-full p-1">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-          </div>
-        )}
-      </div>
-      <h3 className={`text-md font-bold ${kazanildi ? 'text-gray-800' : 'text-gray-600'}`}>
-        {rozet.ad}
-      </h3>
-      <p className="text-xs text-gray-500 text-center mt-1">{rozet.aciklama}</p>
-      
-      {!kazanildi && (
-        <div className="mt-3 bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
-          {rozet.seviye}. Seviyede Açılır
-        </div>
+        >
+          <CheckIcon fontSize="small" sx={{ color: 'white' }} />
+        </Box>
       )}
-    </div>
+
+      <CardContent sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}>
+        <Box
+          sx={{
+            width: 80,
+            height: 80,
+            borderRadius: '50%',
+            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            mb: 2,
+            position: 'relative',
+            overflow: 'hidden',
+            border: earned ? '2px solid rgba(139, 92, 246, 0.6)' : '2px solid rgba(99, 102, 241, 0.2)',
+          }}
+        >
+          <img
+            src={badge.gorsel}
+            alt={badge.ad}
+            style={{ 
+              width: '100%', 
+              height: '100%',
+              objectFit: 'cover'
+            }}
+            onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+              const target = e.currentTarget;
+              target.src = `https://ui-avatars.com/api/?name=${badge.ad}&background=8B5CF6&color=fff&size=80`;
+            }}
+          />
+          
+          {!earned && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontWeight: 'bold',
+              }}
+            >
+              <LevelUpIcon />
+            </Box>
+          )}
+        </Box>
+
+        <Typography 
+          variant="subtitle1" 
+          component="h3" 
+          align="center" 
+          gutterBottom 
+          fontWeight={600}
+          color={earned ? 'text.primary' : 'text.secondary'}
+        >
+          {badge.ad}
+        </Typography>
+
+        <Typography 
+          variant="body2" 
+          color="text.secondary" 
+          align="center" 
+          sx={{ mb: 'auto', flexGrow: 1 }}
+        >
+          {badge.aciklama}
+        </Typography>
+
+        {!earned && (
+          <Chip
+            label={`Seviye ${badge.seviye}'de açılır`}
+            size="small"
+            sx={{
+              mt: 2,
+              backgroundColor: 'rgba(99, 102, 241, 0.1)',
+              color: '#6366F1',
+              fontWeight: 500,
+              borderRadius: '12px'
+            }}
+          />
+        )}
+      </CardContent>
+    </Card>
   );
 
+  // Loading state
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-      </div>
+      <Box 
+        sx={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '70vh',
+          flexDirection: 'column', 
+          gap: 2 
+        }}
+      >
+        <CircularProgress size={60} thickness={4} sx={{ color: '#8B5CF6' }} />
+        <Typography variant="h6" color="text.secondary">İlerleme bilgileri yükleniyor...</Typography>
+      </Box>
     );
   }
 
+  // Calculate points needed for next level
+  const pointsForNextLevel = 350 - (userProgress.puanlar % 350);
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-center mb-8">Dans İlerleme Durumum</h1>
-      
-      {/* İlerleme özeti kartı */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-          <div className="mb-4 md:mb-0">
-            <h2 className="text-2xl font-bold text-gray-800">Seviye {userProgress.seviye}</h2>
-            <p className="text-gray-600">Toplam {userProgress.puanlar} puan kazandınız</p>
-          </div>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <Container maxWidth="lg" sx={{ py: 6 }}>
+        <Box sx={{ mb: 6, textAlign: 'center' }}>
+          <Typography 
+            variant="h3" 
+            component="h1" 
+            gutterBottom
+            fontWeight="bold"
+            sx={{
+              position: 'relative',
+              display: 'inline-block',
+              background: 'linear-gradient(90deg, #6366F1 0%, #8B5CF6 100%)',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              textFillColor: 'transparent',
+              WebkitTextFillColor: 'transparent',
+              mb: 2
+            }}
+          >
+            Dans İlerleme Durumum
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 650, mx: 'auto' }}>
+            Dans yolculuğunuzda kaydettiğiniz ilerlemeyi takip edin, rozetleri kazanın ve dans becerilerinizi geliştirin.
+          </Typography>
+        </Box>
+
+        {/* Progress summary card */}
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            p: { xs: 3, md: 4 }, 
+            mb: 6, 
+            borderRadius: 4,
+            background: 'linear-gradient(145deg, #ffffff, #f5f7ff)',
+            boxShadow: '0 10px 30px rgba(99, 102, 241, 0.1)',
+            overflow: 'hidden',
+            position: 'relative'
+          }}
+        >
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '6px',
+              background: 'linear-gradient(90deg, #6366F1, #8B5CF6, #6366F1)',
+              backgroundSize: '200% 100%',
+              animation: 'gradient-move 8s ease infinite',
+              '@keyframes gradient-move': {
+                '0%': { backgroundPosition: '0% 50%' },
+                '50%': { backgroundPosition: '100% 50%' },
+                '100%': { backgroundPosition: '0% 50%' }
+              }
+            }}
+          />
           
-          <div className="flex items-center">
-            <div className="text-right mr-4">
-              <p className="text-sm text-gray-600">Bir sonraki seviye</p>
-              <p className="font-bold text-indigo-600">{350 - (userProgress.puanlar % 350)} puan kaldı</p>
-            </div>
-            <div className="bg-indigo-600 text-white text-xl font-bold rounded-full w-12 h-12 flex items-center justify-center">
-              {userProgress.seviye}
-            </div>
-          </div>
-        </div>
-        
-        <IlerlemeBar yuzde={userProgress.ilerlemeYuzdesi} etiket="Genel İlerleme" />
-        
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-          <div className="bg-indigo-50 p-4 rounded-lg text-center">
-            <p className="text-xl font-bold text-indigo-700">{userProgress.tamamlananKurslar}</p>
-            <p className="text-sm text-gray-600">Tamamlanan Kurslar</p>
-          </div>
+          <Grid container spacing={4}>
+            <Grid item xs={12} md={6}>
+              <Box sx={{ display: 'flex', alignItems: isMobile ? 'center' : 'flex-start', flexDirection: isMobile ? 'column' : 'row', gap: 3 }}>
+                <Avatar
+                  sx={{
+                    width: 80,
+                    height: 80,
+                    bgcolor: 'rgba(99, 102, 241, 0.9)',
+                    fontSize: '2rem',
+                    fontWeight: 'bold',
+                    boxShadow: '0 8px 16px rgba(99, 102, 241, 0.3)'
+                  }}
+                >
+                  {userProgress.seviye}
+                </Avatar>
+                
+                <Box>
+                  <Typography variant="h4" fontWeight="bold" gutterBottom>
+                    Seviye {userProgress.seviye}
+                  </Typography>
+                  
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    Toplam {userProgress.puanlar} puan kazandınız
+                  </Typography>
+                  
+                  <Box 
+                    sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 1,
+                      color: '#8B5CF6',
+                      my: 1
+                    }}
+                  >
+                    <LevelUpIcon fontSize="small" />
+                    <Typography 
+                      variant="body2" 
+                      fontWeight="medium"
+                      color="primary"
+                    >
+                      Bir sonraki seviye için {pointsForNextLevel} puan daha gerekiyor
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+              
+              <Box sx={{ mt: 4 }}>
+                <ProgressBar value={userProgress.ilerlemeYuzdesi} label="Genel İlerleme" />
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Typography 
+                variant="subtitle1" 
+                fontWeight="bold" 
+                color="text.secondary" 
+                sx={{ mb: 2, display: { xs: 'block', md: 'none' } }}
+              >
+                Dans İstatistiklerim
+              </Typography>
+              
+              <Grid container spacing={2}>
+                <Grid item xs={6} sm={6}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      borderRadius: 3,
+                      height: '100%',
+                      background: 'linear-gradient(145deg, #f0f5ff, #ffffff)',
+                      border: '1px solid rgba(99, 102, 241, 0.1)',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        boxShadow: '0 5px 15px rgba(99, 102, 241, 0.15)',
+                        transform: 'translateY(-3px)'
+                      }
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                      <CourseIcon sx={{ fontSize: 40, color: '#6366F1', mb: 1 }} />
+                      <Typography variant="h4" fontWeight="bold" color="#6366F1">
+                        {userProgress.tamamlananKurslar}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" textAlign="center">
+                        Tamamlanan Kurslar
+                      </Typography>
+                    </Box>
+                  </Paper>
+                </Grid>
+                
+                <Grid item xs={6} sm={6}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      borderRadius: 3,
+                      height: '100%',
+                      background: 'linear-gradient(145deg, #f3f0ff, #ffffff)',
+                      border: '1px solid rgba(139, 92, 246, 0.1)',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        boxShadow: '0 5px 15px rgba(139, 92, 246, 0.15)',
+                        transform: 'translateY(-3px)'
+                      }
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                      <ActivityIcon sx={{ fontSize: 40, color: '#8B5CF6', mb: 1 }} />
+                      <Typography variant="h4" fontWeight="bold" color="#8B5CF6">
+                        {userProgress.tamamlananDersler}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" textAlign="center">
+                        Katılınan Dersler
+                      </Typography>
+                    </Box>
+                  </Paper>
+                </Grid>
+                
+                <Grid item xs={6} sm={6}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      borderRadius: 3,
+                      height: '100%',
+                      background: 'linear-gradient(145deg, #eff6ff, #ffffff)',
+                      border: '1px solid rgba(59, 130, 246, 0.1)',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        boxShadow: '0 5px 15px rgba(59, 130, 246, 0.15)',
+                        transform: 'translateY(-3px)'
+                      }
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                      <TimeIcon sx={{ fontSize: 40, color: '#3B82F6', mb: 1 }} />
+                      <Typography variant="h4" fontWeight="bold" color="#3B82F6">
+                        {userProgress.toplamDansSuresi}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" textAlign="center">
+                        Dans Saati
+                      </Typography>
+                    </Box>
+                  </Paper>
+                </Grid>
+                
+                <Grid item xs={6} sm={6}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      borderRadius: 3,
+                      height: '100%',
+                      background: 'linear-gradient(145deg, #ecfdf5, #ffffff)',
+                      border: '1px solid rgba(16, 185, 129, 0.1)',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        boxShadow: '0 5px 15px rgba(16, 185, 129, 0.15)',
+                        transform: 'translateY(-3px)'
+                      }
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                      <TrophyIcon sx={{ fontSize: 40, color: '#10B981', mb: 1 }} />
+                      <Typography variant="h4" fontWeight="bold" color="#10B981">
+                        {userProgress.kazanilanRozetler.length}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" textAlign="center">
+                        Kazanılan Rozetler
+                      </Typography>
+                    </Box>
+                  </Paper>
+                </Grid>
+              </Grid>
+            </Grid>
+          </Grid>
+        </Paper>
+
+        {/* Badges section */}
+        <Box sx={{ mb: 6 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+            <TrophyIcon sx={{ color: '#8B5CF6', mr: 1, fontSize: 28 }} />
+            <Typography 
+              variant="h4" 
+              component="h2" 
+              fontWeight="bold"
+              sx={{
+                position: 'relative',
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  width: '40px',
+                  height: '4px',
+                  borderRadius: '2px',
+                  background: 'linear-gradient(90deg, #6366F1 0%, #8B5CF6 100%)',
+                  bottom: '-8px',
+                  left: '0',
+                }
+              }}
+            >
+              Rozetlerim
+            </Typography>
+          </Box>
           
-          <div className="bg-purple-50 p-4 rounded-lg text-center">
-            <p className="text-xl font-bold text-purple-700">{userProgress.tamamlananDersler}</p>
-            <p className="text-sm text-gray-600">Katılınan Dersler</p>
-          </div>
+          <Grid container spacing={3}>
+            {badges.map((badge, index) => (
+              <Grid 
+                item 
+                xs={6} 
+                sm={4} 
+                md={2.4} 
+                key={badge.id}
+                component={motion.div}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.1 }}
+              >
+                <BadgeCard 
+                  badge={badge} 
+                  earned={userProgress.kazanilanRozetler.includes(badge.id)} 
+                />
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+
+        {/* Tips section */}
+        <Paper 
+          component={motion.div}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          elevation={0} 
+          sx={{ 
+            p: { xs: 3, md: 4 }, 
+            borderRadius: 4,
+            background: 'linear-gradient(145deg, #f5f7ff, #ffffff)',
+            overflow: 'hidden',
+            position: 'relative',
+            border: '1px solid rgba(99, 102, 241, 0.1)',
+            boxShadow: '0 10px 30px rgba(99, 102, 241, 0.05)',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '6px',
+              height: '100%',
+              background: 'linear-gradient(180deg, #6366F1, #8B5CF6)',
+              borderTopLeftRadius: 4,
+              borderBottomLeftRadius: 4
+            }
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+            <TipIcon sx={{ color: '#8B5CF6', mr: 1, fontSize: 24 }} />
+            <Typography variant="h5" fontWeight="bold">
+              Dans Becerilerinizi Nasıl Geliştirebilirsiniz?
+            </Typography>
+          </Box>
           
-          <div className="bg-blue-50 p-4 rounded-lg text-center">
-            <p className="text-xl font-bold text-blue-700">{userProgress.toplamDansSuresi}</p>
-            <p className="text-sm text-gray-600">Dans Saati</p>
-          </div>
+          <List sx={{ pl: 2 }}>
+            <ListItem sx={{ py: 1 }}>
+              <ListItemIcon sx={{ minWidth: 36 }}>
+                <CheckIcon sx={{ color: '#8B5CF6' }} />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Haftada en az 3 kez pratik yapın."
+                primaryTypographyProps={{ fontWeight: 500 }}
+              />
+            </ListItem>
+            
+            <ListItem sx={{ py: 1 }}>
+              <ListItemIcon sx={{ minWidth: 36 }}>
+                <CheckIcon sx={{ color: '#8B5CF6' }} />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Dans partnerlerinizle düzenli olarak buluşun ve geri bildirim isteyin."
+                primaryTypographyProps={{ fontWeight: 500 }}
+              />
+            </ListItem>
+            
+            <ListItem sx={{ py: 1 }}>
+              <ListItemIcon sx={{ minWidth: 36 }}>
+                <CheckIcon sx={{ color: '#8B5CF6' }} />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Dans videolarınızı çekin ve kendinizi izleyerek geliştirin."
+                primaryTypographyProps={{ fontWeight: 500 }}
+              />
+            </ListItem>
+            
+            <ListItem sx={{ py: 1 }}>
+              <ListItemIcon sx={{ minWidth: 36 }}>
+                <CheckIcon sx={{ color: '#8B5CF6' }} />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Kendinize gerçekçi hedefler belirleyin ve ilerlemenizi takip edin."
+                primaryTypographyProps={{ fontWeight: 500 }}
+              />
+            </ListItem>
+          </List>
           
-          <div className="bg-green-50 p-4 rounded-lg text-center">
-            <p className="text-xl font-bold text-green-700">{userProgress.kazanilanRozetler.length}</p>
-            <p className="text-sm text-gray-600">Kazanılan Rozetler</p>
-          </div>
-        </div>
-      </div>
-      
-      {/* Rozetler bölümü */}
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold mb-6">Rozetlerim</h2>
-        
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {rozetler.map(rozet => (
-            <RozetKarti 
-              key={rozet.id} 
-              rozet={rozet} 
-              kazanildi={userProgress.kazanilanRozetler.includes(rozet.id)} 
-            />
-          ))}
-        </div>
-      </div>
-      
-      {/* İpuçları bölümü */}
-      <div className="bg-indigo-50 rounded-lg p-6">
-        <h2 className="text-xl font-bold mb-4">Dans Becerilerinizi Nasıl Geliştirebilirsiniz?</h2>
-        
-        <ul className="space-y-3">
-          <li className="flex items-start">
-            <svg className="h-6 w-6 text-indigo-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>Haftada en az 3 kez pratik yapın.</span>
-          </li>
-          <li className="flex items-start">
-            <svg className="h-6 w-6 text-indigo-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>Dans partnerlerinizle düzenli olarak buluşun ve geri bildirim isteyin.</span>
-          </li>
-          <li className="flex items-start">
-            <svg className="h-6 w-6 text-indigo-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>Dans videolarınızı çekin ve kendinizi izleyerek geliştirin.</span>
-          </li>
-          <li className="flex items-start">
-            <svg className="h-6 w-6 text-indigo-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>Kendinize gerçekçi hedefler belirleyin ve ilerlemenizi takip edin.</span>
-          </li>
-        </ul>
-        
-        <button className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">
-          Dans Kurslarına Göz At
-        </button>
-      </div>
-    </div>
+          <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              component={motion.button}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              variant="contained"
+              color="primary"
+              size="large"
+              sx={{
+                bgcolor: 'rgba(99, 102, 241, 0.9)',
+                backgroundImage: 'linear-gradient(90deg, #6366F1 0%, #8B5CF6 100%)',
+                boxShadow: '0 4px 10px rgba(99, 102, 241, 0.3)',
+                borderRadius: '10px',
+                textTransform: 'none',
+                px: 4,
+                py: 1.5,
+                fontWeight: 600
+              }}
+            >
+              Dans Kurslarına Göz At
+            </Button>
+          </Box>
+        </Paper>
+      </Container>
+    </motion.div>
   );
-}
+};
 
 export default BadgeSystem; 

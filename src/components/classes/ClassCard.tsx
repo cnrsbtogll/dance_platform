@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { dansEgitmenleri, dansOkullari } from '../../data/dansVerileri';
 
@@ -40,67 +40,124 @@ interface ClassCardProps {
 }
 
 function ClassCard({ kurs }: ClassCardProps): JSX.Element {
+  const [isHovered, setIsHovered] = useState(false);
+  
   // Eğitmen ve okul bilgilerini bul
   const egitmen = dansEgitmenleri.find(egitmen => egitmen.id === kurs.egitmen_id);
   const okul = dansOkullari.find(okul => okul.id === kurs.okul_id);
 
+  // Seviye için renkler
+  const getLevelColor = (seviye: string) => {
+    switch (seviye.toLowerCase()) {
+      case 'başlangıç':
+        return 'bg-emerald-500';
+      case 'orta':
+        return 'bg-amber-500';
+      case 'ileri':
+        return 'bg-rose-500';
+      case 'tüm seviyeler':
+        return 'bg-indigo-500';
+      default:
+        return 'bg-indigo-500';
+    }
+  };
+
+  // Gün ve saat bilgisi
+  const formatSchedule = () => {
+    return `${kurs.gun} · ${kurs.saat}`;
+  };
+
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300">
-      <div className="relative h-48 overflow-hidden">
-        <img 
-          src={kurs.gorsel} 
-          alt={kurs.baslik} 
-          className="w-full h-full object-cover"
-          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-            const target = e.currentTarget;
-            target.onerror = null;
-            target.src = 'https://via.placeholder.com/400x250?text=Dans+Kursu';
-          }}
-        />
-        <div className="absolute top-0 right-0 bg-indigo-600 text-white px-2 py-1 text-sm">
-          {kurs.seviye}
+    <div 
+      className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div className="relative">
+        {/* Image Container with Overlay */}
+        <div className="relative h-56 overflow-hidden group">
+          <img 
+            src={kurs.gorsel} 
+            alt={kurs.baslik} 
+            className={`w-full h-full object-cover transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'}`}
+            onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+              const target = e.currentTarget;
+              target.onerror = null;
+              target.src = 'https://via.placeholder.com/400x250?text=Dans+Kursu';
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80"></div>
+          
+          {/* Seviye badge */}
+          <div className={`absolute top-4 right-4 ${getLevelColor(kurs.seviye)} text-white px-3 py-1 text-sm font-medium rounded-full shadow-lg`}>
+            {kurs.seviye}
+          </div>
+          
+          {/* Schedule badge */}
+          <div className="absolute bottom-4 left-4 bg-white/80 backdrop-blur-sm text-gray-800 px-3 py-1 text-sm font-medium rounded-full flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {formatSchedule()}
+          </div>
         </div>
       </div>
       
-      <div className="p-5">
-        <h2 className="text-xl font-bold mb-2 text-gray-800">{kurs.baslik}</h2>
+      <div className="p-6">
+        <h2 className="text-xl font-bold mb-3 text-gray-800 group-hover:text-indigo-600">{kurs.baslik}</h2>
         
-        <div className="flex items-center text-gray-600 mb-2">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-          </svg>
-          <span>{egitmen ? egitmen.ad : 'Bilinmeyen Eğitmen'}</span>
+        <div className="flex items-center mb-3">
+          {egitmen && egitmen.gorsel ? (
+            <img 
+              src={egitmen.gorsel} 
+              alt={egitmen.ad}
+              className="w-8 h-8 rounded-full object-cover mr-2 border-2 border-white shadow-sm" 
+              onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                const target = e.currentTarget;
+                target.onerror = null;
+                target.src = 'https://via.placeholder.com/40?text=Eğitmen';
+              }}
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center mr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+              </svg>
+            </div>
+          )}
+          <div>
+            <span className="text-sm font-medium text-gray-800">{egitmen ? egitmen.ad : 'Bilinmeyen Eğitmen'}</span>
+            {egitmen && egitmen.uzmanlık && (
+              <div className="text-xs text-gray-500">{egitmen.uzmanlık}</div>
+            )}
+          </div>
         </div>
         
-        <div className="flex items-center text-gray-600 mb-3">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 01-1 1v1H7v-1a1 1 0 01-1-1V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
+        <div className="flex items-center mb-4 text-gray-600 text-sm">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
           </svg>
           <span>{okul ? okul.ad : 'Bilinmeyen Okul'}</span>
+          {okul && okul.konum && (
+            <span className="ml-1 text-gray-400">· {okul.konum}</span>
+          )}
         </div>
         
-        <div className="flex justify-between items-center text-sm mb-4">
-          <div className="flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span>{kurs.gun}</span>
-          </div>
-          <div className="flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>{kurs.saat}</span>
-          </div>
-        </div>
+        {/* Açıklama */}
+        <p className="text-gray-600 text-sm mb-5 line-clamp-2">
+          {kurs.aciklama || 'Bu dans kursu hakkında detaylı bilgi için detaylar butonuna tıklayın.'}
+        </p>
         
-        <div className="flex justify-between items-center mt-4">
+        <div className="flex justify-between items-center pt-3 border-t border-gray-100">
           <span className="text-xl font-bold text-indigo-600">{kurs.fiyat}</span>
           <Link 
             to={`/class/${kurs.id}`}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-300 shadow-sm"
           >
-            Detaylar
+            <span>Detaylar</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
           </Link>
         </div>
       </div>
