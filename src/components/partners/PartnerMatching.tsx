@@ -7,6 +7,7 @@ import { collection, getDocs, query, orderBy, where, limit, DocumentData } from 
 import { db } from '../../config/firebase';
 import { useAuth } from '../../hooks/useAuth'; 
 import { User, DanceStyle as DanceStyleType, DanceLevel } from '../../types';
+import { motion } from 'framer-motion';
 
 // Placeholder görüntü yolları
 const PLACEHOLDER_PARTNER_IMAGE = '/assets/placeholders/dance-partner-placeholder.svg';
@@ -859,10 +860,19 @@ function PartnerMatching(): JSX.Element {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <div className="text-center mb-10">
-        <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Dans Partneri Bulun</h1>
-        <p className="text-gray-600 max-w-xl mx-auto">Size uygun dans partneri ile birlikte hareketlerin büyüsünü keşfedin. Deneyim, stil ve zamanınıza göre ideal eşleşmeyi bulun.</p>
-      </div>
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="text-center mb-10"
+      >
+        <h1 className="text-4xl sm:text-5xl font-bold mb-4 inline-block relative bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          Dans Partneri Bulun
+        </h1>
+        <p className="text-gray-600 max-w-2xl mx-auto">
+          Size uygun dans partneri ile birlikte hareketlerin büyüsünü keşfedin. Deneyim seviyesi, dans stilleri ve uygun zamanlar üzerinden ideal eşleşmeyi bulun.
+        </p>
+      </motion.div>
       
       {/* Mobile filter toggle */}
       <div className="lg:hidden mb-4">

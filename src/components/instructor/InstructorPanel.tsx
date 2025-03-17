@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User } from '../../types';
+import { motion } from 'framer-motion';
 
 interface InstructorPanelProps {
   user?: User | null;
@@ -10,7 +11,19 @@ function InstructorPanel({ user }: InstructorPanelProps) {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-center mb-8">Eğitmen Yönetim Paneli</h1>
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="text-center mb-10"
+      >
+        <h1 className="text-3xl sm:text-4xl font-bold mb-4 inline-block relative bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          Eğitmen Yönetim Paneli
+        </h1>
+        <p className="text-gray-600 max-w-2xl mx-auto">
+          Kurslarınızı, öğrencilerinizi ve ders programınızı profesyonelce yönetin ve dans eğitimi deneyiminizi en üst düzeye çıkarın.
+        </p>
+      </motion.div>
       
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="border-b">

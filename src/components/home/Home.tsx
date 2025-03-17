@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { User } from '../../types';
+import { motion } from 'framer-motion';
 
 interface HomeProps {
   isAuthenticated: boolean;
@@ -15,25 +16,24 @@ function Home({ isAuthenticated, user }: HomeProps) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-indigo-50/30 to-white">
       {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-indigo-600 to-purple-600 shadow-xl">
-        <div className="absolute inset-0">
-          <svg className="absolute left-0 top-0 h-full w-full" viewBox="0 0 1000 1000" preserveAspectRatio="none">
-            <path className="text-indigo-500/20 fill-current" d="M0,0 L1000,0 L1000,1000 L0,1000 Z" />
-            <path className="text-white/5 fill-current" d="M0,0 C300,150 500,50 1000,250 L1000,1000 L0,1000 Z" />
-            <path className="text-white/5 fill-current" d="M0,250 C300,350 700,250 1000,500 L1000,1000 L0,1000 Z" />
-          </svg>
-        </div>
-        <div className="relative mx-auto max-w-7xl px-6 py-24 sm:py-32 lg:px-8">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-6 tracking-tight">
-            Dans Platformuna <span className="block md:inline">Hoş Geldiniz</span>
+      <div className="container mx-auto pt-16 pb-12 px-4 sm:px-6 lg:px-8">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-16"
+        >
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 inline-block relative bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            Dans Platformuna Hoş Geldiniz
           </h1>
-          <p className="mt-6 max-w-xl text-xl text-indigo-100">
+          <p className="text-gray-600 max-w-2xl mx-auto text-lg">
             Dans tutkunuzu geliştirin, yeni partnerler bulun ve yeteneklerinizi sergileyin. Dansın her adımında yanınızdayız.
           </p>
-          <div className="mt-10 flex flex-col sm:flex-row gap-4">
+          
+          <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
             <Link 
               to="/partners" 
-              className="inline-flex items-center justify-center rounded-md bg-white px-6 py-3 text-base font-medium text-indigo-700 shadow-md hover:bg-indigo-50 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white"
+              className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-6 py-3 text-base font-medium text-white shadow-md hover:bg-indigo-700 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -42,7 +42,7 @@ function Home({ isAuthenticated, user }: HomeProps) {
             </Link>
             <Link 
               to="/classes" 
-              className="inline-flex items-center justify-center rounded-md bg-indigo-900/20 backdrop-blur-sm px-6 py-3 text-base font-medium text-white border border-white/20 hover:bg-indigo-900/30 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-700"
+              className="inline-flex items-center justify-center rounded-md bg-white border border-indigo-200 px-6 py-3 text-base font-medium text-indigo-600 shadow-md hover:bg-indigo-50 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -50,7 +50,7 @@ function Home({ isAuthenticated, user }: HomeProps) {
               Dans Kursu Bul
             </Link>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Feature Cards */}

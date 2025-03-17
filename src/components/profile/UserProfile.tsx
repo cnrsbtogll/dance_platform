@@ -157,22 +157,24 @@ const UserProfile: React.FC = () => {
           </Alert>
         </Snackbar>
 
-        <Box sx={{ mb: 4 }}>
+        <Box sx={{ mb: 6, textAlign: 'center' }}>
           <Typography 
-            variant="h4" 
+            variant="h3" 
             component="h1" 
             gutterBottom
+            fontWeight="bold"
             sx={{
+              position: 'relative',
+              display: 'inline-block',
               background: 'linear-gradient(90deg, #6366F1 0%, #8B5CF6 100%)',
               backgroundClip: 'text',
               textFillColor: 'transparent',
-              fontWeight: 'bold',
-              display: 'inline-block'
+              mb: 2
             }}
           >
             Profil Bilgileri
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 650, mx: 'auto' }}>
             Kişisel bilgilerinizi görüntüleyin ve düzenleyin
           </Typography>
         </Box>

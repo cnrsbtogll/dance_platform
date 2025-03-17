@@ -106,28 +106,23 @@ function ClassList(): JSX.Element {
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-indigo-50/10 to-white">
       {/* Hero Section */}
-      <div className="relative bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-16 mb-10">
-        <div className="absolute inset-0 overflow-hidden">
-          <svg className="absolute left-0 top-0 h-full w-full" viewBox="0 0 1000 1000" preserveAspectRatio="none">
-            <path className="text-indigo-500/20 fill-current" d="M0,0 L1000,0 L1000,1000 L0,1000 Z" />
-            <path className="text-white/5 fill-current" d="M0,0 C300,150 500,50 1000,250 L1000,1000 L0,1000 Z" />
-            <path className="text-white/5 fill-current" d="M0,250 C300,350 700,250 1000,500 L1000,1000 L0,1000 Z" />
-          </svg>
-        </div>
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <h1 className="text-4xl md:text-5xl font-bold text-center mb-4">Dans Kursları</h1>
-            <p className="text-xl text-center text-indigo-100 max-w-3xl mx-auto mb-8">
-              Profesyonel eğitmenler eşliğinde dans yeteneklerinizi geliştirin ve tutkuyla dans edin.
-            </p>
-          </motion.div>
-        </div>
+      <div className="container mx-auto px-4 py-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-10"
+        >
+          <h1 className="text-4xl sm:text-5xl font-bold mb-4 inline-block relative bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            Dans Kursları
+          </h1>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Profesyonel eğitmenler eşliğinde dans yeteneklerinizi geliştirin ve tutkuyla dans edin. Seviyelere ve dans türlerine göre kendinize uygun kursu bulun.
+          </p>
+        </motion.div>
       </div>
 
+      {/* Filter Section and Content */}
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

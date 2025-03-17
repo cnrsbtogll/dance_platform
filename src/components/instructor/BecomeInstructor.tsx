@@ -14,6 +14,7 @@ import {
 import { db, auth } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import CustomSelect from '../common/CustomSelect';
+import { motion } from 'framer-motion';
 
 // Dans stilleri interface
 interface DanceStyle {
@@ -311,10 +312,22 @@ function BecomeInstructor() {
   }));
 
   return (
-    <div className="max-w-2xl mx-auto my-10">
+    <div className="container mx-auto px-4 py-8 max-w-3xl">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="text-center mb-10"
+      >
+        <h1 className="text-3xl sm:text-4xl font-bold mb-4 inline-block relative bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          Eğitmen Olarak Başvurun
+        </h1>
+        <p className="text-gray-600 max-w-2xl mx-auto">
+          Dans tutkunuzu profesyonel bir kariyere dönüştürün ve platformumuzda yeni öğrencilerle buluşun.
+        </p>
+      </motion.div>
+      
       <div className="bg-white p-8 rounded-lg shadow-md">
-        <h2 className="text-2xl font-semibold text-gray-800 mb-6">Eğitmen Olmak İçin Başvurun</h2>
-        
         {error && (
           <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6" role="alert">
             <p>{error}</p>
