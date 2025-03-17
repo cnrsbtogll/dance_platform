@@ -3,6 +3,7 @@ import SchoolManagement from './SchoolManagement';
 import InstructorManagement from './InstructorManagement';
 import InstructorRequests from './InstructorRequests';
 import DanceStyleManagement from './DanceStyleManagement';
+import { UserManagement } from './UserManagement';
 import SeedUsersButton from '../../scripts/SeedUsersButton';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
@@ -159,12 +160,7 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
               <p className="text-gray-500 mt-2">Bu bölüm henüz yapım aşamasındadır.</p>
             </div>
           )}
-          {activeTab === 'kullanicilar' && (
-            <div className="text-center py-4">
-              <h2 className="text-xl font-semibold">Kullanıcı Yönetimi</h2>
-              <p className="text-gray-500 mt-2">Bu bölüm henüz yapım aşamasındadır.</p>
-            </div>
-          )}
+          {activeTab === 'kullanicilar' && <UserManagement />}
           {activeTab === 'ornek-veri' && isSuperAdmin && (
             <div>
               <h2 className="text-xl font-semibold mb-4">Örnek Veri Ekleme</h2>

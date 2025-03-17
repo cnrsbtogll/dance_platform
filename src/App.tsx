@@ -12,6 +12,7 @@ import SignIn from './components/auth/SignIn';
 import SignUp from './components/auth/SignUp';
 import ProfileEditor from './components/profile/ProfileEditor';
 import Home from './components/home/Home';
+import SchoolDetails from './components/admin/SchoolDetails';
 import useAuth from './hooks/useAuth';
 import { auth } from './config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -260,6 +261,12 @@ function App(): JSX.Element {
                 path="/admin" 
                 element={
                   isAuthenticated ? <AdminPanel user={user} /> : <Navigate to="/signin" />
+                } 
+              />
+              <Route 
+                path="/admin/schools/:id" 
+                element={
+                  isAuthenticated ? <SchoolDetails /> : <Navigate to="/signin" />
                 } 
               />
               <Route 

@@ -1,7 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { dansOkullari } from '../../data/dansVerileri';
-import { collection, getDocs, doc, deleteDoc, getDoc, updateDoc, addDoc, query, orderBy, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { 
+  collection, 
+  getDocs, 
+  doc, 
+  deleteDoc, 
+  getDoc, 
+  updateDoc, 
+  addDoc, 
+  query, 
+  orderBy, 
+  serverTimestamp,
+  where,
+  setDoc 
+} from 'firebase/firestore';
+import { 
+  createUserWithEmailAndPassword, 
+  updateProfile,
+  sendEmailVerification 
+} from 'firebase/auth';
+import { db, auth } from '../../config/firebase';
+import { motion } from 'framer-motion';
 
 // Tip tanımlamaları
 interface Egitmen {
@@ -31,6 +50,13 @@ interface Okul {
   gorsel: string;
 }
 
+// Dans stilleri için interface
+interface DanceStyle {
+  id: string;
+  label: string;
+  value: string;
+}
+
 interface FormData {
   ad: string;
   uzmanlık: string;
@@ -40,6 +66,8 @@ interface FormData {
   gorsel: string;
   email?: string;
   phoneNumber?: string;
+  password?: string; // Super admin için yeni alan
+  createAccount?: boolean; // Kullanıcı hesabı oluşturmak için
 }
 
 function InstructorManagement(): JSX.Element {
@@ -55,10 +83,90 @@ function InstructorManagement(): JSX.Element {
     okul_id: '',
     gorsel: '',
     email: '',
-    phoneNumber: ''
+    phoneNumber: '',
+    password: '',
+    createAccount: false
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
+  const [danceStyles, setDanceStyles] = useState<DanceStyle[]>([]);
+  const [loadingStyles, setLoadingStyles] = useState(true);
+
+  // Dans stillerini Firebase'den çek
+  useEffect(() => {
+    const fetchDanceStyles = async () => {
+      setLoadingStyles(true);
+      try {
+        const danceStylesRef = collection(db, 'danceStyles');
+        const q = query(danceStylesRef, orderBy('label'));
+        const querySnapshot = await getDocs(q);
+        
+        const styles: DanceStyle[] = [];
+        querySnapshot.forEach((doc) => {
+          styles.push({
+            id: doc.id,
+            ...doc.data()
+          } as DanceStyle);
+        });
+        
+        if (styles.length === 0) {
+          // Eğer Firestore'da stil yoksa varsayılan stilleri kullan
+          setDanceStyles([
+            { id: 'default-1', label: 'Salsa', value: 'salsa' },
+            { id: 'default-2', label: 'Bachata', value: 'bachata' },
+            { id: 'default-3', label: 'Kizomba', value: 'kizomba' },
+            { id: 'default-4', label: 'Tango', value: 'tango' },
+            { id: 'default-5', label: 'Vals', value: 'vals' }
+          ]);
+        } else {
+          setDanceStyles(styles);
+        }
+      } catch (err) {
+        console.error('Dans stilleri getirilirken hata oluştu:', err);
+        // Hata durumunda varsayılan stillere geri dön
+        setDanceStyles([
+          { id: 'default-1', label: 'Salsa', value: 'salsa' },
+          { id: 'default-2', label: 'Bachata', value: 'bachata' },
+          { id: 'default-3', label: 'Kizomba', value: 'kizomba' },
+          { id: 'default-4', label: 'Tango', value: 'tango' },
+          { id: 'default-5', label: 'Vals', value: 'vals' }
+        ]);
+      } finally {
+        setLoadingStyles(false);
+      }
+    };
+
+    fetchDanceStyles();
+  }, []);
+
+  // Kullanıcının süper admin olup olmadığını kontrol et
+  useEffect(() => {
+    const checkIfSuperAdmin = async () => {
+      if (!auth.currentUser) return;
+      
+      try {
+        const userRef = doc(db, 'users', auth.currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          let roles = userData.role || [];
+          
+          if (!Array.isArray(roles)) {
+            roles = [roles];
+          }
+          
+          setIsSuperAdmin(roles.includes('admin'));
+        }
+      } catch (err) {
+        console.error('Süper admin kontrolü yapılırken hata oluştu:', err);
+      }
+    };
+    
+    checkIfSuperAdmin();
+  }, []);
 
   // İlk yüklemede verileri çek
   useEffect(() => {
@@ -103,7 +211,9 @@ function InstructorManagement(): JSX.Element {
       okul_id: egitmen.okul_id,
       gorsel: egitmen.gorsel,
       email: egitmen.email || '',
-      phoneNumber: egitmen.phoneNumber || ''
+      phoneNumber: egitmen.phoneNumber || '',
+      password: '',
+      createAccount: false
     });
     setDuzenlemeModu(true);
   };
@@ -119,23 +229,37 @@ function InstructorManagement(): JSX.Element {
       okul_id: '',
       gorsel: '/assets/images/dance/egitmen_default.jpg',
       email: '',
-      phoneNumber: ''
+      phoneNumber: '',
+      password: '',
+      createAccount: isSuperAdmin // Süper admin ise varsayılan olarak hesap oluşturma aktif
     });
     setDuzenlemeModu(true);
   };
 
   // Form alanı değişikliği
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>): void => {
-    const { name, value } = e.target;
-    setFormVeri(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    const { name, value, type } = e.target;
+    
+    if (type === 'checkbox') {
+      const checkbox = e.target as HTMLInputElement;
+      setFormVeri(prev => ({
+        ...prev,
+        [name]: checkbox.checked
+      }));
+    } else {
+      setFormVeri(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   // Form gönderimi
   const formGonder = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
     
     const okul_id = typeof formVeri.okul_id === 'string' 
       ? parseInt(formVeri.okul_id) 
@@ -153,6 +277,8 @@ function InstructorManagement(): JSX.Element {
           biyografi: formVeri.biyografi,
           okul_id: okul_id,
           gorsel: formVeri.gorsel,
+          email: formVeri.email,
+          phoneNumber: formVeri.phoneNumber,
           updatedAt: serverTimestamp()
         });
         
@@ -165,12 +291,57 @@ function InstructorManagement(): JSX.Element {
             tecrube: formVeri.tecrube,
             biyografi: formVeri.biyografi,
             okul_id: okul_id,
-            gorsel: formVeri.gorsel
+            gorsel: formVeri.gorsel,
+            email: formVeri.email,
+            phoneNumber: formVeri.phoneNumber
           } : egitmen
         );
         setEgitmenler(guncellenenEgitmenler);
+        setSuccess('Eğitmen bilgileri başarıyla güncellendi.');
         
       } else {
+        // Süper admin ve kullanıcı hesabı oluşturma seçeneği işaretliyse
+        let userId = '';
+        
+        if (isSuperAdmin && formVeri.createAccount && formVeri.email && formVeri.password) {
+          // Email'in zaten kullanılıp kullanılmadığını kontrol et
+          const usersRef = collection(db, 'users');
+          const emailQuery = query(usersRef, where('email', '==', formVeri.email));
+          const emailQuerySnapshot = await getDocs(emailQuery);
+          
+          if (!emailQuerySnapshot.empty) {
+            throw new Error('Bu e-posta adresi zaten kullanılıyor.');
+          }
+          
+          // Firebase Auth ile yeni kullanıcı oluştur
+          const userCredential = await createUserWithEmailAndPassword(
+            auth, 
+            formVeri.email, 
+            formVeri.password
+          );
+          
+          userId = userCredential.user.uid;
+          
+          // Kullanıcı profilini güncelle
+          await updateProfile(userCredential.user, {
+            displayName: formVeri.ad
+          });
+          
+          // E-posta doğrulama gönder
+          await sendEmailVerification(userCredential.user);
+          
+          // Firestore'da users koleksiyonuna yeni kullanıcı ekle
+          await setDoc(doc(db, 'users', userId), {
+            id: userId,
+            email: formVeri.email,
+            displayName: formVeri.ad,
+            phoneNumber: formVeri.phoneNumber || '',
+            role: ['instructor'], // Eğitmen rolü ekle
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+        }
+        
         // Yeni eğitmen ekle
         const newInstructorData = {
           ad: formVeri.ad,
@@ -179,6 +350,10 @@ function InstructorManagement(): JSX.Element {
           biyografi: formVeri.biyografi,
           okul_id: okul_id,
           gorsel: formVeri.gorsel,
+          email: formVeri.email || '',
+          phoneNumber: formVeri.phoneNumber || '',
+          userId: userId || null, // Eğer kullanıcı oluşturulduysa, userId'yi kaydet
+          createdBy: auth.currentUser?.uid || null,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         };
@@ -192,21 +367,26 @@ function InstructorManagement(): JSX.Element {
         } as Egitmen;
         
         setEgitmenler([yeniEgitmen, ...egitmenler]);
+        setSuccess('Yeni eğitmen başarıyla eklendi' + (userId ? ' ve kullanıcı hesabı oluşturuldu.' : '.'));
       }
       
       // Formu kapat
       setDuzenlemeModu(false);
       setSeciliEgitmen(null);
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Eğitmen kaydedilirken hata oluştu:', err);
-      alert('Eğitmen kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.');
+      setError('Eğitmen kaydedilirken bir hata oluştu: ' + (err.message || 'Bilinmeyen hata'));
+    } finally {
+      setLoading(false);
     }
   };
 
   // Eğitmen silme
   const egitmenSil = async (id: string): Promise<void> => {
     if (window.confirm('Bu eğitmeni silmek istediğinizden emin misiniz?')) {
+      setLoading(true);
+      setError(null);
       try {
         // Firestore'dan sil
         await deleteDoc(doc(db, 'instructors', id));
@@ -214,10 +394,12 @@ function InstructorManagement(): JSX.Element {
         // State'i güncelle
         const filtrelenmisEgitmenler = egitmenler.filter(egitmen => egitmen.id !== id);
         setEgitmenler(filtrelenmisEgitmenler);
-        
+        setSuccess('Eğitmen başarıyla silindi.');
       } catch (err) {
         console.error('Eğitmen silinirken hata oluştu:', err);
-        alert('Eğitmen silinirken bir hata oluştu. Lütfen tekrar deneyin.');
+        setError('Eğitmen silinirken bir hata oluştu. Lütfen tekrar deneyin.');
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -234,7 +416,7 @@ function InstructorManagement(): JSX.Element {
     return okul ? okul.ad : 'Bilinmeyen Okul';
   };
 
-  if (loading) {
+  if (loading && egitmenler.length === 0) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
@@ -243,30 +425,30 @@ function InstructorManagement(): JSX.Element {
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">
-        <p>{error}</p>
-        <button 
-          onClick={fetchInstructors} 
-          className="mt-2 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-4 rounded"
-        >
-          Yeniden Dene
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div>
+      {/* Hata ve Başarı Mesajları */}
+      {error && (
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+          <p>{error}</p>
+        </div>
+      )}
+      
+      {success && (
+        <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4" role="alert">
+          <p>{success}</p>
+        </div>
+      )}
+      
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Eğitmen Yönetimi</h2>
         {!duzenlemeModu && (
           <button 
             onClick={yeniEgitmenEkle}
             className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+            disabled={loading}
           >
-            Yeni Eğitmen Ekle
+            {loading ? 'Yükleniyor...' : 'Yeni Eğitmen Ekle'}
           </button>
         )}
       </div>
@@ -298,16 +480,22 @@ function InstructorManagement(): JSX.Element {
                 <label htmlFor="uzmanlık" className="block text-sm font-medium text-gray-700 mb-1">
                   Uzmanlık Alanı*
                 </label>
-                <input
-                  type="text"
+                <select
                   id="uzmanlık"
                   name="uzmanlık"
                   required
                   value={formVeri.uzmanlık}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
-                  placeholder="Örn: Salsa, Tango"
-                />
+                >
+                  <option value="">Dans Stili Seçin</option>
+                  {danceStyles.map(style => (
+                    <option key={style.id} value={style.value}>{style.label}</option>
+                  ))}
+                </select>
+                {loadingStyles && (
+                  <div className="text-xs text-gray-500 mt-1">Dans stilleri yükleniyor...</div>
+                )}
               </div>
               
               <div>
@@ -343,6 +531,84 @@ function InstructorManagement(): JSX.Element {
                   ))}
                 </select>
               </div>
+              
+              {/* Süper Admin ise e-posta ve telefon alanları */}
+              {isSuperAdmin && (
+                <>
+                  <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                      E-posta {!seciliEgitmen && formVeri.createAccount && '*'}
+                    </label>
+                    <input
+                      type="email"
+                      id="email"
+                      name="email"
+                      required={!seciliEgitmen && formVeri.createAccount}
+                      value={formVeri.email}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
+                      Telefon
+                    </label>
+                    <input
+                      type="text"
+                      id="phoneNumber"
+                      name="phoneNumber"
+                      value={formVeri.phoneNumber}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  
+                  {/* Kullanıcı hesabı oluşturma seçeneği */}
+                  {!seciliEgitmen && (
+                    <div className="md:col-span-2">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="createAccount"
+                          name="createAccount"
+                          checked={formVeri.createAccount}
+                          onChange={handleInputChange}
+                          className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                        />
+                        <label htmlFor="createAccount" className="ml-2 block text-sm text-gray-700">
+                          Eğitmen için kullanıcı hesabı oluştur
+                        </label>
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Bu seçeneği işaretlerseniz, eğitmen için otomatik olarak kullanıcı hesabı oluşturulacak ve eğitmen rolü atanacaktır.
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Şifre alanı - hesap oluşturma işaretliyse */}
+                  {!seciliEgitmen && formVeri.createAccount && (
+                    <div className="md:col-span-2">
+                      <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                        Şifre*
+                      </label>
+                      <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        required
+                        value={formVeri.password}
+                        onChange={handleInputChange}
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        minLength={6}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Şifre en az 6 karakter uzunluğunda olmalıdır.
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
               
               <div className="md:col-span-2">
                 <label htmlFor="biyografi" className="block text-sm font-medium text-gray-700 mb-1">
@@ -392,98 +658,95 @@ function InstructorManagement(): JSX.Element {
                 type="button"
                 onClick={() => setDuzenlemeModu(false)}
                 className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
+                disabled={loading}
               >
                 İptal
               </button>
               <button
                 type="submit"
                 className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+                disabled={loading}
               >
-                {seciliEgitmen ? 'Güncelle' : 'Kaydet'}
+                {loading ? 'Kaydediliyor...' : (seciliEgitmen ? 'Güncelle' : 'Ekle')}
               </button>
             </div>
           </form>
         </div>
       ) : (
         <>
-          <div className="mb-6">
+          <div className="mb-4">
             <input
               type="text"
-              placeholder="İsim veya uzmanlık alanına göre ara..."
+              placeholder="Eğitmen adı veya uzmanlık ara..."
               value={aramaTerimi}
               onChange={(e) => setAramaTerimi(e.target.value)}
               className="w-full p-2 border border-gray-300 rounded-md"
             />
           </div>
           
-          {filtrelenmisEgitmenler.length === 0 ? (
-            <div className="text-center py-8 bg-gray-50 rounded-lg">
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                className="h-12 w-12 mx-auto text-gray-400" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" 
-                />
-              </svg>
-              <p className="mt-2 text-gray-500">Eğitmen bulunamadı.</p>
+          {loading && (
+            <div className="flex justify-center my-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
+          )}
+          
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Eğitmen
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Uzmanlık
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Okul
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Tecrübe
+                  </th>
+                  {isSuperAdmin && (
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Eğitmen
+                      Kullanıcı
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Uzmanlık
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Dans Okulu
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Tecrübe
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      İşlemler
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filtrelenmisEgitmenler.map((egitmen) => (
-                    <tr key={egitmen.id}>
+                  )}
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    İşlemler
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filtrelenmisEgitmenler.length > 0 ? (
+                  filtrelenmisEgitmenler.map((egitmen) => (
+                    <motion.tr 
+                      key={egitmen.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.3 }}
+                      className="hover:bg-gray-50"
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10">
-                            <img 
-                              className="h-10 w-10 rounded-full object-cover" 
-                              src={egitmen.gorsel} 
-                              alt={egitmen.ad} 
-                              onError={(e) => { 
+                            <img
+                              className="h-10 w-10 rounded-full object-cover"
+                              src={egitmen.gorsel}
+                              alt={egitmen.ad}
+                              onError={(e) => {
                                 (e.target as HTMLImageElement).src = "/assets/images/dance/egitmen_default.jpg";
                               }}
                             />
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">{egitmen.ad}</div>
-                            {egitmen.email && (
-                              <div className="text-sm text-gray-500">{egitmen.email}</div>
-                            )}
-                            {egitmen.phoneNumber && (
-                              <div className="text-sm text-gray-500">Tel: {egitmen.phoneNumber}</div>
-                            )}
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{egitmen.uzmanlık}</div>
+                        <div className="text-sm text-gray-900">
+                          {danceStyles.find(style => style.value === egitmen.uzmanlık)?.label || egitmen.uzmanlık}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">{getOkulAdi(egitmen.okul_id)}</div>
@@ -491,10 +754,23 @@ function InstructorManagement(): JSX.Element {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">{egitmen.tecrube}</div>
                       </td>
+                      {isSuperAdmin && (
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {egitmen.userId ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              Hesap Var
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                              Hesap Yok
+                            </span>
+                          )}
+                        </td>
+                      )}
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
                           onClick={() => egitmenDuzenle(egitmen)}
-                          className="text-indigo-600 hover:text-indigo-900 mr-4"
+                          className="text-indigo-600 hover:text-indigo-900 mr-2"
                         >
                           Düzenle
                         </button>
@@ -505,22 +781,20 @@ function InstructorManagement(): JSX.Element {
                           Sil
                         </button>
                       </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                    </motion.tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={isSuperAdmin ? 6 : 5} className="px-6 py-4 text-center text-sm text-gray-500">
+                      {aramaTerimi ? 'Aramanıza uygun eğitmen bulunamadı.' : 'Henüz hiç eğitmen kaydı bulunmuyor.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
-      
-      <div className="mt-8 bg-blue-50 p-4 rounded-md">
-        <h3 className="text-blue-800 font-semibold">İpucu</h3>
-        <p className="text-blue-700 text-sm mt-1">
-          Eğitmen fotoğrafları, öğrencilerin eğitmeni tanıması için önemli bir faktördür.
-          Yüksek kaliteli ve profesyonel fotoğraflar tercih edilmelidir.
-        </p>
-      </div>
     </div>
   );
 }

@@ -1,15 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { dansOkullari } from '../../data/dansVerileri';
+import { 
+  collection, 
+  getDocs, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  query, 
+  orderBy, 
+  serverTimestamp, 
+  DocumentData, 
+  QueryDocumentSnapshot, 
+  Timestamp 
+} from 'firebase/firestore';
+import { db } from '../../config/firebase';
+import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 
 // Tip tanımlamaları
 interface Okul {
-  id: number;
+  id: string;
   ad: string;
   aciklama: string;
   konum: string;
   iletisim: string;
   telefon: string;
   gorsel: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 interface FormData {
@@ -34,11 +52,39 @@ function SchoolManagement(): JSX.Element {
     telefon: '',
     gorsel: ''
   });
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Firebase'den okulları getir
+  const fetchOkullar = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const okullarRef = collection(db, 'dansOkullari');
+      const q = query(okullarRef, orderBy('ad'));
+      const querySnapshot = await getDocs(q);
+      
+      const okullarData: Okul[] = [];
+      querySnapshot.forEach((doc: QueryDocumentSnapshot<DocumentData>) => {
+        okullarData.push({
+          id: doc.id,
+          ...doc.data()
+        } as Okul);
+      });
+      
+      setOkullar(okullarData);
+    } catch (err) {
+      console.error('Okulları getirirken hata oluştu:', err);
+      setError('Okullar yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // İlk yüklemede verileri çek
   useEffect(() => {
-    // Gerçekte bu veri Supabase/Firebase'den çekilirdi
-    setOkullar(dansOkullari);
+    fetchOkullar();
   }, []);
 
   // Okul düzenleme
@@ -46,11 +92,11 @@ function SchoolManagement(): JSX.Element {
     setSeciliOkul(okul);
     setFormVeri({
       ad: okul.ad,
-      aciklama: okul.aciklama,
-      konum: okul.konum,
-      iletisim: okul.iletisim,
-      telefon: okul.telefon,
-      gorsel: okul.gorsel
+      aciklama: okul.aciklama || '',
+      konum: okul.konum || '',
+      iletisim: okul.iletisim || '',
+      telefon: okul.telefon || '',
+      gorsel: okul.gorsel || ''
     });
     setDuzenlemeModu(true);
   };
@@ -79,60 +125,107 @@ function SchoolManagement(): JSX.Element {
   };
 
   // Form gönderimi
-  const formGonder = (e: React.FormEvent): void => {
+  const formGonder = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
     
-    if (seciliOkul) {
-      // Mevcut okulu güncelle
-      const guncellenenOkullar = okullar.map(okul => 
-        okul.id === seciliOkul.id ? { ...okul, ...formVeri } : okul
-      );
-      setOkullar(guncellenenOkullar);
-      // Gerçek uygulamada burada Firebase/Supabase güncelleme olurdu
-    } else {
-      // Yeni okul ekle
-      const yeniOkul: Okul = {
-        ...formVeri,
-        id: okullar.length > 0 ? Math.max(...okullar.map(o => o.id)) + 1 : 1
-      };
-      setOkullar([...okullar, yeniOkul]);
-      // Gerçek uygulamada burada Firebase/Supabase ekleme olurdu
+    try {
+      if (seciliOkul) {
+        // Mevcut okulu güncelle
+        const okulRef = doc(db, 'dansOkullari', seciliOkul.id);
+        await updateDoc(okulRef, {
+          ...formVeri,
+          updatedAt: serverTimestamp()
+        });
+        
+        setSuccess('Okul başarıyla güncellendi.');
+      } else {
+        // Yeni okul ekle
+        await addDoc(collection(db, 'dansOkullari'), {
+          ...formVeri,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        
+        setSuccess('Yeni okul başarıyla eklendi.');
+      }
+      
+      // Okul listesini yenile
+      fetchOkullar();
+      
+      // Formu kapat
+      setDuzenlemeModu(false);
+      setSeciliOkul(null);
+    } catch (err) {
+      console.error('Okul kaydederken hata oluştu:', err);
+      setError('Okul kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.');
+    } finally {
+      setLoading(false);
     }
-    
-    // Formu kapat
-    setDuzenlemeModu(false);
-    setSeciliOkul(null);
   };
 
   // Okul silme
-  const okulSil = (id: number): void => {
-    if (window.confirm('Bu okulu silmek istediğinizden emin misiniz?')) {
-      const filtrelenmisOkullar = okullar.filter(okul => okul.id !== id);
-      setOkullar(filtrelenmisOkullar);
-      // Gerçek uygulamada burada Firebase/Supabase silme olurdu
+  const okulSil = async (id: string): Promise<void> => {
+    if (window.confirm('Bu okulu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.')) {
+      setLoading(true);
+      setError(null);
+      setSuccess(null);
+      
+      try {
+        // Firebase'den okulu sil
+        const okulRef = doc(db, 'dansOkullari', id);
+        await deleteDoc(okulRef);
+        
+        // UI'dan okulu kaldır
+        setOkullar(prevOkullar => prevOkullar.filter(okul => okul.id !== id));
+        setSuccess('Okul başarıyla silindi.');
+      } catch (err) {
+        console.error('Okul silinirken hata oluştu:', err);
+        setError('Okul silinirken bir hata oluştu. Lütfen tekrar deneyin.');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
   // Arama sonuçları
   const filtrelenmisOkullar = okullar.filter(okul => 
     okul.ad.toLowerCase().includes(aramaTerimi.toLowerCase()) ||
-    okul.konum.toLowerCase().includes(aramaTerimi.toLowerCase())
+    okul.konum?.toLowerCase().includes(aramaTerimi.toLowerCase())
   );
 
   return (
     <div>
+      {/* Başlık ve Yeni Ekle butonu */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Dans Okulu Yönetimi</h2>
         {!duzenlemeModu && (
           <button 
             onClick={yeniOkulEkle}
             className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+            disabled={loading}
           >
-            Yeni Okul Ekle
+            {loading ? 'Yükleniyor...' : 'Yeni Okul Ekle'}
           </button>
         )}
       </div>
       
+      {/* Hata ve Başarı Mesajları */}
+      {error && (
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+          <p>{error}</p>
+        </div>
+      )}
+      
+      {success && (
+        <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4" role="alert">
+          <p>{success}</p>
+        </div>
+      )}
+      
+      {/* Form veya Liste */}
       {duzenlemeModu ? (
         <div className="bg-gray-50 p-6 rounded-lg">
           <h3 className="text-lg font-semibold mb-4">
@@ -233,14 +326,16 @@ function SchoolManagement(): JSX.Element {
                 type="button"
                 onClick={() => setDuzenlemeModu(false)}
                 className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                disabled={loading}
               >
                 İptal
               </button>
               <button
                 type="submit"
                 className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                disabled={loading}
               >
-                {seciliOkul ? 'Güncelle' : 'Ekle'}
+                {loading ? 'Kaydediliyor...' : (seciliOkul ? 'Güncelle' : 'Ekle')}
               </button>
             </div>
           </form>
@@ -257,80 +352,100 @@ function SchoolManagement(): JSX.Element {
             />
           </div>
           
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Okul
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Konum
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    İletişim
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    İşlemler
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filtrelenmisOkullar.length > 0 ? (
-                  filtrelenmisOkullar.map((okul) => (
-                    <tr key={okul.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10">
-                            <img 
-                              className="h-10 w-10 rounded-full object-cover" 
-                              src={okul.gorsel}
-                              alt={okul.ad}
-                              onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                                const target = e.currentTarget;
-                                target.onerror = null;
-                                target.src = 'https://via.placeholder.com/40?text=Okul';
-                              }}
-                            />
+          {loading && (
+            <div className="flex justify-center my-8">
+              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500"></div>
+            </div>
+          )}
+          
+          {!loading && (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Okul
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Konum
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      İletişim
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      İşlemler
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filtrelenmisOkullar.length > 0 ? (
+                    filtrelenmisOkullar.map((okul) => (
+                      <motion.tr 
+                        key={okul.id} 
+                        className="hover:bg-gray-50"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10">
+                              <img 
+                                className="h-10 w-10 rounded-full object-cover" 
+                                src={okul.gorsel}
+                                alt={okul.ad}
+                                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                  const target = e.currentTarget;
+                                  target.onerror = null;
+                                  target.src = 'https://via.placeholder.com/40?text=Okul';
+                                }}
+                              />
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">{okul.ad}</div>
+                            </div>
                           </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">{okul.ad}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{okul.konum}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{okul.telefon}</div>
-                        <div className="text-sm text-gray-500">{okul.iletisim}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button 
-                          onClick={() => okulDuzenle(okul)}
-                          className="text-indigo-600 hover:text-indigo-900 mr-3"
-                        >
-                          Düzenle
-                        </button>
-                        <button 
-                          onClick={() => okulSil(okul.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Sil
-                        </button>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{okul.konum}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{okul.telefon}</div>
+                          <div className="text-sm text-gray-500">{okul.iletisim}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <Link 
+                            to={`/admin/schools/${okul.id}`}
+                            className="text-blue-600 hover:text-blue-900 mr-3"
+                          >
+                            Detaylar
+                          </Link>
+                          <button 
+                            onClick={() => okulDuzenle(okul)}
+                            className="text-indigo-600 hover:text-indigo-900 mr-3"
+                          >
+                            Düzenle
+                          </button>
+                          <button 
+                            onClick={() => okulSil(okul.id)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            Sil
+                          </button>
+                        </td>
+                      </motion.tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
+                        {aramaTerimi ? 'Aramanıza uygun okul bulunamadı.' : 'Henüz hiç okul kaydı bulunmamaktadır.'}
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
-                      {aramaTerimi ? 'Aramanıza uygun okul bulunamadı.' : 'Henüz hiç okul kaydı bulunmamaktadır.'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </>
       )}
     </div>
