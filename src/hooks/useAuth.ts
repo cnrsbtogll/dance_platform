@@ -240,7 +240,7 @@ export const useAuth = (): AuthState => {
                   user: {
                     ...userData,
                     id: firebaseUser.uid,
-                    createdAt: userData.createdAt.toDate(),
+                    createdAt: userData.createdAt ? userData.createdAt.toDate() : new Date(),
                     // Auth verilerinden eksik bilgileri tamamla
                     displayName: userData.displayName || firebaseUser.displayName || '',
                     email: userData.email || firebaseUser.email || '',

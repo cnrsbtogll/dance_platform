@@ -63,7 +63,7 @@ export const signIn = async (email: string, password: string): Promise<User> => 
       // Timestamp'i Date'e çevir
       return {
         ...userData,
-        createdAt: userData.createdAt.toDate(),
+        createdAt: userData.createdAt ? userData.createdAt.toDate() : new Date(),
       } as User;
     } else {
       throw new Error('User data not found in Firestore');

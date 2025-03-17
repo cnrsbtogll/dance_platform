@@ -11,9 +11,14 @@ import {
   serverTimestamp, 
   DocumentData, 
   QueryDocumentSnapshot, 
-  Timestamp 
+  Timestamp,
+  setDoc
 } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import {
+  createUserWithEmailAndPassword,
+  updateProfile
+} from 'firebase/auth';
+import { db, auth } from '../../config/firebase';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
@@ -143,13 +148,67 @@ function SchoolManagement(): JSX.Element {
         setSuccess('Okul başarıyla güncellendi.');
       } else {
         // Yeni okul ekle
-        await addDoc(collection(db, 'dansOkullari'), {
+        const yeniOkulRef = await addDoc(collection(db, 'dansOkullari'), {
           ...formVeri,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
         
-        setSuccess('Yeni okul başarıyla eklendi.');
+        // Okul için kullanıcı hesabı oluştur
+        // E-posta adresini okul iletişim adresinden al
+        const okulEmail = formVeri.iletisim;
+        
+        // E-posta formatını kontrol et
+        if (!okulEmail || !okulEmail.includes('@')) {
+          throw new Error('Okul için geçerli bir e-posta adresi gereklidir');
+        }
+        
+        try {
+          // Geçici şifre oluştur - okul ismine göre basit bir şifre
+          const geciciSifre = `${formVeri.ad.replace(/\s+/g, '').toLowerCase()}${new Date().getFullYear()}`;
+          
+          // Firebase Auth'da kullanıcı oluştur
+          const userCredential = await createUserWithEmailAndPassword(
+            auth,
+            okulEmail,
+            geciciSifre
+          );
+          
+          // Kullanıcı profil bilgilerini güncelleyelim
+          await updateProfile(userCredential.user, {
+            displayName: formVeri.ad,
+            photoURL: formVeri.gorsel || null
+          });
+          
+          // Firestore'da kullanıcı belgesini oluştur
+          await setDoc(doc(db, 'users', userCredential.user.uid), {
+            id: userCredential.user.uid,
+            displayName: formVeri.ad,
+            email: okulEmail,
+            phoneNumber: formVeri.telefon || '',
+            role: ['school'],  // Okul rolü
+            photoURL: formVeri.gorsel || '',
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            schoolId: yeniOkulRef.id // Okulun ID'si
+          });
+          
+          // Okul belgesine kullanıcı ID'sini ekle
+          await updateDoc(doc(db, 'dansOkullari', yeniOkulRef.id), {
+            userId: userCredential.user.uid
+          });
+          
+          setSuccess(
+            `Yeni okul ve okul hesabı başarıyla oluşturuldu!\n\n` +
+            `Okul Giriş Bilgileri:\n` +
+            `E-posta: ${okulEmail}\n` +
+            `Geçici Şifre: ${geciciSifre}\n\n` +
+            `ÖNEMLİ: Lütfen bu şifreyi not alın, daha sonra görüntüleyemeyeceksiniz.`
+          );
+        } catch (authError) {
+          console.error('Okul kullanıcı hesabı oluşturulurken hata:', authError);
+          setSuccess('Yeni okul eklendi ancak kullanıcı hesabı oluşturulamadı. Lütfen manuel olarak oluşturun.');
+        }
       }
       
       // Okul listesini yenile
@@ -160,7 +219,7 @@ function SchoolManagement(): JSX.Element {
       setSeciliOkul(null);
     } catch (err) {
       console.error('Okul kaydederken hata oluştu:', err);
-      setError('Okul kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.');
+      setError('Okul kaydedilirken bir hata oluştu: ' + (err instanceof Error ? err.message : 'Bilinmeyen hata'));
     } finally {
       setLoading(false);
     }
@@ -220,7 +279,7 @@ function SchoolManagement(): JSX.Element {
       )}
       
       {success && (
-        <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4" role="alert">
+        <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4 whitespace-pre-line" role="alert">
           <p>{success}</p>
         </div>
       )}
@@ -228,9 +287,16 @@ function SchoolManagement(): JSX.Element {
       {/* Form veya Liste */}
       {duzenlemeModu ? (
         <div className="bg-gray-50 p-6 rounded-lg">
-          <h3 className="text-lg font-semibold mb-4">
+          <h3 className="text-lg font-semibold mb-2">
             {seciliOkul ? 'Okul Düzenle' : 'Yeni Okul Ekle'}
           </h3>
+          
+          {!seciliOkul && (
+            <p className="text-sm text-gray-600 mb-4">
+              Yeni okul eklendiğinde, otomatik olarak "school" rolüne sahip bir kullanıcı hesabı oluşturulacaktır. 
+              Bu hesap, okul yöneticileri tarafından kullanılabilir.
+            </p>
+          )}
           
           <form onSubmit={formGonder}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -266,16 +332,21 @@ function SchoolManagement(): JSX.Element {
               
               <div>
                 <label htmlFor="iletisim" className="block text-sm font-medium text-gray-700 mb-1">
-                  E-posta
+                  E-posta Adresi*
                 </label>
                 <input
                   type="email"
                   id="iletisim"
                   name="iletisim"
+                  required
                   value={formVeri.iletisim}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  placeholder="okul@ornek.com"
                 />
+                <p className="mt-1 text-xs text-gray-500">
+                  Bu e-posta adresi, okul için otomatik olarak oluşturulacak kullanıcı hesabı için kullanılacaktır.
+                </p>
               </div>
               
               <div>

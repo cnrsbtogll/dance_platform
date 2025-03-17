@@ -271,7 +271,7 @@ function InstructorRequests() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-gray-500">
-                    {request.createdAt?.toDate().toLocaleDateString('tr-TR')}
+                    {request.createdAt ? request.createdAt.toDate().toLocaleDateString('tr-TR') : '-'}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
