@@ -1,9 +1,10 @@
 import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
 import { updateProfilePhotoDirectly } from '../../services/userService';
-import { Button, Avatar, Box, Typography, CircularProgress } from '@mui/material';
-import { CloudUpload } from '@mui/icons-material';
+import { Button, Avatar, Box, Typography, CircularProgress, Paper, IconButton, Backdrop } from '@mui/material';
+import { CloudUpload, PhotoCamera, Close, Edit, AddAPhoto } from '@mui/icons-material';
 import { auth } from '../../config/firebase';
 import { updateProfile } from 'firebase/auth';
+import { motion } from 'framer-motion';
 
 interface ProfilePhotoUploaderProps {
   userId: string;
@@ -21,6 +22,7 @@ const ProfilePhotoUploader: React.FC<ProfilePhotoUploaderProps> = ({
   const [previewURL, setPreviewURL] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const MAX_FILE_SIZE_MB = 5; // Maximum file size in MB
@@ -35,10 +37,7 @@ const ProfilePhotoUploader: React.FC<ProfilePhotoUploaderProps> = ({
     };
   }, [previewURL]);
 
-  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  const validateAndSetImage = (file: File) => {
     // Check file size
     if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
       setError(`Dosya boyutu çok büyük. Lütfen ${MAX_FILE_SIZE_MB}MB'dan küçük bir görsel seçin.`);
@@ -74,6 +73,33 @@ const ProfilePhotoUploader: React.FC<ProfilePhotoUploaderProps> = ({
     };
     
     img.src = objectUrl;
+  };
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    validateAndSetImage(file);
+  };
+
+  const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      validateAndSetImage(e.dataTransfer.files[0]);
+    }
   };
 
   const handleUpload = async () => {
@@ -233,9 +259,17 @@ const ProfilePhotoUploader: React.FC<ProfilePhotoUploaderProps> = ({
       fileInputRef.current.click();
     }
   };
+  
+  const handleClearPreview = () => {
+    if (previewURL && previewURL.startsWith('blob:')) {
+      URL.revokeObjectURL(previewURL);
+    }
+    setPreviewURL(null);
+    setError(null);
+  };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <input
         type="file"
         accept="image/*"
@@ -244,44 +278,223 @@ const ProfilePhotoUploader: React.FC<ProfilePhotoUploaderProps> = ({
         style={{ display: 'none' }}
       />
 
-      <Avatar
-        src={previewURL || currentPhotoURL}
-        alt="Profile"
-        sx={{ width: 100, height: 100, cursor: 'pointer', mb: 1 }}
-        onClick={triggerFileSelect}
-      />
-
-      <Box sx={{ display: 'flex', gap: 1 }}>
-        <Button
-          variant="outlined"
-          startIcon={<CloudUpload />}
-          onClick={triggerFileSelect}
-          disabled={isUploading}
+      <Box
+        component={motion.div}
+        whileHover={{ scale: 1.03 }}
+        sx={{ position: 'relative', mb: 3 }}
+      >
+        {/* Avatar with overlay */}
+        <Box
+          onDragEnter={handleDrag}
+          sx={{
+            position: 'relative',
+            width: 140,
+            height: 140,
+            borderRadius: '50%',
+            overflow: 'hidden',
+            boxShadow: '0 8px 24px rgba(149, 157, 165, 0.2)',
+            cursor: 'pointer',
+            border: dragActive ? '3px dashed #8B5CF6' : '3px solid #8B5CF6',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              boxShadow: '0 12px 28px rgba(149, 157, 165, 0.3)',
+            }
+          }}
+          onClick={!previewURL ? triggerFileSelect : undefined}
         >
-          Fotoğraf Seç
-        </Button>
+          <Avatar
+            src={previewURL || currentPhotoURL}
+            alt="Profile"
+            sx={{ 
+              width: '100%', 
+              height: '100%',
+              backgroundColor: '#e0e7ff'
+            }}
+          />
+          
+          {/* Gradient overlay on hover */}
+          {!previewURL && (
+            <Box
+              component={motion.div}
+              initial={{ opacity: 0 }}
+              whileHover={{ opacity: 1 }}
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.6) 0%, rgba(139, 92, 246, 0.6) 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                zIndex: 1
+              }}
+            >
+              <AddAPhoto fontSize="large" />
+            </Box>
+          )}
+        </Box>
 
-        {previewURL && (
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleUpload}
-            disabled={isUploading}
+        {/* Edit button overlay */}
+        {!previewURL && currentPhotoURL && (
+          <IconButton 
+            size="small"
+            onClick={triggerFileSelect}
+            component={motion.button}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            sx={{
+              position: 'absolute',
+              right: -5,
+              bottom: 10,
+              backgroundColor: '#8B5CF6',
+              color: 'white',
+              boxShadow: '0 4px 12px rgba(139, 92, 246, 0.4)',
+              border: '2px solid white',
+              '&:hover': {
+                backgroundColor: '#7C3AED',
+              }
+            }}
           >
-            {isUploading ? <CircularProgress size={24} /> : 'Yükle'}
-          </Button>
+            <Edit fontSize="small" />
+          </IconButton>
+        )}
+
+        {/* Preview controls */}
+        {previewURL && (
+          <Box 
+            component={motion.div}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            sx={{ 
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(0, 0, 0, 0.5)',
+              borderRadius: '50%',
+              padding: 2,
+              zIndex: 2
+            }}
+          >
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <IconButton 
+                size="small" 
+                onClick={handleUpload}
+                disabled={isUploading}
+                sx={{ 
+                  backgroundColor: 'white',
+                  color: '#8B5CF6',
+                  '&:hover': {
+                    backgroundColor: '#f9fafb',
+                  }
+                }}
+              >
+                {isUploading ? <CircularProgress size={20} color="inherit" /> : <CloudUpload />}
+              </IconButton>
+              <IconButton 
+                size="small" 
+                onClick={handleClearPreview}
+                disabled={isUploading}
+                sx={{ 
+                  backgroundColor: 'white',
+                  color: '#ef4444',
+                  '&:hover': {
+                    backgroundColor: '#f9fafb',
+                  }
+                }}
+              >
+                <Close />
+              </IconButton>
+            </Box>
+          </Box>
         )}
       </Box>
 
+      {/* Drop zone text or instructions */}
+      {!previewURL ? (
+        <Typography 
+          variant="body2" 
+          color="text.secondary" 
+          sx={{ 
+            mt: 1, 
+            textAlign: 'center',
+            maxWidth: 250,
+            fontWeight: 500,
+            color: dragActive ? '#8B5CF6' : 'inherit'
+          }}
+        >
+          Fotoğraf seçmek için tıklayın veya sürükleyip bırakın
+        </Typography>
+      ) : (
+        <Typography 
+          component={motion.p}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          variant="body2" 
+          color="primary" 
+          sx={{ 
+            mt: 1, 
+            textAlign: 'center',
+            fontWeight: 500,
+          }}
+        >
+          Fotoğrafınızı yüklemek için yukarıdaki kontrolleri kullanın
+        </Typography>
+      )}
+
       {error && (
-        <Typography color="error" variant="body2" sx={{ mt: 1, textAlign: 'center' }}>
+        <Typography 
+          component={motion.p}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          color="error" 
+          variant="body2" 
+          sx={{ mt: 2, textAlign: 'center', maxWidth: 300 }}
+        >
           {error}
         </Typography>
       )}
       
-      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+      <Typography 
+        variant="caption" 
+        color="text.secondary" 
+        sx={{ mt: 2, textAlign: 'center' }}
+      >
         Önerilen: 400x400 piksel, maksimum {MAX_FILE_SIZE_MB}MB boyutunda JPEG veya PNG dosyası.
       </Typography>
+
+      {/* Backdrop overlay for drag and drop */}
+      <Backdrop
+        sx={{ zIndex: (theme) => theme.zIndex.drawer + 1, color: '#fff' }}
+        open={dragActive}
+        invisible
+      >
+        <Box
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        />
+      </Backdrop>
     </Box>
   );
 };
