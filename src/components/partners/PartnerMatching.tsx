@@ -1,13 +1,14 @@
 // src/components/partners/PartnerMatching.tsx
 import React, { useState, useEffect, Fragment, ChangeEvent, FormEvent } from 'react';
 import { Transition } from '@headlessui/react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import CustomSelect from '../common/CustomSelect';
-import { collection, getDocs, query, orderBy, where, limit, DocumentData } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { collection, getDocs, query, orderBy, where, limit, DocumentData, addDoc, deleteDoc, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db, auth } from '../../config/firebase';
 import { useAuth } from '../../hooks/useAuth'; 
 import { User, DanceStyle as DanceStyleType, DanceLevel } from '../../types';
 import { motion } from 'framer-motion';
+import { fetchSignInMethodsForEmail } from 'firebase/auth';
 
 // Placeholder görüntü yolları - 404 hatasını önlemek için var olan bir görsele yönlendirelim
 const PLACEHOLDER_PARTNER_IMAGE = '/assets/images/dance/egitmen1.jpg';
@@ -72,6 +73,7 @@ interface FirestoreUser {
 
 function PartnerMatching(): JSX.Element {
   const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
   const [dansTuru, setDansTuru] = useState<string>('');
   const [cinsiyet, setCinsiyet] = useState<string>('');
   const [seviye, setSeviye] = useState<string>('');
@@ -87,6 +89,11 @@ function PartnerMatching(): JSX.Element {
   const [loadingStyles, setLoadingStyles] = useState(true);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState<boolean>(false);
+  const [contactStatus, setContactStatus] = useState<{partnerId: string, sent: boolean, message: string, contactId?: string} | null>(null);
+  // Toast bildirim durumu
+  const [toast, setToast] = useState<{show: boolean, message: string, type: 'success' | 'error' | 'info'} | null>(null);
+  // İletişim talebi gönderme veya iptal etme yükleniyor durumu
+  const [contactActionLoading, setContactActionLoading] = useState<boolean>(false);
 
   // Dans stilleri eşleştirme haritası - danceStyles ile users tablosundaki değerler arasında
   const [styleMapping, setStyleMapping] = useState<{[key: string]: DanceStyle}>({});
@@ -376,6 +383,95 @@ function PartnerMatching(): JSX.Element {
   // Fetch users from Firestore when component mounts
   useEffect(() => {
     fetchAndProcessUsers();
+  }, [currentUser]);
+
+  // Kullanıcının mevcut iletişim taleplerini kontrol et
+  useEffect(() => {
+    if (currentUser) {
+      checkExistingContactRequests();
+    } else {
+      // Kullanıcı çıkış yapmışsa iletişim talebi bilgilerini temizle
+      setContactStatus(null);
+      localStorage.removeItem('contactStatus');
+    }
+  }, [currentUser, partnerler]);
+
+  // Mevcut iletişim taleplerini kontrol et
+  const checkExistingContactRequests = async () => {
+    if (!currentUser || partnerler.length === 0) return;
+    
+    try {
+      const contactRequestsRef = collection(db, 'contactRequests');
+      const q = query(contactRequestsRef, 
+        where('senderId', '==', currentUser.id),
+        where('status', '==', 'pending')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const contactRequest = querySnapshot.docs[0].data();
+        const partnerId = contactRequest.receiverId;
+        
+        // İlgili partneri bul
+        const partner = partnerler.find(p => p.id === partnerId);
+        
+        if (partner) {
+          setContactStatus({
+            partnerId: partnerId,
+            sent: true,
+            message: `${partner.ad} adlı partnere iletişim talebiniz gönderildi. Yanıt bekleyin.`,
+            contactId: querySnapshot.docs[0].id
+          });
+          
+          // LocalStorage'a kaydet
+          localStorage.setItem('contactStatus', JSON.stringify({
+            partnerId: partnerId,
+            sent: true,
+            message: `${partner.ad} adlı partnere iletişim talebiniz gönderildi. Yanıt bekleyin.`,
+            contactId: querySnapshot.docs[0].id,
+            timestamp: new Date().getTime()
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('İletişim talepleri kontrol edilirken hata oluştu:', error);
+    }
+  };
+
+  // Sayfa yüklendiğinde local storage'dan contactStatus'u kontrol et
+  useEffect(() => {
+    const savedContactStatus = localStorage.getItem('contactStatus');
+    
+    // Kullanıcı giriş yapmamışsa localStorage'da iletişim bilgisi olmamalı
+    if (!currentUser) {
+      localStorage.removeItem('contactStatus');
+      return;
+    }
+    
+    if (savedContactStatus) {
+      try {
+        const parsedStatus = JSON.parse(savedContactStatus);
+        
+        // 24 saatten eski kayıtları temizle
+        const isStillValid = (new Date().getTime() - parsedStatus.timestamp) < 24 * 60 * 60 * 1000;
+        
+        if (isStillValid && currentUser) {
+          setContactStatus({
+            partnerId: parsedStatus.partnerId,
+            sent: parsedStatus.sent,
+            message: parsedStatus.message,
+            contactId: parsedStatus.contactId
+          });
+        } else {
+          // Süresi dolmuş veya kullanıcı giriş yapmamış, localStorage'dan temizle
+          localStorage.removeItem('contactStatus');
+        }
+      } catch (error) {
+        console.error('LocalStorage contact status parse hatası:', error);
+        localStorage.removeItem('contactStatus');
+      }
+    }
   }, [currentUser]);
 
   // Seviye seçenekleri
@@ -695,6 +791,232 @@ function PartnerMatching(): JSX.Element {
     setAramaTamamlandi(true);
   };
 
+  // Kullanıcının partnere iletişim isteği göndermesini yönetir
+  const handleContact = async (partner: Partner) => {
+    // Kullanıcı giriş yapmamışsa
+    if (!currentUser) {
+      // Modal popup göster
+      setShowLoginPrompt(true);
+      return;
+    }
+
+    // İşlem sırasında yükleniyor durumunu aktifleştir
+    setContactActionLoading(true);
+    
+    try {
+      // Firebase'e iletişim talebini kaydet
+      const contactRequestsRef = collection(db, 'contactRequests');
+      
+      // İletişim talebi verisini oluştur
+      const contactRequestData = {
+        senderId: currentUser.id,
+        senderName: currentUser.displayName,
+        senderPhoto: currentUser.photoURL,
+        receiverId: partner.id,
+        receiverName: partner.ad,
+        receiverPhoto: partner.foto,
+        status: 'pending', // pending, accepted, rejected, cancelled
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+      
+      // Firebase'e kaydet
+      const newContactRef = await addDoc(contactRequestsRef, contactRequestData);
+      
+      // Başarılı olunca durumu güncelle
+      setContactStatus({
+        partnerId: partner.id,
+        sent: true,
+        message: `${partner.ad} adlı partnere iletişim talebiniz gönderildi. Yanıt bekleyin.`,
+        contactId: newContactRef.id
+      });
+      
+      // LocalStorage'a kaydet - sayfa yenilendiğinde kaybolmaması için
+      localStorage.setItem('contactStatus', JSON.stringify({
+        partnerId: partner.id,
+        sent: true,
+        message: `${partner.ad} adlı partnere iletişim talebiniz gönderildi. Yanıt bekleyin.`,
+        contactId: newContactRef.id,
+        timestamp: new Date().getTime()
+      }));
+      
+      // Toast bildirimini göster
+      setToast({
+        show: true,
+        message: `${partner.ad} adlı partnere iletişim talebiniz gönderildi. Yanıt bekleyin.`,
+        type: 'success'
+      });
+      
+      // 5 saniye sonra toast'u kapat
+      setTimeout(() => {
+        setToast(null);
+      }, 5000);
+      
+      console.log(`${partner.ad} adlı partnere iletişim talebi gönderildi!`);
+    } catch (error) {
+      console.error('İletişim talebi gönderilirken hata:', error);
+      setToast({
+        show: true,
+        message: 'İletişim talebi gönderilirken bir hata oluştu. Lütfen tekrar deneyin.',
+        type: 'error'
+      });
+    } finally {
+      setContactActionLoading(false);
+    }
+  };
+
+  // İletişim talebini iptal et
+  const cancelContactRequest = async () => {
+    if (!contactStatus || !contactStatus.contactId || !currentUser) return;
+    
+    // İşlem sırasında yükleniyor durumunu aktifleştir
+    setContactActionLoading(true);
+    
+    try {
+      // İlgili partner bilgisini bul
+      const partner = partnerler.find(p => p.id === contactStatus.partnerId);
+      const partnerName = partner ? partner.ad : 'Partner';
+      
+      // Firestore'dan iletişim talebini al
+      const contactRef = doc(db, 'contactRequests', contactStatus.contactId);
+      const contactSnap = await getDoc(contactRef);
+      
+      if (contactSnap.exists()) {
+        // Talebin durumunu "cancelled" olarak güncelle (tamamen silmek yerine)
+        await updateDoc(contactRef, {
+          status: 'cancelled',
+          updatedAt: serverTimestamp()
+        });
+        
+        // ContactStatus durumunu temizle
+        setContactStatus(null);
+        
+        // localStorage'dan da temizle
+        localStorage.removeItem('contactStatus');
+        
+        // Başarı mesajı göster
+        setToast({
+          show: true,
+          message: `${partnerName} adlı partnere gönderdiğiniz iletişim talebi iptal edildi.`,
+          type: 'info'
+        });
+        
+        // 5 saniye sonra toast'u kapat
+        setTimeout(() => {
+          setToast(null);
+        }, 5000);
+      } else {
+        throw new Error('İletişim talebi bulunamadı');
+      }
+    } catch (error) {
+      console.error('İletişim talebi iptal edilirken hata:', error);
+      setToast({
+        show: true,
+        message: 'İletişim talebi iptal edilirken bir hata oluştu. Lütfen tekrar deneyin.',
+        type: 'error'
+      });
+    } finally {
+      setContactActionLoading(false);
+    }
+  };
+
+  // Toast bileşeni
+  const Toast = () => {
+    if (!toast || !toast.show) return null;
+    
+    const bgColorClass = toast.type === 'success' ? 'bg-green-500' : 
+                          toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+                          
+    return (
+      <div className="fixed bottom-5 right-5 z-50 transform transition-all duration-300 ease-in-out">
+        <div className={`${bgColorClass} text-white py-3 px-4 rounded-lg shadow-lg flex items-start max-w-md`}>
+          {toast.type === 'success' && (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+          {toast.type === 'error' && (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          )}
+          {toast.type === 'info' && (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )}
+          <span>{toast.message}</span>
+          <button 
+            onClick={() => setToast(null)}
+            className="ml-auto text-white hover:text-gray-200 flex-shrink-0"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Replace the login prompt banner with a modal popup
+  const LoginPromptModal = () => {
+    if (!showLoginPrompt) return null;
+    
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+          {/* Background overlay */}
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setShowLoginPrompt(false)}></div>
+          
+          {/* Modal panel */}
+          <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+          <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+            <div>
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
+                <svg className="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+              </div>
+              <div className="mt-3 text-center sm:mt-5">
+                <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                  Üyelik Gerekli
+                </h3>
+                <div className="mt-2">
+                  <p className="text-sm text-gray-500">
+                    İletişime geçmek için lütfen üye olun veya giriş yapın. Dans partnerlerinizle iletişime geçmek ve diğer özellikleri kullanabilmek için üyelik gereklidir.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+              <button
+                type="button"
+                className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-base font-medium text-white hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:col-start-2 sm:text-sm"
+                onClick={() => {
+                  setShowLoginPrompt(false);
+                  navigate('/signup');
+                }}
+              >
+                Kayıt Ol
+              </button>
+              <button
+                type="button"
+                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                onClick={() => {
+                  setShowLoginPrompt(false);
+                  navigate('/signin');
+                }}
+              >
+                Giriş Yap
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Partner kartı bileşeni - Modern tasarım
   const PartnerKarti: React.FC<PartnerKartiProps> = ({ partner }) => (
     <div className="bg-white rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 flex flex-col h-full">
@@ -832,21 +1154,74 @@ function PartnerMatching(): JSX.Element {
         </div>
         
         <div className="mt-auto">
-          <button 
-            className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-colors duration-300 flex items-center justify-center font-medium shadow-md"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-            İletişime Geç
-          </button>
+          {contactStatus && contactStatus.partnerId === partner.id && contactStatus.sent ? (
+            <div className="rounded-lg mb-4">
+              <div className="p-3 bg-green-100 text-green-800 rounded-lg mb-2 text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                {contactStatus.message}
+              </div>
+              <button 
+                className="w-full py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors duration-300 flex items-center justify-center font-medium"
+                onClick={cancelContactRequest}
+                disabled={contactActionLoading}
+              >
+                {contactActionLoading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-red-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    İşlem yapılıyor...
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    İletişim Talebini İptal Et
+                  </>
+                )}
+              </button>
+            </div>
+          ) : (
+            <button 
+              className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-colors duration-300 flex items-center justify-center font-medium shadow-md"
+              onClick={() => handleContact(partner)}
+              disabled={contactActionLoading}
+            >
+              {contactActionLoading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  İşlem yapılıyor...
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  İletişime Geç
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="container mx-auto px-4 py-8">
+      {/* Render the login prompt modal */}
+      <LoginPromptModal />
+      
+      {/* Toast bildirim */}
+      <Toast />
+      
       {/* Başlık ve filtreler */}
       <div className="mb-8">
         <motion.div 
@@ -862,45 +1237,6 @@ function PartnerMatching(): JSX.Element {
             Stilinize ve seviyenize uygun dans partnerleri bulun. Beraber dans etmek, teknik geliştirmek veya dans etkinliklerine katılmak için harika bir yol!
           </p>
         </motion.div>
-        
-        {/* Login prompt for non-authenticated users */}
-        {showLoginPrompt && !currentUser && (
-          <div className="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4 mb-6 rounded">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm">
-                  Kişiselleştirilmiş partner eşleştirmeleri için 
-                  <Link to="/signin" className="font-medium underline text-blue-700 hover:text-blue-600 ml-1">
-                    giriş yapabilir
-                  </Link>
-                  <span className="mx-1">veya</span>
-                  <Link to="/signup" className="font-medium underline text-blue-700 hover:text-blue-600">
-                    hesap oluşturabilirsiniz
-                  </Link>.
-                </p>
-              </div>
-              <div className="ml-auto pl-3">
-                <div className="-mx-1.5 -my-1.5">
-                  <button 
-                    type="button" 
-                    onClick={() => setShowLoginPrompt(false)}
-                    className="inline-flex bg-blue-50 rounded-md p-1.5 text-blue-500 hover:bg-blue-100 focus:outline-none"
-                  >
-                    <span className="sr-only">Kapat</span>
-                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
         
         {/* Mobile filter toggle */}
         <div className="lg:hidden mb-4">
@@ -1008,19 +1344,24 @@ function PartnerMatching(): JSX.Element {
                 
                 <button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-3 px-4 rounded-xl shadow-md transition-colors duration-300 font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 shadow-md flex items-center justify-center font-medium"
                   disabled={loading}
                 >
                   {loading ? (
-                    <span className="flex items-center justify-center">
+                    <>
                       <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                       Aranıyor...
-                    </span>
+                    </>
                   ) : (
-                    'Partner Ara'
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      Partner Ara
+                    </>
                   )}
                 </button>
               </form>

@@ -4,13 +4,14 @@ import InstructorManagement from './InstructorManagement';
 import InstructorRequests from './InstructorRequests';
 import DanceStyleManagement from './DanceStyleManagement';
 import { StudentManagement } from './StudentManagement';
+import ContactRequestsManagement from './ContactRequestsManagement';
 import SeedUsersButton from '../../scripts/SeedUsersButton';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { User } from '../../types';
 import { motion } from 'framer-motion';
 
-type TabType = 'okullar' | 'egitmenler' | 'egitmen-talepleri' | 'kurslar' | 'ogrenciler' | 'dans-stilleri' | 'ornek-veri' | 'okul-basvurulari';
+type TabType = 'okullar' | 'egitmenler' | 'egitmen-talepleri' | 'kurslar' | 'ogrenciler' | 'dans-stilleri' | 'ornek-veri' | 'okul-basvurulari' | 'iletisim-talepleri';
 
 interface AdminPanelProps {
   user?: User | null;
@@ -144,6 +145,16 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
             >
               Dans Stilleri
             </button>
+            <button
+              onClick={() => setActiveTab('iletisim-talepleri')}
+              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
+                activeTab === 'iletisim-talepleri'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              İletişim Talepleri
+            </button>
             {isSuperAdmin && (
               <button
                 onClick={() => setActiveTab('ornek-veri')}
@@ -177,6 +188,7 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
             </div>
           )}
           {activeTab === 'dans-stilleri' && <DanceStyleManagement />}
+          {activeTab === 'iletisim-talepleri' && <ContactRequestsManagement />}
           {activeTab === 'ornek-veri' && isSuperAdmin && (
             <div>
               <h2 className="text-xl font-semibold mb-4">Örnek Veri Ekleme</h2>
