@@ -114,7 +114,7 @@ function SearchFilters({ onFilterChange }: SearchFiltersProps): JSX.Element {
   ];
 
   // Seviye seçenekleri
-  const seviyeler: string[] = ['Başlangıç', 'Orta', 'İleri', 'Tüm Seviyeler'];
+  const seviyeler: string[] = ['Başlangıç', 'Orta', 'İleri'];
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
