@@ -1,260 +1,330 @@
-import React, { useState, useEffect } from 'react';
-import ClassCard from './ClassCard';
-import { dansKurslari } from '../../data/dansVerileri';
-import SearchFilters from '../search/SearchFilters';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect, ReactNode } from 'react';
+import { DanceClass, User } from '../../types';
+import { getInstructorDanceClasses, deleteDanceClass } from '../../services/classService';
 
-// Tip tanımlamaları
-interface Kurs {
-  id: number;
-  baslik: string;
-  aciklama: string;
-  seviye: string;
-  fiyat: string;
-  egitmen_id: number;
-  okul_id: number;
-  gorsel: string;
-  gun: string;
-  saat: string;
-  kapasite: number;
-  süre: string;
+interface ClassListProps {
+  user?: User | null;
+  instructorId?: string;
+  schoolId?: string;
+  onEdit?: (classId: string) => void;
+  onRefresh?: () => void;
+  refreshKey?: number; // Yenilemeyi tetiklemek için sayaç
+  emptyComponent?: ReactNode; // Boş durum için özel bileşen
 }
 
-interface FiltersType {
-  seviye?: string;
-  fiyatAralik?: string;
-  arama?: string;
-  dansTuru?: string;
-  gun?: string;
-}
-
-function ClassList(): JSX.Element {
-  const [kurslar, setKurslar] = useState<Kurs[]>([]);
-  const [filteredKurslar, setFilteredKurslar] = useState<Kurs[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [isFiltering, setIsFiltering] = useState<boolean>(false);
-  const [activeFilters, setActiveFilters] = useState<number>(0);
-
+const ClassList: React.FC<ClassListProps> = ({ 
+  user, 
+  instructorId, 
+  schoolId, 
+  onEdit, 
+  onRefresh,
+  refreshKey,
+  emptyComponent
+}) => {
+  const [classes, setClasses] = useState<DanceClass[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
+  
+  // Dersleri yükle
   useEffect(() => {
-    // Gerçek uygulamada bu verileri bir API'dan çekerdiniz
-    setKurslar(dansKurslari);
-    setFilteredKurslar(dansKurslari);
-    setLoading(false);
-  }, []);
-
-  const handleFilterChange = (filters: FiltersType): void => {
-    setIsFiltering(true);
-    let filtered = [...kurslar];
-    let filterCount = 0;
-
-    // Seviye filtresi
-    if (filters.seviye && filters.seviye !== 'Tümü') {
-      filtered = filtered.filter(kurs => kurs.seviye.includes(filters.seviye as string));
-      filterCount++;
+    if (!user && !instructorId && !schoolId) {
+      setError('Oturum bilginiz veya eğitmen/okul kimliği bulunamadı.');
+      setLoading(false);
+      return;
     }
-
-    // Dans türü filtresi
-    if (filters.dansTuru && filters.dansTuru !== '') {
-      filtered = filtered.filter(kurs => kurs.baslik.toLowerCase().includes(filters.dansTuru!.toLowerCase()));
-      filterCount++;
-    }
-
-    // Gün filtresi
-    if (filters.gun && filters.gun !== '') {
-      filtered = filtered.filter(kurs => kurs.gun === filters.gun);
-      filterCount++;
-    }
-
-    // Fiyat aralığı filtresi
-    if (filters.fiyatAralik) {
-      const [min, max] = filters.fiyatAralik.split('-');
-      filtered = filtered.filter(kurs => {
-        const fiyat = parseInt(kurs.fiyat.replace(/\D/g, ''));
-        return fiyat >= parseInt(min) && fiyat <= parseInt(max);
-      });
-      filterCount++;
-    }
-
-    // Arama filtresi
-    if (filters.arama) {
-      const searchTerm = filters.arama.toLowerCase();
-      filtered = filtered.filter(
-        kurs => kurs.baslik.toLowerCase().includes(searchTerm) || 
-                kurs.aciklama.toLowerCase().includes(searchTerm)
-      );
-      filterCount++;
-    }
-
-    setActiveFilters(filterCount);
-    setFilteredKurslar(filtered);
     
-    // Kısa bir gecikme sonrasında filtreleme animasyonunu kapat
-    setTimeout(() => {
-      setIsFiltering(false);
-    }, 600);
+    const fetchClasses = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        let classData: DanceClass[] = [];
+        
+        console.log('Dersler çekiliyor:', { user, instructorId, schoolId });
+        
+        if (instructorId) {
+          console.log('Eğitmen ID ile dersler çekiliyor:', instructorId);
+          classData = await getInstructorDanceClasses(instructorId);
+        } else if (schoolId) {
+          console.log('Okul ID ile dersler çekiliyor:', schoolId);
+          // Okul derslerini çekme fonksiyonu servise eklenebilir
+          // classData = await getSchoolDanceClasses(schoolId);
+        } else if (user && user.id) {
+          console.log('Kullanıcı ID ile dersler çekiliyor:', user.id);
+          classData = await getInstructorDanceClasses(user.id);
+        }
+        
+        console.log('Çekilen ders verileri:', classData);
+        setClasses(classData);
+      } catch (err) {
+        console.error('Dersler yüklenirken hata:', err);
+        setError('Dersler yüklenirken bir hata oluştu.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchClasses();
+  }, [user, instructorId, schoolId, onRefresh, refreshKey]);
+  
+  // Dersi sil
+  const handleDeleteClass = async (classId: string) => {
+    // Silme işlemi için onay al
+    const isConfirmed = window.confirm('Bu dersi silmek istediğinizden emin misiniz?');
+    
+    if (!isConfirmed) return;
+    
+    setDeleteLoading(classId);
+    
+    try {
+      await deleteDanceClass(classId);
+      setClasses(classes.filter(c => c.id !== classId));
+    } catch (err) {
+      console.error('Ders silinirken hata:', err);
+      setError('Ders silinirken bir hata oluştu.');
+    } finally {
+      setDeleteLoading(null);
+    }
   };
-
+  
+  // Dans stiline göre renk
+  const getDanceStyleColor = (style: string) => {
+    switch (style) {
+      case 'salsa':
+        return 'bg-red-500';
+      case 'bachata':
+        return 'bg-purple-500';
+      case 'kizomba':
+        return 'bg-blue-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+  
+  // Seviyeye göre renk
+  const getLevelColor = (level: string) => {
+    switch (level) {
+      case 'beginner':
+        return 'bg-green-500';
+      case 'intermediate':
+        return 'bg-yellow-500';
+      case 'advanced':
+        return 'bg-orange-500';
+      case 'professional':
+        return 'bg-red-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+  
+  // Türkçe seviye adı
+  const getLevelName = (level: string) => {
+    switch (level) {
+      case 'beginner':
+        return 'Başlangıç';
+      case 'intermediate':
+        return 'Orta';
+      case 'advanced':
+        return 'İleri';
+      case 'professional':
+        return 'Profesyonel';
+      default:
+        return level;
+    }
+  };
+  
+  // Türkçe dans stili adı
+  const getDanceStyleName = (style: string) => {
+    switch (style) {
+      case 'salsa':
+        return 'Salsa';
+      case 'bachata':
+        return 'Bachata';
+      case 'kizomba':
+        return 'Kizomba';
+      case 'other':
+        return 'Diğer';
+      default:
+        return style;
+    }
+  };
+  
+  // Tarihi formatla
+  const formatDate = (date: Date | any) => {
+    if (!date) return '';
+    
+    const d = new Date(date.seconds ? date.seconds * 1000 : date);
+    return d.toLocaleDateString('tr-TR', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric'
+    });
+  };
+  
   if (loading) {
+    return <div className="text-center py-8">Dersler yükleniyor...</div>;
+  }
+  
+  if (error) {
     return (
-      <div className="flex flex-col justify-center items-center h-screen bg-gray-50">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-indigo-600 mb-4"></div>
-        <p className="text-indigo-700 text-lg">Dans kursları yükleniyor...</p>
+      <div className="bg-red-100 text-red-700 p-4 rounded-lg">
+        <p>{error}</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="mt-2 px-4 py-2 bg-red-600 text-white rounded-lg"
+        >
+          Tekrar Dene
+        </button>
       </div>
     );
   }
-
+  
+  if (classes.length === 0) {
+    // Özel boş durum bileşeni varsa onu göster
+    if (emptyComponent) {
+      return <>{emptyComponent}</>;
+    }
+    
+    // Yoksa varsayılan boş durum mesajını göster
+    return (
+      <div className="text-center py-8">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+        <p className="text-gray-500">Henüz aktif ders bulunmuyor.</p>
+      </div>
+    );
+  }
+  
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-indigo-50/10 to-white">
-      {/* Hero Section */}
-      <div className="container mx-auto px-4 py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-center mb-10"
-        >
-          <h1 className="text-4xl sm:text-5xl font-bold mb-4 inline-block relative bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-            Dans Kursları
-          </h1>
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            Profesyonel eğitmenler eşliğinde dans yeteneklerinizi geliştirin ve tutkuyla dans edin. Seviyelere ve dans türlerine göre kendinize uygun kursu bulun.
-          </p>
-        </motion.div>
-      </div>
-
-      {/* Filter Section and Content */}
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="mb-10"
-        >
-          <SearchFilters onFilterChange={handleFilterChange} />
-        </motion.div>
-        
-        <div className="mt-8">
-          {/* Filtreleme Durumu */}
-          <motion.div
-            className="mb-8 flex justify-between items-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-          >
-            <div className="text-gray-700">
-              <span className="font-medium">{filteredKurslar.length}</span> kurs bulundu
-              {activeFilters > 0 && (
-                <span className="ml-2 text-indigo-600 text-sm font-medium">
-                  ({activeFilters} filtre aktif)
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-gray-200">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Ders
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Stil / Seviye
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Tarih / Saat
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Katılımcılar
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Durum
+            </th>
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              İşlemler
+            </th>
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-gray-200">
+          {classes.map((danceClass) => (
+            <tr key={danceClass.id} className="hover:bg-gray-50">
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="flex items-center">
+                  {danceClass.imageUrl ? (
+                    <img 
+                      src={danceClass.imageUrl} 
+                      alt={danceClass.name} 
+                      className="h-10 w-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${getDanceStyleColor(danceClass.danceStyle)} text-white font-bold`}>
+                      {getDanceStyleName(danceClass.danceStyle).charAt(0)}
+                    </div>
+                  )}
+                  <div className="ml-4">
+                    <div className="text-sm font-medium text-gray-900">{danceClass.name}</div>
+                    <div className="text-sm text-gray-500 truncate max-w-xs">
+                      {danceClass.description.substring(0, 50)}{danceClass.description.length > 50 ? '...' : ''}
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="flex flex-wrap gap-1">
+                  <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getDanceStyleColor(danceClass.danceStyle)} text-white`}>
+                    {getDanceStyleName(danceClass.danceStyle)}
+                  </span>
+                  <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getLevelColor(danceClass.level)} text-white`}>
+                    {getLevelName(danceClass.level)}
+                  </span>
+                </div>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="text-sm text-gray-900">{formatDate(danceClass.date)}</div>
+                <div className="text-sm text-gray-500">{danceClass.time}</div>
+                {danceClass.recurring && (
+                  <div className="mt-1">
+                    <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                      Tekrarlanan
+                    </span>
+                  </div>
+                )}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="flex items-center">
+                  <div className="h-2 w-full bg-gray-200 rounded-full">
+                    <div 
+                      className={`h-2 rounded-full ${
+                        danceClass.currentParticipants / danceClass.maxParticipants > 0.8
+                          ? 'bg-red-500'
+                          : danceClass.currentParticipants / danceClass.maxParticipants > 0.5
+                          ? 'bg-yellow-500'
+                          : 'bg-green-500'
+                      }`}
+                      style={{ width: `${(danceClass.currentParticipants / danceClass.maxParticipants) * 100}%` }}
+                    ></div>
+                  </div>
+                  <span className="ml-2 text-sm text-gray-700">
+                    {danceClass.currentParticipants} / {danceClass.maxParticipants}
+                  </span>
+                </div>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                  danceClass.status === 'active' ? 'bg-green-100 text-green-800' : 
+                  danceClass.status === 'cancelled' ? 'bg-red-100 text-red-800' : 
+                  danceClass.status === 'completed' ? 'bg-gray-100 text-gray-800' : 
+                  'bg-blue-100 text-blue-800'
+                }`}>
+                  {danceClass.status === 'active' ? 'Aktif' : 
+                   danceClass.status === 'cancelled' ? 'İptal' : 
+                   danceClass.status === 'completed' ? 'Tamamlandı' : 
+                   danceClass.status === 'draft' ? 'Taslak' : 
+                   'Aktif'}
                 </span>
-              )}
-            </div>
-            
-            <div className="flex space-x-2">
-              <button
-                onClick={() => {
-                  // En popüler kurslara göre sırala (örnek olarak id'ye göre)
-                  const sorted = [...filteredKurslar].sort((a, b) => a.id - b.id);
-                  setFilteredKurslar(sorted);
-                }}
-                className="px-3 py-1 text-sm border border-gray-300 rounded-full hover:border-indigo-500 hover:text-indigo-600 transition-colors"
-              >
-                En Popüler
-              </button>
-              <button
-                onClick={() => {
-                  // Fiyata göre artan sırala
-                  const sorted = [...filteredKurslar].sort((a, b) => {
-                    return parseInt(a.fiyat.replace(/\D/g, '')) - parseInt(b.fiyat.replace(/\D/g, ''));
-                  });
-                  setFilteredKurslar(sorted);
-                }}
-                className="px-3 py-1 text-sm border border-gray-300 rounded-full hover:border-indigo-500 hover:text-indigo-600 transition-colors"
-              >
-                Fiyat: Düşük-Yüksek
-              </button>
-              <button
-                onClick={() => {
-                  // Fiyata göre azalan sırala
-                  const sorted = [...filteredKurslar].sort((a, b) => {
-                    return parseInt(b.fiyat.replace(/\D/g, '')) - parseInt(a.fiyat.replace(/\D/g, ''));
-                  });
-                  setFilteredKurslar(sorted);
-                }}
-                className="px-3 py-1 text-sm border border-gray-300 rounded-full hover:border-indigo-500 hover:text-indigo-600 transition-colors"
-              >
-                Fiyat: Yüksek-Düşük
-              </button>
-            </div>
-          </motion.div>
-
-          {filteredKurslar.length > 0 ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-              className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 ${isFiltering ? 'opacity-50' : ''}`}
-            >
-              {filteredKurslar.map((kurs, index) => (
-                <motion.div
-                  key={kurs.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.1 + index * 0.05 }}
-                >
-                  <ClassCard kurs={kurs} />
-                </motion.div>
-              ))}
-            </motion.div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5 }}
-              className="text-center py-20"
-            >
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-100 text-indigo-600 mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-semibold text-gray-700 mb-2">Kurs Bulunamadı</h3>
-              <p className="text-gray-500 max-w-md mx-auto">Arama kriterlerinize uygun kurs bulunamadı. Lütfen farklı filtreler deneyiniz.</p>
-            </motion.div>
-          )}
-        </div>
-        
-        {/* Pagination (Optional) */}
-        {filteredKurslar.length > 12 && (
-          <div className="mt-12 flex justify-center">
-            <nav className="flex items-center space-x-2">
-              <button className="px-3 py-1 border border-gray-300 rounded-md hover:bg-indigo-50 text-gray-700 disabled:opacity-50">
-                Önceki
-              </button>
-              <button className="px-3 py-1 bg-indigo-600 text-white rounded-md">1</button>
-              <button className="px-3 py-1 border border-gray-300 rounded-md hover:bg-indigo-50 text-gray-700">2</button>
-              <button className="px-3 py-1 border border-gray-300 rounded-md hover:bg-indigo-50 text-gray-700">
-                Sonraki
-              </button>
-            </nav>
-          </div>
-        )}
-        
-        {/* CTA Section */}
-        <div className="mt-16 mb-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl overflow-hidden shadow-xl">
-          <div className="px-6 py-12 text-center text-white">
-            <h2 className="text-3xl font-bold mb-4">Dansta Yeteneklerini Keşfet</h2>
-            <p className="text-indigo-100 mb-8 max-w-2xl mx-auto">
-              Dans etmek sadece bir hareket değil, bir yaşam tarzıdır. Profesyonel eğitmenlerle dans yeteneklerinizi keşfedin.
-            </p>
-            <button className="px-6 py-3 bg-white text-indigo-700 font-medium rounded-lg shadow-md hover:bg-indigo-50 transition-colors duration-300">
-              Eğitmenlerle Tanışın
-            </button>
-          </div>
-        </div>
-      </div>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <div className="flex justify-end space-x-2">
+                  {onEdit && (
+                    <button
+                      onClick={() => onEdit(danceClass.id)}
+                      className="text-indigo-600 hover:text-indigo-900"
+                    >
+                      Düzenle
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDeleteClass(danceClass.id)}
+                    className="text-red-600 hover:text-red-900"
+                    disabled={deleteLoading === danceClass.id}
+                  >
+                    {deleteLoading === danceClass.id ? 'Siliniyor...' : 'Sil'}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
-}
+};
 
-export default ClassList; 
+export default ClassList;

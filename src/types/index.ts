@@ -17,6 +17,8 @@ export interface User {
   level?: DanceLevel;
   createdAt: Date;
   updatedAt?: Date;
+  schoolId?: string;  // Kullanıcının bağlı olduğu okul ID'si
+  instructorId?: string; // Öğrencinin bağlı olduğu eğitmen ID'si
 }
 
 export interface UserWithProfile extends User {
@@ -98,13 +100,18 @@ export interface DanceClass {
     longitude: number;
   };
   price: number;
-  currency: string;
+  currency: 'TRY' | 'USD' | 'EUR'; // Standart para birimi kodları
   duration: number; // Minutes
   maxParticipants: number;
   currentParticipants: number;
-  date: Date;
+  date: Date | any; // FireStore Timestamp için esneklik
   time: string;
   recurring: boolean;
   daysOfWeek?: string[];
   imageUrl?: string;
+  createdAt?: any; // Firestore Timestamp
+  updatedAt?: any; // Firestore Timestamp
+  status?: 'active' | 'cancelled' | 'completed' | 'draft';
+  tags?: string[]; // Ek etiketler
+  highlights?: string[]; // Öne çıkan bilgiler
 }
