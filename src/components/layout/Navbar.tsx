@@ -87,15 +87,15 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
 
   // Aktif sayfayı belirlemek için yardımcı fonksiyon
   const isActive = (path: string): boolean => {
-    // Ana sayfa (/) için partner bul sayfasını aktif göster
-    if (location.pathname === '/') {
-      return path === '/partners';
+    // Ana sayfa kontrolü - artık doğrudan '/' sayfası için kontrol ediyoruz
+    if (path === '/' && location.pathname === '/') {
+      return true;
     }
-    // Diğer sayfalar için normal kontrol
-    if (path === '/') {
-      return false; // Ana sayfa hiçbir zaman aktif gösterilmeyecek
+    // Diğer sayfalar için normal kontrol - eğer ana sayfa değilse
+    if (path !== '/' && path !== '') {
+      return location.pathname.startsWith(path);
     }
-    return location.pathname.startsWith(path);
+    return false;
   };
 
   return (
@@ -118,6 +118,14 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               <Link 
+                to="/" 
+                className={`${isActive('/') 
+                  ? 'border-indigo-500 text-indigo-700' 
+                  : 'border-transparent text-gray-500 hover:border-indigo-500 hover:text-indigo-700'} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+              >
+                Ana Sayfa
+              </Link>
+              <Link 
                 to="/partners" 
                 className={`${isActive('/partners') 
                   ? 'border-indigo-500 text-indigo-700' 
@@ -131,7 +139,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                   ? 'border-indigo-500 text-indigo-700' 
                   : 'border-transparent text-gray-500 hover:border-indigo-500 hover:text-indigo-700'} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
               >
-                Dans Kursları
+                Dans Kursu Bul
               </Link>
               <Link 
                 to="/progress" 
@@ -222,6 +230,15 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
         <div className="sm:hidden">
           <div className="pt-2 pb-3 space-y-1">
             <Link
+              to="/"
+              className={`block pl-3 pr-4 py-2 border-l-4 ${isActive('/') 
+                ? 'border-indigo-500 text-indigo-700 bg-indigo-50' 
+                : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-indigo-500 hover:text-indigo-700'} text-base font-medium`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Ana Sayfa
+            </Link>
+            <Link
               to="/partners"
               className={`block pl-3 pr-4 py-2 border-l-4 ${isActive('/partners') 
                 ? 'border-indigo-500 text-indigo-700 bg-indigo-50' 
@@ -237,7 +254,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                 : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-indigo-500 hover:text-indigo-700'} text-base font-medium`}
               onClick={() => setIsMenuOpen(false)}
             >
-              Dans Kursları
+              Dans Kursu Bul
             </Link>
             <Link
               to="/progress"

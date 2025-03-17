@@ -9,6 +9,7 @@ import Navbar from './components/layout/Navbar';
 import SignIn from './components/auth/SignIn';
 import SignUp from './components/auth/SignUp';
 import ProfileEditor from './components/profile/ProfileEditor';
+import Home from './components/home/Home';
 import useAuth from './hooks/useAuth';
 import { auth } from './config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -246,7 +247,7 @@ function App(): JSX.Element {
         
         <main className={`pt-20 pb-10 ${(isOffline || (error && !isOffline)) ? 'mt-8' : ''}`}>
           <Routes>
-            <Route path="/" element={<PartnerMatching />} />
+            <Route path="/" element={<Home isAuthenticated={isAuthenticated} user={user} />} />
             <Route path="/classes" element={<ClassList />} />
             <Route path="/class/:id" element={<ClassDetails />} />
             <Route path="/partners" element={<PartnerMatching />} />
@@ -282,7 +283,7 @@ function App(): JSX.Element {
               <div>
                 <h3 className="text-lg font-semibold mb-3">Bağlantılar</h3>
                 <ul className="space-y-2">
-                  <li><a href="/classes" className="text-gray-300 hover:text-white">Dans Kursları</a></li>
+                  <li><a href="/classes" className="text-gray-300 hover:text-white">Dans Kursu Bul</a></li>
                   <li><a href="/partners" className="text-gray-300 hover:text-white">Partner Bul</a></li>
                   <li><a href="/progress" className="text-gray-300 hover:text-white">İlerleme</a></li>
                   {isAuthenticated && (
