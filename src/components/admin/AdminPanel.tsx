@@ -3,14 +3,14 @@ import SchoolManagement from './SchoolManagement';
 import InstructorManagement from './InstructorManagement';
 import InstructorRequests from './InstructorRequests';
 import DanceStyleManagement from './DanceStyleManagement';
-import { UserManagement } from './UserManagement';
+import { StudentManagement } from './StudentManagement';
 import SeedUsersButton from '../../scripts/SeedUsersButton';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { User } from '../../types';
 import { motion } from 'framer-motion';
 
-type TabType = 'okullar' | 'egitmenler' | 'egitmen-talepleri' | 'kurslar' | 'kullanicilar' | 'dans-stilleri' | 'ornek-veri';
+type TabType = 'okullar' | 'egitmenler' | 'egitmen-talepleri' | 'kurslar' | 'ogrenciler' | 'dans-stilleri' | 'ornek-veri';
 
 interface AdminPanelProps {
   user?: User | null;
@@ -125,14 +125,14 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
               Kurslar
             </button>
             <button
-              onClick={() => setActiveTab('kullanicilar')}
+              onClick={() => setActiveTab('ogrenciler')}
               className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
-                activeTab === 'kullanicilar'
+                activeTab === 'ogrenciler'
                   ? 'border-indigo-500 text-indigo-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Kullanıcılar
+              Öğrenciler
             </button>
             {isSuperAdmin && (
               <button
@@ -160,7 +160,7 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
               <p className="text-gray-500 mt-2">Bu bölüm henüz yapım aşamasındadır.</p>
             </div>
           )}
-          {activeTab === 'kullanicilar' && <UserManagement />}
+          {activeTab === 'ogrenciler' && <StudentManagement />}
           {activeTab === 'ornek-veri' && isSuperAdmin && (
             <div>
               <h2 className="text-xl font-semibold mb-4">Örnek Veri Ekleme</h2>

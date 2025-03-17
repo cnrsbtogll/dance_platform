@@ -141,11 +141,87 @@ export const StudentManagement: React.FC = () => {
     checkIfSuperAdmin();
   }, []);
 
+  // Fetch all users (students, instructors, schools) from Firestore
+  const fetchAllUsers = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Get all users from Firestore
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, orderBy('createdAt', 'desc'));
+      const querySnapshot = await getDocs(q);
+      
+      const studentsData: FirebaseUser[] = [];
+      const instructorsData: Instructor[] = [];
+      const schoolsData: School[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        const id = doc.id;
+        
+        // Role değerini kontrol et - string veya array olabilir
+        let role = data.role;
+        
+        // Test için her rolü 
+        if (Array.isArray(role)) {
+          // Role bir array ise her role türüne göre işlem yap
+          if (role.includes('student')) {
+            studentsData.push({ id, ...data } as FirebaseUser);
+          }
+          if (role.includes('instructor')) {
+            instructorsData.push({
+              id,
+              displayName: data.displayName || 'İsimsiz Eğitmen',
+              email: data.email || ''
+            });
+          }
+          if (role.includes('school')) {
+            schoolsData.push({
+              id,
+              displayName: data.displayName || 'İsimsiz Okul',
+              email: data.email || ''
+            });
+          }
+        } else {
+          // Role bir string ise
+          if (role === 'student') {
+            studentsData.push({ id, ...data } as FirebaseUser);
+          } else if (role === 'instructor') {
+            instructorsData.push({
+              id,
+              displayName: data.displayName || 'İsimsiz Eğitmen',
+              email: data.email || ''
+            });
+          } else if (role === 'school') {
+            schoolsData.push({
+              id,
+              displayName: data.displayName || 'İsimsiz Okul',
+              email: data.email || ''
+            });
+          }
+        }
+      });
+      
+      console.log(`${studentsData.length} öğrenci bulundu`);
+      console.log(`${instructorsData.length} eğitmen bulundu:`, instructorsData.map(i => i.displayName));
+      console.log(`${schoolsData.length} okul bulundu:`, schoolsData.map(s => s.displayName));
+      
+      setStudents(studentsData);
+      setFilteredStudents(studentsData);
+      setInstructors(instructorsData);
+      setSchools(schoolsData);
+    } catch (err) {
+      console.error('Kullanıcılar yüklenirken hata oluştu:', err);
+      setError(`Kullanıcılar yüklenirken bir hata oluştu: ${err instanceof Error ? err.message : 'Bilinmeyen hata'}. Lütfen sayfayı yenileyin.`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Fetch students, instructors and schools on initial load
   useEffect(() => {
-    fetchStudents();
-    fetchInstructors();
-    fetchSchools();
+    fetchAllUsers();
   }, []);
 
   // Update filtered students when search term changes
@@ -167,91 +243,6 @@ export const StudentManagement: React.FC = () => {
     }
     
     setFilteredStudents(filtered);
-  };
-
-  // Fetch students from Firestore
-  const fetchStudents = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Get all student users from Firestore
-      const usersRef = collection(db, 'users');
-      const q = query(
-        usersRef, 
-        where("role", "==", "student"),
-        orderBy('createdAt', 'desc')
-      );
-      const querySnapshot = await getDocs(q);
-      
-      const studentsData: FirebaseUser[] = [];
-      querySnapshot.forEach((doc) => {
-        studentsData.push({
-          id: doc.id,
-          ...doc.data()
-        } as FirebaseUser);
-      });
-      
-      setStudents(studentsData);
-      setFilteredStudents(studentsData);
-    } catch (err) {
-      console.error('Öğrenciler yüklenirken hata oluştu:', err);
-      setError('Öğrenciler yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch instructors from Firestore
-  const fetchInstructors = async () => {
-    try {
-      const usersRef = collection(db, 'users');
-      const q = query(
-        usersRef, 
-        where("role", "==", "instructor")
-      );
-      const querySnapshot = await getDocs(q);
-      
-      const instructorsData: Instructor[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        instructorsData.push({
-          id: doc.id,
-          displayName: data.displayName || 'İsimsiz Eğitmen',
-          email: data.email || ''
-        });
-      });
-      
-      setInstructors(instructorsData);
-    } catch (err) {
-      console.error('Eğitmenler yüklenirken hata oluştu:', err);
-    }
-  };
-
-  // Fetch schools from Firestore
-  const fetchSchools = async () => {
-    try {
-      const usersRef = collection(db, 'users');
-      const q = query(
-        usersRef, 
-        where("role", "==", "school")
-      );
-      const querySnapshot = await getDocs(q);
-      
-      const schoolsData: School[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        schoolsData.push({
-          id: doc.id,
-          displayName: data.displayName || 'İsimsiz Okul',
-          email: data.email || ''
-        });
-      });
-      
-      setSchools(schoolsData);
-    } catch (err) {
-      console.error('Okullar yüklenirken hata oluştu:', err);
-    }
   };
 
   // Edit student
@@ -281,7 +272,7 @@ export const StudentManagement: React.FC = () => {
       email: '',
       phoneNumber: '',
       level: 'beginner',
-      photoURL: '',
+      photoURL: '/assets/placeholders/default-student.jpg',
       instructorId: '',
       schoolId: '',
       password: '',
@@ -307,6 +298,9 @@ export const StudentManagement: React.FC = () => {
       }));
     }
   };
+
+  // Default placeholder image for students
+  const DEFAULT_STUDENT_IMAGE = '/assets/placeholders/default-student.png';
 
   // Form submission
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
@@ -334,7 +328,8 @@ export const StudentManagement: React.FC = () => {
           schoolName = selectedSchool?.displayName || '';
         }
         
-        await updateDoc(userRef, {
+        // Öğrenci güncellenirken role değeri korunur (değiştirilmez)
+        const updateData = {
           displayName: formData.displayName,
           phoneNumber: formData.phoneNumber,
           level: formData.level,
@@ -342,28 +337,39 @@ export const StudentManagement: React.FC = () => {
           instructorName: instructorName || null,
           schoolId: formData.schoolId || null,
           schoolName: schoolName || null,
+          photoURL: formData.photoURL || DEFAULT_STUDENT_IMAGE,
           updatedAt: serverTimestamp()
-        });
+        };
         
-        // Update the students array
-        const updatedStudents = students.map(student => 
-          student.id === selectedStudent.id 
-            ? { 
-                ...student, 
-                displayName: formData.displayName,
-                phoneNumber: formData.phoneNumber,
-                level: formData.level,
-                instructorId: formData.instructorId || null,
-                instructorName: instructorName || null,
-                schoolId: formData.schoolId || null,
-                schoolName: schoolName || null,
-                updatedAt: serverTimestamp() as Timestamp 
-              } 
-            : student
-        );
-        
-        setStudents(updatedStudents);
-        setSuccess('Öğrenci bilgileri başarıyla güncellendi.');
+        try {
+          await updateDoc(userRef, updateData);
+          console.log('Öğrenci güncellendi:', selectedStudent.id);
+          
+          // Update the students array
+          const updatedStudents = students.map(student => 
+            student.id === selectedStudent.id 
+              ? { 
+                  ...student, 
+                  displayName: formData.displayName,
+                  phoneNumber: formData.phoneNumber,
+                  level: formData.level,
+                  instructorId: formData.instructorId || null,
+                  instructorName: instructorName || null,
+                  schoolId: formData.schoolId || null,
+                  schoolName: schoolName || null,
+                  photoURL: formData.photoURL || DEFAULT_STUDENT_IMAGE,
+                  updatedAt: serverTimestamp() as Timestamp 
+                } 
+              : student
+          );
+          
+          setStudents(updatedStudents);
+          setSuccess('Öğrenci bilgileri başarıyla güncellendi.');
+        } catch (updateError) {
+          console.error('Öğrenci güncellenirken hata:', updateError);
+          throw new Error('Öğrenci güncellenirken bir hata oluştu: ' + 
+            (updateError instanceof Error ? updateError.message : 'Bilinmeyen hata'));
+        }
       } else {
         // Create new student
         if (!formData.email || !formData.displayName) {
@@ -401,7 +407,7 @@ export const StudentManagement: React.FC = () => {
           // Update user profile
           await updateProfile(userCredential.user, {
             displayName: formData.displayName,
-            photoURL: formData.photoURL || null
+            photoURL: formData.photoURL || DEFAULT_STUDENT_IMAGE
           });
           
           // Send email verification
@@ -437,28 +443,35 @@ export const StudentManagement: React.FC = () => {
           instructorName: instructorName || null,
           schoolId: formData.schoolId || null,
           schoolName: schoolName || null,
-          photoURL: formData.photoURL || '',
+          photoURL: formData.photoURL || DEFAULT_STUDENT_IMAGE,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         };
         
-        await setDoc(doc(db, 'users', userId), newStudentData);
-        
-        // Add to students array
-        const newStudent: FirebaseUser = {
-          ...newStudentData,
-          role: 'student' as UserRole,
-          level: formData.level,
-          instructorId: formData.instructorId || null,
-          instructorName: instructorName || null,
-          schoolId: formData.schoolId || null,
-          schoolName: schoolName || null,
-          createdAt: serverTimestamp() as Timestamp,
-          updatedAt: serverTimestamp() as Timestamp
-        };
-        
-        setStudents([newStudent, ...students]);
-        setSuccess('Yeni öğrenci başarıyla oluşturuldu.');
+        try {
+          await setDoc(doc(db, 'users', userId), newStudentData);
+          console.log('Yeni öğrenci kaydedildi:', userId);
+          
+          // Add to students array
+          const newStudent: FirebaseUser = {
+            ...newStudentData,
+            role: 'student' as UserRole,
+            level: formData.level,
+            instructorId: formData.instructorId || null,
+            instructorName: instructorName || null,
+            schoolId: formData.schoolId || null,
+            schoolName: schoolName || null,
+            createdAt: serverTimestamp() as Timestamp,
+            updatedAt: serverTimestamp() as Timestamp
+          };
+          
+          setStudents([newStudent, ...students]);
+          setSuccess('Yeni öğrenci başarıyla oluşturuldu.');
+        } catch (docError) {
+          console.error('Firestore dökümanı oluşturulurken hata:', docError);
+          throw new Error('Öğrenci bilgileri kaydedilirken bir hata oluştu: ' + 
+            (docError instanceof Error ? docError.message : 'Bilinmeyen hata'));
+        }
       }
       
       // Close the form
@@ -516,10 +529,10 @@ export const StudentManagement: React.FC = () => {
             <div className="flex-shrink-0 h-10 w-10">
               <img
                 className="h-10 w-10 rounded-full object-cover"
-                src={student.photoURL || 'https://via.placeholder.com/40?text=User'}
+                src={student.photoURL || DEFAULT_STUDENT_IMAGE}
                 alt={student.displayName}
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = "https://via.placeholder.com/40?text=User";
+                  (e.target as HTMLImageElement).src = DEFAULT_STUDENT_IMAGE;
                 }}
               />
             </div>

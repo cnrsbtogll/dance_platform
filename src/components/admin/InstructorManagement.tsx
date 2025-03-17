@@ -21,6 +21,8 @@ import {
 } from 'firebase/auth';
 import { db, auth } from '../../config/firebase';
 import { motion } from 'framer-motion';
+import InstructorPhotoUploader from './InstructorPhotoUploader';
+import { resizeImageFromBase64 } from '../../services/userService';
 
 // Tip tanımlamaları
 interface Egitmen {
@@ -66,8 +68,7 @@ interface FormData {
   gorsel: string;
   email?: string;
   phoneNumber?: string;
-  password?: string; // Super admin için yeni alan
-  createAccount?: boolean; // Kullanıcı hesabı oluşturmak için
+  password?: string; // Şifre alanı
 }
 
 function InstructorManagement(): JSX.Element {
@@ -85,8 +86,7 @@ function InstructorManagement(): JSX.Element {
     gorsel: '',
     email: '',
     phoneNumber: '',
-    password: '',
-    createAccount: true // Varsayılan olarak hesap oluşturma aktif
+    password: ''
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -239,8 +239,7 @@ function InstructorManagement(): JSX.Element {
       gorsel: egitmen.gorsel,
       email: egitmen.email || '',
       phoneNumber: egitmen.phoneNumber || '',
-      password: '',
-      createAccount: false
+      password: ''
     });
     setDuzenlemeModu(true);
   };
@@ -257,8 +256,7 @@ function InstructorManagement(): JSX.Element {
       gorsel: '/assets/images/dance/egitmen_default.jpg',
       email: '',
       phoneNumber: '',
-      password: '',
-      createAccount: true // Her zaman hesap oluşturulmalı
+      password: ''
     });
     setDuzenlemeModu(true);
   };
@@ -281,6 +279,76 @@ function InstructorManagement(): JSX.Element {
     }
   };
 
+  // Fotoğraf değişikliği
+  const handleImageChange = async (base64Image: string | null): Promise<void> => {
+    try {
+      setLoading(true);
+      
+      // Eğer fotoğraf silindiyse
+      if (base64Image === null) {
+        setFormVeri(prev => ({
+          ...prev,
+          gorsel: '/assets/images/dance/egitmen_default.jpg'
+        }));
+        setLoading(false);
+        return;
+      }
+      
+      // Görüntü boyutunu küçültmek için resizeImageFromBase64 kullan
+      const resizedImage = await resizeImageFromBase64(base64Image, 400, 400, 0.75);
+      
+      // Form state'ini güncelle
+      setFormVeri(prev => ({
+        ...prev,
+        gorsel: resizedImage
+      }));
+      
+      // Eğer mevcut bir eğitmen düzenleniyorsa, doğrudan Firebase'e kaydet
+      if (seciliEgitmen) {
+        const egitmenRef = doc(db, 'instructors', seciliEgitmen.id);
+        
+        // Eğitmen dokümanının görsel alanını güncelle
+        await updateDoc(egitmenRef, {
+          gorsel: resizedImage,
+          updatedAt: serverTimestamp()
+        });
+        
+        // Eğitmene ait kullanıcı varsa, onun photoURL'ini de güncelle
+        const egitmenDoc = await getDoc(egitmenRef);
+        if (egitmenDoc.exists() && egitmenDoc.data().userId) {
+          const userId = egitmenDoc.data().userId;
+          
+          try {
+            // Kullanıcı belgesini güncelle
+            await updateDoc(doc(db, 'users', userId), {
+              photoURL: resizedImage,
+              updatedAt: serverTimestamp()
+            });
+            
+            console.log('Kullanıcı fotoğrafı da güncellendi');
+          } catch (userError) {
+            console.error('Kullanıcı fotoğrafı güncellenirken hata:', userError);
+          }
+        }
+        
+        setSuccess('Fotoğraf başarıyla yüklendi ve kaydedildi.');
+      } else {
+        // Yeni eğitmen ekleme durumunda sadece form state'i güncellenir
+        setSuccess('Fotoğraf başarıyla yüklendi. Eğitmen kaydedildiğinde fotoğraf da kaydedilecek.');
+      }
+      
+      // 3 saniye sonra başarı mesajını temizle
+      setTimeout(() => {
+        setSuccess(null);
+      }, 3000);
+    } catch (error) {
+      console.error('Fotoğraf yüklenirken hata oluştu:', error);
+      setError('Fotoğraf yüklenirken bir hata oluştu. Lütfen tekrar deneyin.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Form gönderimi
   const formGonder = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
@@ -293,7 +361,7 @@ function InstructorManagement(): JSX.Element {
     
     try {
       if (seciliEgitmen) {
-        // Mevcut eğitmeni güncelle
+        // Mevcut eğitmeni güncelle - görsel zaten yüklenmiş olabilir
         const egitmenRef = doc(db, 'instructors', seciliEgitmen.id);
         
         await updateDoc(egitmenRef, {
@@ -323,62 +391,59 @@ function InstructorManagement(): JSX.Element {
           } : egitmen
         );
         setEgitmenler(guncellenenEgitmenler);
-        setSuccess('Eğitmen bilgileri başarıyla güncellendi.');
+        setSuccess('Eğitmen bilgileri başarıyla güncellendi. Fotoğraf daha önceden işlenmiş ve kaydedilmişti.');
         
       } else {
-        // Kullanıcı hesabı oluşturma kısmı (artık her zaman yapılacak)
+        // Kullanıcı hesabı oluşturma kısmı (her zaman yapılacak)
         let userId = '';
         let geciciSifre = '';
         
-        if (formVeri.createAccount && formVeri.email) {
-          if (!formVeri.email) {
-            throw new Error('Eğitmen hesabı oluşturmak için geçerli bir e-posta adresi gereklidir.');
-          }
-          
-          // Email'in zaten kullanılıp kullanılmadığını kontrol et
-          const usersRef = collection(db, 'users');
-          const emailQuery = query(usersRef, where('email', '==', formVeri.email));
-          const emailQuerySnapshot = await getDocs(emailQuery);
-          
-          if (!emailQuerySnapshot.empty) {
-            throw new Error('Bu e-posta adresi zaten kullanılıyor.');
-          }
-          
-          // Geçici şifre oluştur - eğitmen ismine göre basit bir şifre
-          geciciSifre = formVeri.password || `${formVeri.ad.replace(/\s+/g, '').toLowerCase()}${new Date().getFullYear()}`;
-          
-          // Firebase Auth ile yeni kullanıcı oluştur
-          const userCredential = await createUserWithEmailAndPassword(
-            auth, 
-            formVeri.email, 
-            geciciSifre
-          );
-          
-          userId = userCredential.user.uid;
-          
-          // Kullanıcı profilini güncelle
-          await updateProfile(userCredential.user, {
-            displayName: formVeri.ad,
-            photoURL: formVeri.gorsel || null
-          });
-          
-          // E-posta doğrulama gönder
-          await sendEmailVerification(userCredential.user);
-          
-          // Firestore'da users koleksiyonuna yeni kullanıcı ekle
-          await setDoc(doc(db, 'users', userId), {
-            id: userId,
-            email: formVeri.email,
-            displayName: formVeri.ad,
-            phoneNumber: formVeri.phoneNumber || '',
-            role: ['instructor'], // Eğitmen rolü ekle
-            level: 'advanced', // Eğitmenler için varsayılan seviye 
-            photoURL: formVeri.gorsel || '',
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-            schoolId: okul_id // Eğitmenin bağlı olduğu okul
-          });
+        if (!formVeri.email) {
+          throw new Error('Eğitmen hesabı oluşturmak için geçerli bir e-posta adresi gereklidir.');
         }
+        
+        // Email'in zaten kullanılıp kullanılmadığını kontrol et
+        const usersRef = collection(db, 'users');
+        const emailQuery = query(usersRef, where('email', '==', formVeri.email));
+        const emailQuerySnapshot = await getDocs(emailQuery);
+        
+        if (!emailQuerySnapshot.empty) {
+          throw new Error('Bu e-posta adresi zaten kullanılıyor.');
+        }
+        
+        // Geçici şifre oluştur - eğitmen ismine göre basit bir şifre
+        geciciSifre = formVeri.password || `${formVeri.ad.replace(/\s+/g, '').toLowerCase()}${new Date().getFullYear()}`;
+        
+        // Firebase Auth ile yeni kullanıcı oluştur
+        const userCredential = await createUserWithEmailAndPassword(
+          auth, 
+          formVeri.email, 
+          geciciSifre
+        );
+        
+        userId = userCredential.user.uid;
+        
+        // Kullanıcı profilini güncelle
+        await updateProfile(userCredential.user, {
+          displayName: formVeri.ad
+        });
+        
+        // E-posta doğrulama gönder
+        await sendEmailVerification(userCredential.user);
+        
+        // Firestore'da users koleksiyonuna yeni kullanıcı ekle
+        await setDoc(doc(db, 'users', userId), {
+          id: userId,
+          email: formVeri.email,
+          displayName: formVeri.ad,
+          phoneNumber: formVeri.phoneNumber || '',
+          role: ['instructor'], // Eğitmen rolü ekle
+          level: 'advanced', // Eğitmenler için varsayılan seviye 
+          photoURL: formVeri.gorsel || '',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          schoolId: okul_id // Eğitmenin bağlı olduğu okul
+        });
         
         // Yeni eğitmen ekle
         const newInstructorData = {
@@ -408,17 +473,13 @@ function InstructorManagement(): JSX.Element {
         setEgitmenler([yeniEgitmen, ...egitmenler]);
         
         // Başarı mesajı
-        if (userId) {
-          setSuccess(
-            `Yeni eğitmen ve hesabı başarıyla oluşturuldu!\n\n` +
-            `Eğitmen Giriş Bilgileri:\n` +
-            `E-posta: ${formVeri.email}\n` +
-            `Geçici Şifre: ${geciciSifre}\n\n` +
-            `ÖNEMLİ: Lütfen bu şifreyi not alın, daha sonra görüntüleyemeyeceksiniz.`
-          );
-        } else {
-          setSuccess('Yeni eğitmen başarıyla eklendi.');
-        }
+        setSuccess(
+          `Yeni eğitmen ve hesabı başarıyla oluşturuldu!\n\n` +
+          `Eğitmen Giriş Bilgileri:\n` +
+          `E-posta: ${formVeri.email}\n` +
+          `Geçici Şifre: ${geciciSifre}\n\n` +
+          `ÖNEMLİ: Lütfen bu şifreyi not alın, daha sonra görüntüleyemeyeceksiniz.`
+        );
       }
       
       // Formu kapat
@@ -588,23 +649,22 @@ function InstructorManagement(): JSX.Element {
                 )}
               </div>
               
-              {/* E-posta ve şifre alanları - tüm kullanıcılar görür */}
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                  E-posta {!seciliEgitmen && formVeri.createAccount && '*'}
+                  E-posta*
                 </label>
                 <input
                   type="email"
                   id="email"
                   name="email"
-                  required={!seciliEgitmen && formVeri.createAccount}
+                  required={!seciliEgitmen}
                   value={formVeri.email}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                 />
                 {!seciliEgitmen && (
                   <p className="mt-1 text-xs text-gray-500">
-                    Bu e-posta adresi, eğitmen için otomatik olarak oluşturulacak kullanıcı hesabı için kullanılacaktır.
+                    Eğitmen için otomatik olarak bir kullanıcı hesabı oluşturulacaktır.
                   </p>
                 )}
               </div>
@@ -625,42 +685,23 @@ function InstructorManagement(): JSX.Element {
               
               {!seciliEgitmen && (
                 <div className="md:col-span-2">
-                  <div className="flex items-center mb-2">
-                    <input
-                      type="checkbox"
-                      id="createAccount"
-                      name="createAccount"
-                      checked={formVeri.createAccount}
-                      onChange={handleInputChange}
-                      className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                    />
-                    <label htmlFor="createAccount" className="ml-2 block text-sm text-gray-700">
-                      Eğitmen için giriş yapabilen kullanıcı hesabı oluştur
+                  <div className="mt-3">
+                    <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                      Şifre
                     </label>
+                    <input
+                      type="password"
+                      id="password"
+                      name="password"
+                      value={formVeri.password}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                      placeholder="Boş bırakırsanız otomatik şifre oluşturulur"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Şifre belirtilmezse, eğitmenin adına göre otomatik bir şifre oluşturulacaktır.
+                    </p>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    Bu seçenek işaretlendiğinde, eğitmen için otomatik olarak bir kullanıcı hesabı oluşturulur ve "instructor" rolü atanır.
-                  </p>
-                  
-                  {formVeri.createAccount && (
-                    <div className="mt-3">
-                      <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                        Şifre
-                      </label>
-                      <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        value={formVeri.password}
-                        onChange={handleInputChange}
-                        className="w-full p-2 border border-gray-300 rounded-md"
-                        placeholder="Boş bırakırsanız otomatik şifre oluşturulur"
-                      />
-                      <p className="mt-1 text-xs text-gray-500">
-                        Şifre belirtilmezse, eğitmenin adına göre otomatik bir şifre oluşturulacaktır.
-                      </p>
-                    </div>
-                  )}
                 </div>
               )}
               
@@ -680,30 +721,22 @@ function InstructorManagement(): JSX.Element {
               
               <div className="md:col-span-2">
                 <label htmlFor="gorsel" className="block text-sm font-medium text-gray-700 mb-1">
-                  Fotoğraf URL'si
+                  Eğitmen Fotoğrafı
                 </label>
-                <input
-                  type="text"
-                  id="gorsel"
-                  name="gorsel"
-                  value={formVeri.gorsel}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                  placeholder="https://ornek.com/foto.jpg"
+                <InstructorPhotoUploader 
+                  currentPhotoURL={formVeri.gorsel} 
+                  onImageChange={(base64Image: string | null) => {
+                    if (base64Image !== null) {
+                      handleImageChange(base64Image);
+                    } else {
+                      // Fotoğraf silindiğinde işlem
+                      setFormVeri(prev => ({
+                        ...prev,
+                        gorsel: '/assets/images/dance/egitmen_default.jpg'
+                      }));
+                    }
+                  }} 
                 />
-                
-                {formVeri.gorsel && (
-                  <div className="mt-2">
-                    <img 
-                      src={formVeri.gorsel} 
-                      alt="Önizleme" 
-                      className="h-20 w-20 object-cover rounded-md"
-                      onError={(e) => { 
-                        (e.target as HTMLImageElement).src = "/assets/images/dance/egitmen_default.jpg";
-                      }} 
-                    />
-                  </div>
-                )}
               </div>
             </div>
             
