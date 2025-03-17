@@ -9,8 +9,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { User, DanceStyle as DanceStyleType, DanceLevel } from '../../types';
 import { motion } from 'framer-motion';
 
-// Placeholder görüntü yolları
-const PLACEHOLDER_PARTNER_IMAGE = '/assets/placeholders/dance-partner-placeholder.svg';
+// Placeholder görüntü yolları - 404 hatasını önlemek için var olan bir görsele yönlendirelim
+const PLACEHOLDER_PARTNER_IMAGE = '/assets/images/dance/egitmen1.jpg';
 
 // Extended User interface with partner matching properties
 interface ExtendedUser extends User {
@@ -86,6 +86,7 @@ function PartnerMatching(): JSX.Element {
   const [danceStyles, setDanceStyles] = useState<DanceStyle[]>([]);
   const [loadingStyles, setLoadingStyles] = useState(true);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState<boolean>(false);
 
   // Dans stilleri eşleştirme haritası - danceStyles ile users tablosundaki değerler arasında
   const [styleMapping, setStyleMapping] = useState<{[key: string]: DanceStyle}>({});
@@ -297,7 +298,7 @@ function PartnerMatching(): JSX.Element {
         weight: extendedCurrentUser.weight,
       } : null;
 
-      // Fetch all users except current user and exclude admins and instructors
+      // Fetch all users who are students (regardless of current user login status)
       const usersRef = collection(db, 'users');
       const q = query(usersRef);
       const querySnapshot = await getDocs(q);
@@ -319,8 +320,8 @@ function PartnerMatching(): JSX.Element {
           isOnlyStudent = userData.role === 'student';
         }
         
-        // Include only current user's partner matches (exclude self) who are only students
-        if (currentUser && doc.id !== currentUser.id && isOnlyStudent) {
+        // Include students & exclude current user if logged in
+        if ((!currentUser || doc.id !== currentUser.id) && isOnlyStudent) {
           users.push({
             id: doc.id,
             displayName: userData.displayName || '',
@@ -343,28 +344,25 @@ function PartnerMatching(): JSX.Element {
       const partners = users.map(user => {
         const partner = convertUserToPartner(user);
         
-        // Calculate relevance score
+        // Calculate relevance score if user is logged in
         if (currentUserData) {
           partner.relevanceScore = calculateRelevanceScore(partner, currentUserData);
+        } else {
+          // No relevance score for anonymous users
+          partner.relevanceScore = 0;
         }
         
         return partner;
       });
       
-      // Sort by relevance score and take top ones
-      const sortedPartners = [...partners].sort((a, b) => 
-        (b.relevanceScore || 0) - (a.relevanceScore || 0)
-      );
+      // Sort by relevance score for logged in users, otherwise randomly
+      const sortedPartners = currentUserData 
+        ? [...partners].sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
+        : [...partners].sort(() => Math.random() - 0.5); // Shuffle for anonymous users
       
       setAllPartnerler(sortedPartners);
       setPartnerler(sortedPartners.slice(0, 12)); // Show top 12 initially
       setAramaTamamlandi(true);
-      
-      // Debug
-      console.log("Kullanıcılar ve dans stilleri yüklendi:");
-      users.forEach(user => {
-        console.log(`${user.displayName} kullanıcısının dans stilleri:`, user.danceStyles);
-      });
       
     } catch (err) {
       console.error('Error fetching users:', err);
@@ -519,29 +517,16 @@ function PartnerMatching(): JSX.Element {
     uygunSaatlerValue: string[]
   ): void => {
     setLoading(true);
-    console.log("Filtreler uygulanıyor...");
-    console.log("Dans türü:", dansTuruValue);
-    console.log("Cinsiyet:", cinsiyetValue);
-    console.log("Seviye:", seviyeValue);
-    console.log("Konum:", konumValue);
-    console.log("Uygun saatler:", uygunSaatlerValue);
     
-    // Debug amaçlı partner konumlarını logla
-    debugPartnerLocations();
-    
-    // Debug için tüm partner dans stillerini göster
-    debugDansStilleri();
-
-    // Mobile view: Hide filters after search
-    if (window.innerWidth < 1024) {
-      setIsFilterVisible(false);
-    }
-
-    // Filter partners based on criteria
-    setTimeout(() => {
-      let filtreliPartnerler = [...allPartnerler];
-      console.log("Filtreleme öncesi partner sayısı:", filtreliPartnerler.length);
-
+    try {
+      // Prompt for login after applying filters if not logged in
+      if (!currentUser) {
+        setShowLoginPrompt(true);
+      }
+      
+      // Apply filters
+      let filteredResults = [...allPartnerler];
+      
       if (dansTuruValue) {
         // Seçilen dans türünü bulalım
         const selectedDanceStyle = danceStyles.find(style => style.value === dansTuruValue);
@@ -557,7 +542,7 @@ function PartnerMatching(): JSX.Element {
           console.log("Filtreleme değerleri - ID:", selectedId, "Value:", selectedValue, "Label:", selectedLabel);
           
           // Dans stillerini kontrol et
-          filtreliPartnerler = filtreliPartnerler.filter(partner => {
+          filteredResults = filteredResults.filter(partner => {
             // Küçük harf ile karşılaştırma yapalım
             const partnerDansStilleri = partner.dans.map(dans => 
               typeof dans === 'string' ? dans.toLowerCase() : dans
@@ -587,13 +572,13 @@ function PartnerMatching(): JSX.Element {
       }
 
       if (cinsiyetValue) {
-        filtreliPartnerler = filtreliPartnerler.filter(partner => 
+        filteredResults = filteredResults.filter(partner => 
           partner.cinsiyet === cinsiyetValue
         );
       }
 
       if (seviyeValue) {
-        filtreliPartnerler = filtreliPartnerler.filter(partner => 
+        filteredResults = filteredResults.filter(partner => 
           partner.seviye === seviyeValue
         );
       }
@@ -603,7 +588,7 @@ function PartnerMatching(): JSX.Element {
         const normalizedKonum = normalizeText(konumValue);
         console.log("Arama için normalize edilmiş konum:", normalizedKonum);
         
-        filtreliPartnerler = filtreliPartnerler.filter(partner => {
+        filteredResults = filteredResults.filter(partner => {
           if (!partner.konum) return false;
           
           const matches = cityMatches(partner.konum, konumValue);
@@ -618,24 +603,26 @@ function PartnerMatching(): JSX.Element {
       }
 
       if (uygunSaatlerValue.length > 0) {
-        filtreliPartnerler = filtreliPartnerler.filter(partner => 
+        filteredResults = filteredResults.filter(partner => 
           uygunSaatlerValue.some(saat => partner.saatler.includes(saat))
         );
       }
 
-      console.log("Filtreleme sonrası partner sayısı:", filtreliPartnerler.length);
+      console.log("Filtreleme sonrası partner sayısı:", filteredResults.length);
       
       // Eğer hiç partner bulunamadıysa ve konum filtresi kullanıldıysa, konumla ilgili uyarı ver
-      if (filtreliPartnerler.length === 0 && konumValue && konumValue.trim() !== '') {
+      if (filteredResults.length === 0 && konumValue && konumValue.trim() !== '') {
         console.warn(`"${konumValue}" konumu için hiç partner bulunamadı!`);
         console.log("Tüm partnerlerin konumları:");
         allPartnerler.forEach(p => console.log(`- ${p.ad}: ${p.konum}`));
       }
       
-      setPartnerler(filtreliPartnerler);
+      setPartnerler(filteredResults);
       setLoading(false);
       setAramaTamamlandi(true);
-    }, 300);
+    } catch (error) {
+      console.error('Filtreleme sırasında hata oluştu:', error);
+    }
   };
 
   // Mevcut state değerleriyle filtreleri uygulayan fonksiyon
@@ -859,201 +846,243 @@ function PartnerMatching(): JSX.Element {
   );
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="text-center mb-10"
-      >
-        <h1 className="text-4xl sm:text-5xl font-bold mb-4 inline-block relative bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-          Dans Partneri Bulun
-        </h1>
-        <p className="text-gray-600 max-w-2xl mx-auto">
-          Size uygun dans partneri ile birlikte hareketlerin büyüsünü keşfedin. Deneyim seviyesi, dans stilleri ve uygun zamanlar üzerinden ideal eşleşmeyi bulun.
-        </p>
-      </motion.div>
-      
-      {/* Mobile filter toggle */}
-      <div className="lg:hidden mb-4">
-        <button 
-          onClick={() => setIsFilterVisible(!isFilterVisible)}
-          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white border border-gray-300 rounded-lg shadow-sm text-gray-700 font-medium"
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {/* Başlık ve filtreler */}
+      <div className="mb-8">
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-8"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-          </svg>
-          {isFilterVisible ? 'Filtreleri Gizle' : 'Filtreler'}
-        </button>
-      </div>
-      
-      <div className="flex flex-col lg:flex-row gap-8">
-        {/* Filter panel - Responsive */}
-        <div className={`lg:w-1/4 ${isFilterVisible || window.innerWidth >= 1024 ? 'block' : 'hidden'}`}>
-          <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-4">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">Partner Filtrele</h2>
-              <button 
-                onClick={resetFilters}
-                className="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          <h1 className="text-3xl sm:text-4xl font-bold mb-4 inline-block relative bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            Dans Partneri Bul
+          </h1>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Stilinize ve seviyenize uygun dans partnerleri bulun. Beraber dans etmek, teknik geliştirmek veya dans etkinliklerine katılmak için harika bir yol!
+          </p>
+        </motion.div>
+        
+        {/* Login prompt for non-authenticated users */}
+        {showLoginPrompt && !currentUser && (
+          <div className="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4 mb-6 rounded">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                 </svg>
-                Sıfırla
-              </button>
-            </div>
-            
-            <form onSubmit={partnerAra} className="space-y-5">
-              {loadingStyles ? (
-                <div className="bg-gray-50 p-3 rounded-xl flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-600 mr-2"></div>
-                  <span className="text-gray-600 text-sm">Dans stilleri yükleniyor...</span>
-                </div>
-              ) : (
-                <CustomSelect 
-                  label="Dans Türü"
-                  options={danceStyles}
-                  value={dansTuru}
-                  onChange={handleDansTuruChange}
-                  placeholder="Tüm dans türleri"
-                />
-              )}
-              
-              <CustomSelect 
-                label="Cinsiyet"
-                options={cinsiyetler}
-                value={cinsiyet}
-                onChange={handleCinsiyetChange}
-                placeholder="Hepsi"
-              />
-              
-              <CustomSelect 
-                label="Seviye"
-                options={seviyeler}
-                value={seviye}
-                onChange={handleSeviyeChange}
-                placeholder="Tüm seviyeler"
-              />
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Konum
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                  <input
-                    type="text"
-                    value={konum}
-                    onChange={handleKonumChange}
-                    placeholder="Şehir, semt..."
-                    className="w-full pl-10 p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Uygun Saatler
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {['Sabah', 'Öğlen', 'Akşam', 'Hafta Sonu'].map(saat => (
-                    <button
-                      key={saat}
-                      type="button"
-                      onClick={() => handleSaatChange(saat)}
-                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-                        uygunSaatler.includes(saat)
-                          ? 'bg-indigo-600 text-white shadow-md'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      {saat}
-                    </button>
-                  ))}
-                </div>
+              <div className="ml-3">
+                <p className="text-sm">
+                  Kişiselleştirilmiş partner eşleştirmeleri için 
+                  <Link to="/signin" className="font-medium underline text-blue-700 hover:text-blue-600 ml-1">
+                    giriş yapabilir
+                  </Link>
+                  <span className="mx-1">veya</span>
+                  <Link to="/signup" className="font-medium underline text-blue-700 hover:text-blue-600">
+                    hesap oluşturabilirsiniz
+                  </Link>.
+                </p>
               </div>
-              
-              <button
-                type="submit"
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-3 px-4 rounded-xl shadow-md transition-colors duration-300 font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                disabled={loading}
-              >
-                {loading ? (
-                  <span className="flex items-center justify-center">
-                    <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Aranıyor...
-                  </span>
-                ) : (
-                  'Partner Ara'
-                )}
-              </button>
-            </form>
-          </div>
-        </div>
-
-        {/* Results section */}
-        <div className="lg:w-3/4">
-          {initialLoading ? (
-            <div className="flex justify-center items-center min-h-[300px]">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
-              <span className="ml-3 text-lg text-gray-600">Partnerler yükleniyor...</span>
-            </div>
-          ) : (
-            <>
-              {aramaTamamlandi && (
-                <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-                  <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-gray-800">
-                      {partnerler.length > 0 
-                        ? `${partnerler.length} Dans Partneri Bulundu` 
-                        : "Uygun dans partneri bulunamadı"}
-                    </h2>
-                    <div className="text-sm text-gray-500">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Son güncelleme: {new Date().toLocaleDateString()}
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {partnerler.map(partner => (
-                  <PartnerKarti key={partner.id} partner={partner} />
-                ))}
-              </div>
-              
-              {/* Empty state */}
-              {aramaTamamlandi && partnerler.length === 0 && (
-                <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-                  <div className="w-24 h-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-6">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-800 mb-2">Partner bulunamadı</h3>
-                  <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                    Seçtiğiniz kriterlere uygun dans partneri şu anda mevcut değil. Filtreleri değiştirerek tekrar deneyebilirsiniz.
-                  </p>
+              <div className="ml-auto pl-3">
+                <div className="-mx-1.5 -my-1.5">
                   <button 
-                    onClick={resetFilters}
-                    className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg font-medium hover:bg-indigo-200 transition-colors"
+                    type="button" 
+                    onClick={() => setShowLoginPrompt(false)}
+                    className="inline-flex bg-blue-50 rounded-md p-1.5 text-blue-500 hover:bg-blue-100 focus:outline-none"
                   >
-                    Tüm Partnerleri Göster
+                    <span className="sr-only">Kapat</span>
+                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
                   </button>
                 </div>
-              )}
-            </>
-          )}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Mobile filter toggle */}
+        <div className="lg:hidden mb-4">
+          <button 
+            onClick={() => setIsFilterVisible(!isFilterVisible)}
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white border border-gray-300 rounded-lg shadow-sm text-gray-700 font-medium"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            {isFilterVisible ? 'Filtreleri Gizle' : 'Filtreler'}
+          </button>
+        </div>
+        
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Filter panel - Responsive */}
+          <div className={`lg:w-1/4 ${isFilterVisible || window.innerWidth >= 1024 ? 'block' : 'hidden'}`}>
+            <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-4">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold text-gray-800">Partner Filtrele</h2>
+                <button 
+                  onClick={resetFilters}
+                  className="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Sıfırla
+                </button>
+              </div>
+              
+              <form onSubmit={partnerAra} className="space-y-5">
+                {loadingStyles ? (
+                  <div className="bg-gray-50 p-3 rounded-xl flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-600 mr-2"></div>
+                    <span className="text-gray-600 text-sm">Dans stilleri yükleniyor...</span>
+                  </div>
+                ) : (
+                  <CustomSelect 
+                    label="Dans Türü"
+                    options={danceStyles}
+                    value={dansTuru}
+                    onChange={handleDansTuruChange}
+                    placeholder="Tüm dans türleri"
+                  />
+                )}
+                
+                <CustomSelect 
+                  label="Cinsiyet"
+                  options={cinsiyetler}
+                  value={cinsiyet}
+                  onChange={handleCinsiyetChange}
+                  placeholder="Hepsi"
+                />
+                
+                <CustomSelect 
+                  label="Seviye"
+                  options={seviyeler}
+                  value={seviye}
+                  onChange={handleSeviyeChange}
+                  placeholder="Tüm seviyeler"
+                />
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Konum
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      value={konum}
+                      onChange={handleKonumChange}
+                      placeholder="Şehir, semt..."
+                      className="w-full pl-10 p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Uygun Saatler
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['Sabah', 'Öğlen', 'Akşam', 'Hafta Sonu'].map(saat => (
+                      <button
+                        key={saat}
+                        type="button"
+                        onClick={() => handleSaatChange(saat)}
+                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                          uygunSaatler.includes(saat)
+                            ? 'bg-indigo-600 text-white shadow-md'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {saat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                <button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-3 px-4 rounded-xl shadow-md transition-colors duration-300 font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Aranıyor...
+                    </span>
+                  ) : (
+                    'Partner Ara'
+                  )}
+                </button>
+              </form>
+            </div>
+          </div>
+
+          {/* Results section */}
+          <div className="lg:w-3/4">
+            {initialLoading ? (
+              <div className="flex justify-center items-center min-h-[300px]">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+                <span className="ml-3 text-lg text-gray-600">Partnerler yükleniyor...</span>
+              </div>
+            ) : (
+              <>
+                {aramaTamamlandi && (
+                  <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                    <div className="flex justify-between items-center">
+                      <h2 className="text-xl font-semibold text-gray-800">
+                        {partnerler.length > 0 
+                          ? `${partnerler.length} Dans Partneri Bulundu` 
+                          : "Uygun dans partneri bulunamadı"}
+                      </h2>
+                      <div className="text-sm text-gray-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Son güncelleme: {new Date().toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {partnerler.map(partner => (
+                    <PartnerKarti key={partner.id} partner={partner} />
+                  ))}
+                </div>
+                
+                {/* Empty state */}
+                {aramaTamamlandi && partnerler.length === 0 && (
+                  <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+                    <div className="w-24 h-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-6">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-800 mb-2">Partner bulunamadı</h3>
+                    <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                      Seçtiğiniz kriterlere uygun dans partneri şu anda mevcut değil. Filtreleri değiştirerek tekrar deneyebilirsiniz.
+                    </p>
+                    <button 
+                      onClick={resetFilters}
+                      className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg font-medium hover:bg-indigo-200 transition-colors"
+                    >
+                      Tüm Partnerleri Göster
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
