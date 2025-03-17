@@ -11,7 +11,6 @@ import {
   persistentLocalCache,
   persistentMultipleTabManager
 } from 'firebase/firestore';
-import { getStorage, FirebaseStorage, connectStorageEmulator } from 'firebase/storage';
 
 console.log('🔍 Firebase modülleri import edildi');
 
@@ -43,11 +42,6 @@ const validateFirebaseConfig = () => {
     throw new Error(`Firebase yapılandırması eksik: ${missingFields.join(', ')}`);
   }
   
-  // Storage bucket formatını kontrol et
-  if (!firebaseConfig.storageBucket.includes('.appspot.com')) {
-    console.warn('⚠️ Storage bucket formatı hatalı olabilir:', firebaseConfig.storageBucket);
-  }
-  
   // API anahtarı formatını kontrol et
   if (!/^AIza[a-zA-Z0-9_-]{35}$/.test(firebaseConfig.apiKey)) {
     console.warn('⚠️ API anahtarı formatı hatalı olabilir');
@@ -63,7 +57,6 @@ console.log('🔍 Firebase başlatılıyor...');
 let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
-let storage: FirebaseStorage;
 
 try {
   // Yapılandırmayı doğrula
@@ -94,10 +87,6 @@ try {
     db = getFirestore(app);
     console.log('✅ Firestore başlatıldı (alternatif yöntem)');
   }
-  
-  console.log('🔍 getStorage çağrılıyor...');
-  storage = getStorage(app);
-  console.log('✅ Firebase Storage başlatıldı');
 
   // Geliştirme ortamını tespit et ve emülatörleri ayarla
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -109,7 +98,6 @@ try {
     console.log('🔍 Firebase emülatörleri kullanılıyor');
     connectAuthEmulator(auth, 'http://localhost:9099');
     connectFirestoreEmulator(db, 'localhost', 8080);
-    connectStorageEmulator(storage, 'localhost', 9199);
   }
 
   // FirebaseRdy olayını oluştur
@@ -155,12 +143,11 @@ try {
   app = {} as FirebaseApp;
   auth = {} as Auth;
   db = {} as Firestore;
-  storage = {} as FirebaseStorage;
   
   console.warn('⚠️ Firebase servisleri boş nesneler olarak ayarlandı (fallback)');
 }
 
 console.log('🔍 Firebase servisleri export ediliyor');
 // Export the initialized services
-export { auth, db, storage };
+export { auth, db };
 export default app;

@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { signOut } from '../../services/authService';
 import { User as UserType } from '../../types';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 
 // Navbar bileşeni için prop tipleri
 interface NavbarProps {
@@ -12,8 +14,59 @@ interface NavbarProps {
 function Navbar({ isAuthenticated, user }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState<boolean>(false);
+  const [profilePhotoURL, setProfilePhotoURL] = useState<string>("");
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Profil fotoğrafını Firestore'dan getir
+  useEffect(() => {
+    const fetchProfilePhoto = async () => {
+      if (!user || !user.id) {
+        setProfilePhotoURL("https://via.placeholder.com/40?text=Kullanıcı");
+        return;
+      }
+      
+      try {
+        // Konsola yazdırma
+        console.log('👤 Kullanıcı profil fotoğrafı kontrolü:', {
+          photoURL: user.photoURL,
+          isPlaceholder: user.photoURL?.startsWith('profile-photo:')
+        });
+        
+        // Mevcut fotoğraf ayarla (varsa ve placeholder değilse)
+        if (user.photoURL && !user.photoURL.startsWith('profile-photo:')) {
+          console.log('🖼️ Auth\'dan doğrudan profil fotoğrafı kullanılıyor');
+          setProfilePhotoURL(user.photoURL);
+        } else {
+          // Firestore'dan al
+          console.log('📸 Profil fotoğrafı Firestore\'dan getiriliyor...');
+          const userDoc = await getDoc(doc(db, 'users', user.id));
+          
+          if (userDoc.exists() && userDoc.data().photoURL) {
+            console.log('✅ Profil fotoğrafı bulundu!');
+            
+            // Önbellekleme sorunlarını önlemek için zaman damgası ekle
+            const photoURL = userDoc.data().photoURL;
+            setProfilePhotoURL(`${photoURL}${photoURL.includes('?') ? '&' : '?'}t=${Date.now()}`);
+          } else {
+            console.log('⚠️ Profil fotoğrafı bulunamadı');
+            setProfilePhotoURL("https://via.placeholder.com/40?text=Kullanıcı");
+          }
+        }
+      } catch (error) {
+        console.error("⛔ Profil fotoğrafı getirme hatası:", error);
+        setProfilePhotoURL("https://via.placeholder.com/40?text=Kullanıcı");
+      }
+    };
+
+    // Profil fotoğrafı değiştiğinde hemen getir
+    fetchProfilePhoto();
+    
+    // Her 30 saniyede bir profil fotoğrafını kontrol et (opsiyonel - önbellekleme sorunlarını çözmek için)
+    const intervalId = setInterval(fetchProfilePhoto, 30000);
+    
+    return () => clearInterval(intervalId);
+  }, [user?.id, user?.photoURL]); // photoURL'deki değişimleri de izle
 
   const handleLogout = async (): Promise<void> => {
     try {
@@ -100,7 +153,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                   >
                     <img
                       className="h-8 w-8 rounded-full object-cover"
-                      src={user?.photoURL || "https://via.placeholder.com/40?text=Kullanıcı"}
+                      src={profilePhotoURL || "https://via.placeholder.com/40?text=Kullanıcı"}
                       alt="Profil"
                     />
                   </button>
@@ -203,7 +256,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                   <div className="flex-shrink-0">
                     <img
                       className="h-10 w-10 rounded-full object-cover"
-                      src={user?.photoURL || "https://via.placeholder.com/40?text=Kullanıcı"}
+                      src={profilePhotoURL || "https://via.placeholder.com/40?text=Kullanıcı"}
                       alt="Profil"
                     />
                   </div>

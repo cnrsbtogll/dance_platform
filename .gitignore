@@ -35,4 +35,4 @@ pnpm-debug.log*
 *.sw?
 
 # Cursor specific
-.cursor/ 
+.cursor/

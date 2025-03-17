@@ -8,8 +8,10 @@ import AdminPanel from './components/admin/AdminPanel';
 import Navbar from './components/layout/Navbar';
 import SignIn from './components/auth/SignIn';
 import SignUp from './components/auth/SignUp';
+import ProfileEditor from './components/profile/ProfileEditor';
 import useAuth from './hooks/useAuth';
 import { auth } from './config/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 console.log('🔍 App bileşeni yükleniyor');
 console.log('🔍 Firebase auth durumu:', auth ? 'Tanımlı' : 'Tanımsız', auth);
@@ -23,6 +25,25 @@ function App(): JSX.Element {
   const isAuthenticated = !!user;
   const [firebaseInitError, setFirebaseInitError] = useState<string | null>(null);
   const [resetTrigger, setResetTrigger] = useState<number>(0);
+
+  // Profil fotoğrafının güncellendiğini log'la (debug için)
+  useEffect(() => {
+    if (user) {
+      console.log('👤 Kullanıcı güncellendi:', { 
+        photoURL: user.photoURL?.substring(0, 30) + '...',
+        displayName: user.displayName
+      });
+      
+      // Firebase Auth güncellemelerini dinle
+      const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+        if (firebaseUser) {
+          console.log('🔄 Firebase Auth kullanıcı değişimi algılandı');
+        }
+      });
+      
+      return () => unsubscribe();
+    }
+  }, [user]);
 
   // Firebase hatalarını resetleme fonksiyonu
   const resetFirebaseErrors = useCallback(() => {
@@ -234,6 +255,12 @@ function App(): JSX.Element {
               path="/admin" 
               element={
                 isAuthenticated ? <AdminPanel /> : <Navigate to="/signin" />
+              } 
+            />
+            <Route 
+              path="/profile" 
+              element={
+                isAuthenticated ? <ProfileEditor user={user} /> : <Navigate to="/signin" />
               } 
             />
             <Route path="/signin" element={isAuthenticated ? <Navigate to="/" /> : <SignIn />} />

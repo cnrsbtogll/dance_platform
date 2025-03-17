@@ -1,141 +1,185 @@
-import { useState } from 'react';
-import Button from '../common/Button';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button, Box, Typography, Grid, Paper, Chip, Stack, Alert, Snackbar } from '@mui/material';
+import { Edit as EditIcon } from '@mui/icons-material';
+import ProfilePhotoUploader from './ProfilePhotoUploader';
+import { fetchUserProfile } from '../../services/userService';
+import { UserWithProfile } from '../../types';
+import useAuth from '../../hooks/useAuth';
 
-interface User {
-  displayName?: string;
-  photoURL?: string;
-  email?: string;
-  id?: string;
-  role?: string;
-}
+const UserProfile: React.FC = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState<UserWithProfile | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-interface UserProfileProps {
-  user: User | null;
-}
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      if (!user?.id) {
+        navigate('/login');
+        return;
+      }
 
-interface ProfileState {
-  name: string;
-  bio: string;
-  danceStyles: string[];
-  level: 'Beginner' | 'Intermediate' | 'Advanced';
-}
+      try {
+        setLoading(true);
+        const profile = await fetchUserProfile(user.id);
+        setUserProfile(profile);
+      } catch (err) {
+        console.error('Error loading user profile:', err);
+        setError('Profil bilgileri yüklenirken bir hata oluştu.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-function UserProfile({ user }: UserProfileProps) {
-  const [profile, setProfile] = useState<ProfileState>({
-    name: user?.displayName || '',
-    bio: '',
-    danceStyles: [],
-    level: 'Beginner'
-  });
+    loadUserProfile();
+  }, [user, navigate]);
 
-  const [isEditing, setIsEditing] = useState(false);
-
-  // Profil düzenleme durumunu değiştir
-  const toggleEdit = () => {
-    setIsEditing(!isEditing);
+  const handleEditClick = () => {
+    navigate('/profile/edit');
   };
 
-  // Formu gönderme işlemi
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Burada API'ye profil güncellemesi gönderme işlemi yapılacak
-    console.log('Profile updated:', profile);
-    setIsEditing(false);
+  const handlePhotoUploadSuccess = (photoURL: string) => {
+    // Update the local state with the new photo URL
+    if (userProfile) {
+      setUserProfile({
+        ...userProfile,
+        photoURL,
+      });
+    }
+    
+    setSuccess('Profil fotoğrafı başarıyla güncellendi.');
+    
+    // Sayfa yenilenecek, dolayısıyla setUser'a gerek yok
+    // Profil fotoğrafı güncellemesi sonrası ProfilePhotoUploader
+    // bileşeni sayfayı kendisi yeniler
   };
 
-  if (!user) {
-    return (
-      <div className="text-center py-10">
-        Please sign in to view your profile.
-      </div>
-    );
+  const handlePhotoUploadError = (error: Error) => {
+    setError(`Profil fotoğrafı yüklenirken bir hata oluştu: ${error.message}`);
+  };
+
+  if (loading) {
+    return <Typography>Yükleniyor...</Typography>;
+  }
+
+  if (!userProfile) {
+    return <Typography>Profil bulunamadı.</Typography>;
   }
 
   return (
-    <div className="bg-white shadow rounded-lg overflow-hidden">
-      <div className="px-6 py-5 sm:px-8">
-        <div className="flex items-center">
-          <div className="flex-shrink-0 h-20 w-20">
-            <img
-              className="h-full w-full rounded-full"
-              src={user?.photoURL || "https://via.placeholder.com/80?text=Kullanıcı"}
-              alt="Profile"
-            />
-          </div>
-          <div className="ml-4">
-            <h2 className="text-2xl font-bold">{user?.displayName || 'Dancer'}</h2>
-            <p className="text-gray-600">{user?.email}</p>
-          </div>
-          <button
-            onClick={toggleEdit}
-            className="ml-auto bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded"
-          >
-            {isEditing ? 'İptal' : 'Düzenle'}
-          </button>
-        </div>
-      </div>
+    <Box sx={{ maxWidth: 800, mx: 'auto', py: 4, px: 2 }}>
+      <Snackbar 
+        open={!!success} 
+        autoHideDuration={6000} 
+        onClose={() => setSuccess(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSuccess(null)} severity="success">
+          {success}
+        </Alert>
+      </Snackbar>
 
-      {isEditing ? (
-        <div className="px-6 py-4 sm:px-8 border-t border-gray-200">
-          <form onSubmit={handleSubmit}>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Ad Soyad</label>
-                <input
-                  type="text"
-                  value={profile.name}
-                  onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                />
-              </div>
+      <Snackbar 
+        open={!!error} 
+        autoHideDuration={6000} 
+        onClose={() => setError(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setError(null)} severity="error">
+          {error}
+        </Alert>
+      </Snackbar>
+
+      <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
+        <Grid container spacing={4}>
+          <Grid item xs={12} sm={4} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            {user?.id && (
+              <ProfilePhotoUploader 
+                userId={user.id} 
+                currentPhotoURL={userProfile.photoURL}
+                onSuccess={handlePhotoUploadSuccess}
+                onError={handlePhotoUploadError}
+              />
+            )}
+          </Grid>
+          
+          <Grid item xs={12} sm={8}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h4" component="h1">
+                {userProfile.displayName || 'İsimsiz Kullanıcı'}
+              </Typography>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Hakkımda</label>
-                <textarea
-                  value={profile.bio}
-                  onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-                  rows={4}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Dans Seviyesi</label>
-                <select
-                  value={profile.level}
-                  onChange={(e) => setProfile({ ...profile, level: e.target.value as ProfileState['level'] })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                >
-                  <option value="Beginner">Başlangıç</option>
-                  <option value="Intermediate">Orta Seviye</option>
-                  <option value="Advanced">İleri Seviye</option>
-                </select>
-              </div>
-              
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded"
-                >
-                  Kaydet
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
-      ) : (
-        <div className="px-6 py-4 sm:px-8 border-t border-gray-200">
-          <h3 className="text-lg font-medium">Dans Bilgileri</h3>
-          <p className="mt-2 text-gray-600">
-            {profile.bio || 'Henüz bir bio eklenmemiş.'}
-          </p>
-          <p className="mt-4 text-sm text-gray-500">
-            <span className="font-medium">Seviye:</span> {profile.level}
-          </p>
-        </div>
-      )}
-    </div>
+              <Button 
+                variant="outlined" 
+                startIcon={<EditIcon />} 
+                onClick={handleEditClick}
+              >
+                Düzenle
+              </Button>
+            </Box>
+            
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body1" sx={{ mb: 1, fontWeight: 'medium' }}>
+                E-posta:
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {userProfile.email || 'E-posta adresi belirtilmemiş'}
+              </Typography>
+            </Box>
+            
+            {userProfile.phoneNumber && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body1" sx={{ mb: 1, fontWeight: 'medium' }}>
+                  Telefon:
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {userProfile.phoneNumber}
+                </Typography>
+              </Box>
+            )}
+            
+            {userProfile.bio && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body1" sx={{ mb: 1, fontWeight: 'medium' }}>
+                  Hakkımda:
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {userProfile.bio}
+                </Typography>
+              </Box>
+            )}
+            
+            {userProfile.level && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body1" sx={{ mb: 1, fontWeight: 'medium' }}>
+                  Seviye:
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {userProfile.level}
+                </Typography>
+              </Box>
+            )}
+            
+            {userProfile.danceStyles && userProfile.danceStyles.length > 0 && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body1" sx={{ mb: 1, fontWeight: 'medium' }}>
+                  Dans Stilleri:
+                </Typography>
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  {userProfile.danceStyles.map((style, index) => (
+                    <Chip key={index} label={style} size="small" sx={{ mb: 1 }} />
+                  ))}
+                </Stack>
+              </Box>
+            )}
+          </Grid>
+        </Grid>
+      </Paper>
+    </Box>
   );
-}
+};
 
 export default UserProfile; 

@@ -19,6 +19,10 @@ export interface User {
   updatedAt?: Date;
 }
 
+export interface UserWithProfile extends User {
+  bio?: string;
+}
+
 export interface Instructor {
   id: string;
   userId: string;

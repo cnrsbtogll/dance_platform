@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, Timestamp, enableNetwork, disableNetwork, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, Timestamp, enableNetwork, disableNetwork, collection, getDocs } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { User } from '../types';
 
@@ -9,6 +9,7 @@ interface AuthState {
   loading: boolean;
   error: string | null;
   isOffline: boolean;
+  setUser: (user: User) => void;
 }
 
 // Yeniden deneme mekanizması için yardımcı fonksiyon
@@ -44,7 +45,8 @@ export const useAuth = (): AuthState => {
     user: null,
     loading: true,
     error: null,
-    isOffline: false
+    isOffline: false,
+    setUser: () => {}
   });
 
   console.log('🔍 useAuth hook başlatılıyor');
@@ -195,7 +197,8 @@ export const useAuth = (): AuthState => {
             // Offline durumunu kontrol et
             if (!navigator.onLine) {
               console.log('Cannot fetch user data: Device is offline');
-              setState({
+              setState(prevState => ({
+                ...prevState,
                 user: {
                   id: firebaseUser.uid,
                   email: firebaseUser.email || '',
@@ -207,7 +210,7 @@ export const useAuth = (): AuthState => {
                 loading: false,
                 error: null,
                 isOffline: true
-              });
+              }));
               isAuthProcessingRef.current = false;
               return;
             }
@@ -232,7 +235,8 @@ export const useAuth = (): AuthState => {
                 const userData = userDoc.data() as Omit<User, 'createdAt'> & { createdAt: Timestamp };
                 
                 // Kullanıcı verilerini ayarla
-                setState({
+                setState(prevState => ({
+                  ...prevState,
                   user: {
                     ...userData,
                     id: firebaseUser.uid,
@@ -245,12 +249,13 @@ export const useAuth = (): AuthState => {
                   loading: false,
                   error: null,
                   isOffline: false
-                });
+                }));
               } else {
                 // Kullanıcı profili daha önce oluşturulmuş mu kontrol et
                 if (userProfileCreatedRef.current) {
                   console.log('⚠️ User profile creation already attempted, skipping...');
-                  setState({
+                  setState(prevState => ({
+                    ...prevState,
                     user: {
                       id: firebaseUser.uid,
                       email: firebaseUser.email || '',
@@ -262,7 +267,7 @@ export const useAuth = (): AuthState => {
                     loading: false,
                     error: null,
                     isOffline: false
-                  });
+                  }));
                   isAuthProcessingRef.current = false;
                   return;
                 }
@@ -286,17 +291,19 @@ export const useAuth = (): AuthState => {
                   console.log('✅ User profile created successfully');
                   
                   // Kullanıcı durumunu güncelle - hata olmadan
-                  setState({
+                  setState(prevState => ({
+                    ...prevState,
                     user: newUserData as User,
                     loading: false,
                     error: null,
                     isOffline: false
-                  });
+                  }));
                 } catch (createError: any) {
                   console.error('❌ Error creating user profile:', createError);
                   
                   // Firestore'da kullanıcı verisi yoksa, sadece Firebase Authentication'dan gelen temel bilgileri kullan
-                  setState({
+                  setState(prevState => ({
+                    ...prevState,
                     user: {
                       id: firebaseUser.uid,
                       email: firebaseUser.email || '',
@@ -308,7 +315,7 @@ export const useAuth = (): AuthState => {
                     loading: false,
                     error: `Kullanıcı profili oluşturulamadı: ${createError.message || 'Bilinmeyen hata'}`,
                     isOffline: false
-                  });
+                  }));
                 }
               }
             } catch (error: any) {
@@ -332,7 +339,8 @@ export const useAuth = (): AuthState => {
               }
               
               // Firestore erişim hatası - Authentication verilerini kullan
-              setState({
+              setState(prevState => ({
+                ...prevState,
                 user: {
                   id: firebaseUser.uid,
                   email: firebaseUser.email || '',
@@ -344,16 +352,17 @@ export const useAuth = (): AuthState => {
                 loading: false,
                 error: errorMessage,
                 isOffline: isOfflineStatus
-              });
+              }));
             }
           } else {
             // Kullanıcı giriş yapmamış
-            setState({
+            setState(prevState => ({
+              ...prevState,
               user: null,
               loading: false,
               error: null,
               isOffline: !navigator.onLine
-            });
+            }));
           }
         } catch (err: any) {
           console.error('Error processing auth state change:', err);
@@ -368,12 +377,13 @@ export const useAuth = (): AuthState => {
             errorMessage += `: ${err.code}`;
           }
           
-          setState({
+          setState(prevState => ({
+            ...prevState,
             user: null,
             loading: false,
             error: errorMessage,
             isOffline: !navigator.onLine
-          });
+          }));
         } finally {
           // İşlem durumunu sıfırla
           isAuthProcessingRef.current = false;
@@ -398,17 +408,54 @@ export const useAuth = (): AuthState => {
         errorMessage += `: ${error.code}`;
       }
       
-      setState({
+      setState(prevState => ({
+        ...prevState,
         user: null,
         loading: false,
         error: errorMessage,
         isOffline: !navigator.onLine
-      });
+      }));
       
       // Boş temizleme fonksiyonu döndür
       return () => {};
     }
   }, []);
+
+  // Kullanıcı güncelleme fonksiyonu
+  const setUser = useCallback((updatedUser: User) => {
+    setState(prevState => ({
+      ...prevState,
+      user: updatedUser
+    }));
+    
+    // Firestore'daki kullanıcı bilgilerini de güncelle
+    if (updatedUser.id) {
+      const userDocRef = doc(db, 'users', updatedUser.id);
+      updateDoc(userDocRef, {
+        photoURL: updatedUser.photoURL,
+        updatedAt: Timestamp.now()
+      }).catch(error => {
+        console.error('Error updating user in Firestore:', error);
+      });
+    }
+  }, []);
+
+  // useEffect içerisinde setState çağrılarını güncelleyelim
+  useEffect(() => {
+    // ... existing code ...
+
+    return () => {
+      // Temizleme işlemleri
+    };
+  }, [setUser]); // setUser'ı dependency olarak ekleyelim
+
+  // setUser fonksiyonunu state içine ekleyelim
+  useEffect(() => {
+    setState(prevState => ({
+      ...prevState,
+      setUser
+    }));
+  }, [setUser]);
 
   return state;
 };
