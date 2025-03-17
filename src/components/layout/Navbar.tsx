@@ -18,6 +18,13 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Kullanıcı rollerini kontrol et
+  const hasInstructorRole = user?.role?.includes('instructor');
+  const hasSchoolAdminRole = user?.role?.includes('school_admin');
+  const hasSuperAdminRole = user?.role?.includes('admin');
+  const hasStudentRole = user?.role?.includes('student') || 
+                       (!hasInstructorRole && !hasSchoolAdminRole && !hasSuperAdminRole && isAuthenticated);
+
   // Profil fotoğrafını Firestore'dan getir
   useEffect(() => {
     const fetchProfilePhoto = async () => {
@@ -33,13 +40,19 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
           isPlaceholder: user.photoURL?.startsWith('profile-photo:')
         });
         
-        // Kullanıcı kendi fotoğrafını yüklemediyse placeholder göster
+        // Firebase Auth'dan gelen photoURL kontrol et
+        if (user.photoURL && !user.photoURL.startsWith('profile-photo:')) {
+          console.log('✅ Firebase Auth profil fotoğrafı kullanılıyor');
+          setProfilePhotoURL(user.photoURL);
+          return;
+        }
+        
         // Firestore'dan kullanıcı dokümanını kontrol et
         const userDoc = await getDoc(doc(db, 'users', user.id));
         
-        // Kullanıcı fotoğrafını özellikle güncellediyse göster, aksi takdirde placeholder kullan
-        if (userDoc.exists() && userDoc.data().photoURL && userDoc.data().hasUploadedProfilePhoto === true) {
-          console.log('✅ Kullanıcı kendi yüklediği profil fotoğrafı bulundu!');
+        // Firestore'da photoURL varsa kullan, hasUploadedProfilePhoto kontrolü zorunlu değil
+        if (userDoc.exists() && userDoc.data().photoURL) {
+          console.log('✅ Firestore profil fotoğrafı bulundu!');
           
           // Önbellekleme sorunlarını önlemek için zaman damgası ekle
           const photoURL = userDoc.data().photoURL;
@@ -153,44 +166,126 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
           </div>
           <div className="hidden sm:ml-6 sm:flex sm:items-center">
             {isAuthenticated ? (
-              <div className="ml-3 relative">
-                <div>
-                  <button
-                    onClick={toggleProfileMenu}
-                    className="flex text-sm border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-200 hover:shadow-md"
+              <>
+                {/* Admin Panel Butonları */}
+                {hasSuperAdminRole && (
+                  <Link
+                    to="/admin"
+                    className="mr-3 inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
                   >
-                    <img
-                      className="h-9 w-9 rounded-full object-cover"
-                      src={profilePhotoURL || "/assets/placeholders/dance-partner-placeholder.svg"}
-                      alt="Profil"
-                    />
-                  </button>
-                </div>
-                {isProfileMenuOpen && (
-                  <div 
-                    className="origin-top-right absolute right-0 mt-2 w-48 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 transition-all duration-200"
-                  >
-                    <div className="rounded-lg bg-white shadow-xs py-1">
-                      <Link
-                        to="/profile"
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-150"
-                        onClick={() => setIsProfileMenuOpen(false)}
-                      >
-                        Profilim
-                      </Link>
-                      <button
-                        onClick={() => {
-                          handleLogout();
-                          setIsProfileMenuOpen(false);
-                        }}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-150"
-                      >
-                        Çıkış Yap
-                      </button>
-                    </div>
-                  </div>
+                    Admin Panel
+                  </Link>
                 )}
-              </div>
+                {hasSchoolAdminRole && !hasSuperAdminRole && (
+                  <Link
+                    to="/school-admin"
+                    className="mr-3 inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
+                  >
+                    Okul Yönetimi Paneli
+                  </Link>
+                )}
+                {hasInstructorRole && !hasSchoolAdminRole && !hasSuperAdminRole && (
+                  <Link
+                    to="/instructor"
+                    className="mr-3 inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
+                  >
+                    Eğitmen Paneli
+                  </Link>
+                )}
+                {/* Öğrenci Teşvik Butonları */}
+                {hasStudentRole && (
+                  <>
+                    <Link
+                      to="/become-school"
+                      className="mr-2 inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
+                    >
+                      Dans Okulu Aç
+                    </Link>
+                    <Link
+                      to="/become-instructor"
+                      className="mr-3 inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
+                    >
+                      Eğitmen Ol
+                    </Link>
+                  </>
+                )}
+
+                <div className="ml-3 relative">
+                  <div className="flex items-center">
+                    {/* Kullanıcı Bilgileri - Masaüstü */}
+                    <div className="hidden md:block mr-3 text-right">
+                      <div className="text-sm font-medium text-gray-800">{user?.displayName || 'Kullanıcı'}</div>
+                      <div className="text-xs text-gray-500 truncate max-w-[140px]">{user?.email || ''}</div>
+                    </div>
+                    <button
+                      onClick={toggleProfileMenu}
+                      className="flex text-sm border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-200 hover:shadow-md"
+                    >
+                      <img
+                        className="h-9 w-9 rounded-full object-cover"
+                        src={profilePhotoURL || "/assets/placeholders/dance-partner-placeholder.svg"}
+                        alt="Profil"
+                      />
+                    </button>
+                  </div>
+                  {isProfileMenuOpen && (
+                    <div 
+                      className="origin-top-right absolute right-0 mt-2 w-48 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 transition-all duration-200"
+                    >
+                      <div className="rounded-lg bg-white shadow-xs py-1">
+                        {/* Kullanıcı Bilgileri - Dropdown */}
+                        <div className="block px-4 py-2 border-b border-gray-100">
+                          <div className="text-sm font-medium text-gray-800">{user?.displayName || 'Kullanıcı'}</div>
+                          <div className="text-xs text-gray-500 truncate">{user?.email || ''}</div>
+                        </div>
+                        {/* Profil linki - rolüne göre farklı profil sayfasına yönlendirme */}
+                        {hasSuperAdminRole ? (
+                          <Link
+                            to="/profile?type=admin"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-150"
+                            onClick={() => setIsProfileMenuOpen(false)}
+                          >
+                            Admin Profilim
+                          </Link>
+                        ) : hasSchoolAdminRole ? (
+                          <Link
+                            to="/profile?type=school"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-150"
+                            onClick={() => setIsProfileMenuOpen(false)}
+                          >
+                            Okul Profilim
+                          </Link>
+                        ) : hasInstructorRole ? (
+                          <Link
+                            to="/profile?type=instructor"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-150"
+                            onClick={() => setIsProfileMenuOpen(false)}
+                          >
+                            Eğitmen Profilim
+                          </Link>
+                        ) : (
+                          <Link
+                            to="/profile"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-150"
+                            onClick={() => setIsProfileMenuOpen(false)}
+                          >
+                            Profilim
+                          </Link>
+                        )}
+                        <button
+                          onClick={() => {
+                            handleLogout();
+                            setIsProfileMenuOpen(false);
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-150"
+                        >
+                          Çıkış Yap
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
             ) : (
               <Link 
                 to="/signin" 
@@ -237,12 +332,110 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                 </div>
                 <div className="mt-3 space-y-1 px-2">
                   <Link
-                    to="/profile"
+                    to="/partners"
                     className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    Profilim
+                    Partner Bul
                   </Link>
+                  <Link
+                    to="/classes"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Dans Kursu Bul
+                  </Link>
+                  <Link
+                    to="/progress"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    İlerleme Durumum
+                  </Link>
+                  
+                  {/* Admin Panel Linkleri - Mobil */}
+                  {hasSuperAdminRole && (
+                    <Link
+                      to="/admin"
+                      className="block px-3 py-2 mt-2 rounded-md text-base font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 transition-colors duration-150"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Admin Panel
+                    </Link>
+                  )}
+                  {hasSchoolAdminRole && !hasSuperAdminRole && (
+                    <Link
+                      to="/school-admin"
+                      className="block px-3 py-2 mt-2 rounded-md text-base font-medium text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 transition-colors duration-150"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Okul Yönetimi Paneli
+                    </Link>
+                  )}
+                  {hasInstructorRole && !hasSchoolAdminRole && !hasSuperAdminRole && (
+                    <Link
+                      to="/instructor"
+                      className="block px-3 py-2 mt-2 rounded-md text-base font-medium text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 transition-colors duration-150"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Eğitmen Paneli
+                    </Link>
+                  )}
+                  
+                  {/* Öğrenci Teşvik Butonları - Mobil */}
+                  {hasStudentRole && (
+                    <>
+                      <Link
+                        to="/become-school"
+                        className="block px-3 py-2 mt-2 rounded-md text-base font-medium text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 transition-colors duration-150"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        Dans Okulu Aç
+                      </Link>
+                      <Link
+                        to="/become-instructor"
+                        className="block px-3 py-2 mt-2 rounded-md text-base font-medium text-white bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 transition-colors duration-150"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        Eğitmen Ol
+                      </Link>
+                    </>
+                  )}
+                  
+                  {/* Profil linki - Mobil versiyon */}
+                  {hasSuperAdminRole ? (
+                    <Link
+                      to="/profile?type=admin"
+                      className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Admin Profilim
+                    </Link>
+                  ) : hasSchoolAdminRole ? (
+                    <Link
+                      to="/profile?type=school"
+                      className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Okul Profilim
+                    </Link>
+                  ) : hasInstructorRole ? (
+                    <Link
+                      to="/profile?type=instructor"
+                      className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Eğitmen Profilim
+                    </Link>
+                  ) : (
+                    <Link
+                      to="/profile"
+                      className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Profilim
+                    </Link>
+                  )}
                   <button
                     onClick={() => {
                       handleLogout();

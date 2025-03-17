@@ -1,7 +1,7 @@
 import { updateProfile } from 'firebase/auth';
 import { doc, updateDoc, Timestamp, getDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
-import { User, DanceLevel, UserWithProfile } from '../types';
+import { User, DanceLevel, UserWithProfile, Instructor } from '../types';
 
 /**
  * Fetch user profile data from Firestore
@@ -143,6 +143,58 @@ export const updateProfilePhotoDirectly = async (
     return resizedImage;
   } catch (error) {
     console.error('Error updating profile photo directly:', error);
+    throw error;
+  }
+};
+
+/**
+ * Fetches all instructors with their profile data from Firestore
+ */
+export const fetchAllInstructors = async (): Promise<Array<Instructor & { user: UserWithProfile }>> => {
+  try {
+    // Collection/path bilgisini projenizdeki yapıya göre ayarlayın
+    const { getDocs, collection, query, where } = await import('firebase/firestore');
+    const instructorsQuery = query(collection(db, 'instructors'));
+    const instructorsSnapshot = await getDocs(instructorsQuery);
+    
+    // Sonuçları işle
+    const instructors: Array<Instructor & { user: UserWithProfile }> = [];
+    
+    for (const instructorDoc of instructorsSnapshot.docs) {
+      const instructorData = instructorDoc.data() as Instructor;
+      
+      // Veri yapısını konsolda göster
+      console.log('Instructor data from Firebase:', instructorData);
+      
+      // Eğitmenin kullanıcı profilini çek
+      try {
+        const userDocRef = doc(db, 'users', instructorData.userId);
+        const userSnapshot = await getDoc(userDocRef);
+        
+        if (userSnapshot.exists()) {
+          const userData = userSnapshot.data() as UserWithProfile;
+          
+          // İki veri setini birleştir
+          instructors.push({
+            ...instructorData,
+            id: instructorDoc.id,
+            user: userData
+          });
+        }
+      } catch (userError) {
+        console.error(`Error fetching user data for instructor ${instructorData.userId}:`, userError);
+        // Kullanıcı bilgisi olmadan da eğitmeni ekle
+        instructors.push({
+          ...instructorData,
+          id: instructorDoc.id,
+          user: {} as UserWithProfile
+        });
+      }
+    }
+    
+    return instructors;
+  } catch (error) {
+    console.error('Error fetching instructors:', error);
     throw error;
   }
 }; 

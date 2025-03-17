@@ -28,7 +28,9 @@ export interface Instructor {
   userId: string;
   biography: string;
   specialties: DanceStyle[];
+  uzmanlık?: DanceStyle[]; // Alternatif alan adı - Türkçe (doğru yazım)
   experience: number; // Years
+  tecrube?: number; // Alternatif alan adı - Türkçe
   certifications: string[];
   socialMediaLinks: {
     instagram?: string;

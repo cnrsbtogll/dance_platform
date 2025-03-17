@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { updateUserProfile } from '../../services/userService';
 import ProfilePhotoUploader from './ProfilePhotoUploader';
 import { DanceLevel, DanceStyle, User } from '../../types';
@@ -25,6 +25,19 @@ interface FirestoreDanceStyle {
 
 const ProfileEditor: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // URL query parametresi ile profil tipini kontrol et
+  const queryParams = new URLSearchParams(location.search);
+  const profileType = queryParams.get('type');
+  
+  // Kullanıcı rollerini kontrol et
+  const isInstructor = profileType === 'instructor' || user?.role?.includes('instructor');
+  const isSchoolAdmin = profileType === 'school' || user?.role?.includes('school_admin');
+  const isAdmin = profileType === 'admin' || user?.role?.includes('admin');
+  
+  // Dans seviyesi gösterilmeli mi?
+  const shouldShowDanceLevel = !isInstructor && !isSchoolAdmin && !isAdmin;
   
   const [formData, setFormData] = useState({
     displayName: '',
@@ -249,21 +262,24 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
             />
           </div>
           
-          <div>
-            <label htmlFor="level" className="block text-sm font-medium text-gray-700">Dans Seviyesi</label>
-            <select
-              id="level"
-              name="level"
-              value={formData.level}
-              onChange={handleInputChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            >
-              <option value="beginner">Başlangıç</option>
-              <option value="intermediate">Orta Seviye</option>
-              <option value="advanced">İleri Seviye</option>
-              <option value="professional">Profesyonel</option>
-            </select>
-          </div>
+          {/* Dans Seviyesi - Sadece öğrenci/kullanıcı rolünde göster */}
+          {shouldShowDanceLevel && (
+            <div>
+              <label htmlFor="level" className="block text-sm font-medium text-gray-700">Dans Seviyesi</label>
+              <select
+                id="level"
+                name="level"
+                value={formData.level}
+                onChange={handleInputChange}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              >
+                <option value="beginner">Başlangıç</option>
+                <option value="intermediate">Orta Seviye</option>
+                <option value="advanced">İleri Seviye</option>
+                <option value="professional">Profesyonel</option>
+              </select>
+            </div>
+          )}
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Dans Stilleri</label>
