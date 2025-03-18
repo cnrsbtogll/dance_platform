@@ -1,5 +1,5 @@
 // src/store/authSlice.ts
-import { createSlice, PayloadAction, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction, createAsyncThunk, ActionReducerMapBuilder } from '@reduxjs/toolkit';
 import {
   signInWithPopup,
   GoogleAuthProvider,
@@ -8,7 +8,8 @@ import {
   updateProfile,
   PhoneAuthProvider,
   signInWithCredential,
-  RecaptchaVerifier
+  RecaptchaVerifier,
+  UserCredential
 } from 'firebase/auth';
 import {
   doc,
@@ -17,8 +18,13 @@ import {
   updateDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { auth, db } from '../api/firebase/firebase';
 import { User, UserRole } from '../types';
+
+// Redux Toolkit için tip tanımlarını ekleyin
+type AsyncThunkConfig = {
+  rejectValue: string;
+};
 
 interface AuthState {
   user: User | null;
@@ -38,9 +44,18 @@ const initialState: AuthState = {
   isRegistrationComplete: false
 };
 
-export const signInWithGoogle = createAsyncThunk(
+// User tipinin özelliklerini kontrol edelim ve genişletelim
+type ExtendedUser = User & {
+  phoneVerified?: boolean;
+};
+
+export const signInWithGoogle = createAsyncThunk<
+  ExtendedUser,
+  void,
+  AsyncThunkConfig
+>(
   'auth/signInWithGoogle',
-  async (_, { rejectWithValue }) => {
+  async (_: void, { rejectWithValue }) => {
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
@@ -52,15 +67,14 @@ export const signInWithGoogle = createAsyncThunk(
       
       if (userSnapshot.exists()) {
         // User exists, return userData
-        return userSnapshot.data() as User;
+        return userSnapshot.data() as ExtendedUser;
       } else {
         // New user, create basic profile
-        const newUser: Partial<User> = {
+        const newUser: Partial<ExtendedUser> = {
           id: user.uid,
           email: user.email || '',
           displayName: user.displayName || '',
           photoURL: user.photoURL || '',
-          verified: false,
           role: 'student', // Default role
           phoneVerified: false
         };
@@ -70,7 +84,7 @@ export const signInWithGoogle = createAsyncThunk(
           createdAt: serverTimestamp()
         });
         
-        return newUser as User;
+        return newUser as ExtendedUser;
       }
     } catch (error) {
       return rejectWithValue((error as Error).message);
@@ -78,9 +92,13 @@ export const signInWithGoogle = createAsyncThunk(
   }
 );
 
-export const signInWithFacebook = createAsyncThunk(
+export const signInWithFacebook = createAsyncThunk<
+  ExtendedUser,
+  void,
+  AsyncThunkConfig
+>(
   'auth/signInWithFacebook',
-  async (_, { rejectWithValue }) => {
+  async (_: void, { rejectWithValue }) => {
     try {
       const provider = new FacebookAuthProvider();
       const result = await signInWithPopup(auth, provider);
@@ -92,15 +110,14 @@ export const signInWithFacebook = createAsyncThunk(
       
       if (userSnapshot.exists()) {
         // User exists, return userData
-        return userSnapshot.data() as User;
+        return userSnapshot.data() as ExtendedUser;
       } else {
         // New user, create basic profile
-        const newUser: Partial<User> = {
+        const newUser: Partial<ExtendedUser> = {
           id: user.uid,
           email: user.email || '',
           displayName: user.displayName || '',
           photoURL: user.photoURL || '',
-          verified: false,
           role: 'student', // Default role
           phoneVerified: false
         };
@@ -110,7 +127,7 @@ export const signInWithFacebook = createAsyncThunk(
           createdAt: serverTimestamp()
         });
         
-        return newUser as User;
+        return newUser as ExtendedUser;
       }
     } catch (error) {
       return rejectWithValue((error as Error).message);
@@ -118,7 +135,11 @@ export const signInWithFacebook = createAsyncThunk(
   }
 );
 
-export const sendPhoneVerification = createAsyncThunk(
+export const sendPhoneVerification = createAsyncThunk<
+  string,
+  string,
+  AsyncThunkConfig
+>(
   'auth/sendPhoneVerification',
   async (phoneNumber: string, { rejectWithValue }) => {
     try {
@@ -140,9 +161,19 @@ export const sendPhoneVerification = createAsyncThunk(
   }
 );
 
-export const verifyPhoneCode = createAsyncThunk(
+interface VerifyPhoneCodeParams {
+  verificationId: string;
+  code: string;
+  userId: string;
+}
+
+export const verifyPhoneCode = createAsyncThunk<
+  boolean,
+  VerifyPhoneCodeParams,
+  AsyncThunkConfig
+>(
   'auth/verifyPhoneCode',
-  async ({ verificationId, code, userId }: { verificationId: string, code: string, userId: string }, { rejectWithValue }) => {
+  async ({ verificationId, code, userId }: VerifyPhoneCodeParams, { rejectWithValue }) => {
     try {
       const credential = PhoneAuthProvider.credential(verificationId, code);
       await signInWithCredential(auth, credential);
@@ -160,9 +191,18 @@ export const verifyPhoneCode = createAsyncThunk(
   }
 );
 
-export const updateUserRole = createAsyncThunk(
+interface UpdateUserRoleParams {
+  userId: string;
+  role: UserRole;
+}
+
+export const updateUserRole = createAsyncThunk<
+  UserRole,
+  UpdateUserRoleParams,
+  AsyncThunkConfig
+>(
   'auth/updateUserRole',
-  async ({ userId, role }: { userId: string, role: UserRole }, { rejectWithValue }) => {
+  async ({ userId, role }: UpdateUserRoleParams, { rejectWithValue }) => {
     try {
       const userDoc = doc(db, 'users', userId);
       await updateDoc(userDoc, { role });
@@ -177,78 +217,78 @@ export const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    setUser: (state, action: PayloadAction<User | null>) => {
+    setUser: (state: AuthState, action: PayloadAction<ExtendedUser | null>) => {
       state.user = action.payload;
     },
-    setLoading: (state, action: PayloadAction<boolean>) => {
+    setLoading: (state: AuthState, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
     },
-    setError: (state, action: PayloadAction<string | null>) => {
+    setError: (state: AuthState, action: PayloadAction<string | null>) => {
       state.error = action.payload;
     },
-    setUserRole: (state, action: PayloadAction<UserRole>) => {
+    setUserRole: (state: AuthState, action: PayloadAction<UserRole>) => {
       state.userRole = action.payload;
     },
-    setRegistrationComplete: (state, action: PayloadAction<boolean>) => {
+    setRegistrationComplete: (state: AuthState, action: PayloadAction<boolean>) => {
       state.isRegistrationComplete = action.payload;
     },
-    clearPhoneVerificationId: (state) => {
+    clearPhoneVerificationId: (state: AuthState) => {
       state.phoneVerificationId = null;
     }
   },
-  extraReducers: (builder) => {
+  extraReducers: (builder: ActionReducerMapBuilder<AuthState>) => {
     builder
-      .addCase(signInWithGoogle.pending, (state) => {
+      .addCase(signInWithGoogle.pending, (state: AuthState) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(signInWithGoogle.fulfilled, (state, action) => {
+      .addCase(signInWithGoogle.fulfilled, (state: AuthState, action: PayloadAction<ExtendedUser>) => {
         state.loading = false;
         state.user = action.payload;
       })
-      .addCase(signInWithGoogle.rejected, (state, action) => {
+      .addCase(signInWithGoogle.rejected, (state: AuthState, action: PayloadAction<string | undefined>) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.payload || 'Google ile giriş başarısız oldu';
       })
-      .addCase(signInWithFacebook.pending, (state) => {
+      .addCase(signInWithFacebook.pending, (state: AuthState) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(signInWithFacebook.fulfilled, (state, action) => {
+      .addCase(signInWithFacebook.fulfilled, (state: AuthState, action: PayloadAction<ExtendedUser>) => {
         state.loading = false;
         state.user = action.payload;
       })
-      .addCase(signInWithFacebook.rejected, (state, action) => {
+      .addCase(signInWithFacebook.rejected, (state: AuthState, action: PayloadAction<string | undefined>) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.payload || 'Facebook ile giriş başarısız oldu';
       })
-      .addCase(sendPhoneVerification.pending, (state) => {
+      .addCase(sendPhoneVerification.pending, (state: AuthState) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(sendPhoneVerification.fulfilled, (state, action) => {
+      .addCase(sendPhoneVerification.fulfilled, (state: AuthState, action: PayloadAction<string>) => {
         state.loading = false;
         state.phoneVerificationId = action.payload;
       })
-      .addCase(sendPhoneVerification.rejected, (state, action) => {
+      .addCase(sendPhoneVerification.rejected, (state: AuthState, action: PayloadAction<string | undefined>) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.payload || 'Telefon doğrulama kodu gönderme başarısız oldu';
       })
-      .addCase(verifyPhoneCode.pending, (state) => {
+      .addCase(verifyPhoneCode.pending, (state: AuthState) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(verifyPhoneCode.fulfilled, (state, action) => {
+      .addCase(verifyPhoneCode.fulfilled, (state: AuthState, action: PayloadAction<boolean>) => {
         state.loading = false;
         if (state.user) {
-          state.user.phoneVerified = true;
+          (state.user as ExtendedUser).phoneVerified = true;
         }
       })
-      .addCase(verifyPhoneCode.rejected, (state, action) => {
+      .addCase(verifyPhoneCode.rejected, (state: AuthState, action: PayloadAction<string | undefined>) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.payload || 'Telefon doğrulama kodu onaylama başarısız oldu';
       })
-      .addCase(updateUserRole.fulfilled, (state, action) => {
+      .addCase(updateUserRole.fulfilled, (state: AuthState, action: PayloadAction<UserRole>) => {
         state.userRole = action.payload;
         if (state.user) {
           state.user.role = action.payload;

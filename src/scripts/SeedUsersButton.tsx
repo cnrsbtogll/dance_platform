@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import Button from '../components/common/Button';
+import Button from '../common/components/ui/Button';
 import { 
   doc, 
   collection,
   setDoc, 
+  getDocs,
   serverTimestamp
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { db } from '../api/firebase/firebase';
 
 // Sample data for creating users - only students, no instructors
 const baseSampleUsers = [
