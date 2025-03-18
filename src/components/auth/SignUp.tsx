@@ -17,7 +17,7 @@ const SignUp: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
@@ -117,7 +117,7 @@ const SignUp: React.FC = () => {
           />
         </div>
 
-        <div className="mb-4">
+        <div className="mb-6">
           <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="confirmPassword">
             Şifre Tekrar
           </label>
@@ -130,23 +130,6 @@ const SignUp: React.FC = () => {
             className="w-full p-2 border rounded-md"
             required
           />
-        </div>
-
-        <div className="mb-6">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="role">
-            Kullanıcı Tipi
-          </label>
-          <select
-            id="role"
-            name="role"
-            value={formData.role}
-            onChange={handleChange}
-            className="w-full p-2 border rounded-md"
-          >
-            <option value="student">Öğrenci</option>
-            <option value="instructor">Eğitmen</option>
-            <option value="school">Dans Okulu</option>
-          </select>
         </div>
 
         <Button type="submit" fullWidth disabled={loading}>
