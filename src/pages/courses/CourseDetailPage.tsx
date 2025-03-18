@@ -23,20 +23,20 @@ const CourseDetailPage: React.FC = () => {
 
       setLoading(true);
       try {
-        const courseRef = doc(db, 'danceClasses', id);
-        const courseSnap = await getDoc(courseRef);
+        const courseRef = doc(db, 'courses', id);
+        const courseDoc = await getDoc(courseRef);
         
-        if (courseSnap.exists()) {
+        if (courseDoc.exists()) {
           setCourse({
-            id: courseSnap.id,
-            ...courseSnap.data()
+            id: courseDoc.id,
+            ...courseDoc.data()
           } as DanceClass);
         } else {
           setError('Kurs bulunamadı');
         }
       } catch (err) {
-        console.error('Kurs detayları yüklenirken hata oluştu:', err);
-        setError('Kurs detayları yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+        console.error('Kurs bilgisi çekilirken hata oluştu:', err);
+        setError('Kurs bilgisi yüklenirken bir hata oluştu');
       } finally {
         setLoading(false);
       }
@@ -96,7 +96,7 @@ const CourseDetailPage: React.FC = () => {
   // Kursa kaydol
   const handleEnroll = async () => {
     if (!currentUser) {
-      navigate('/signin', { state: { returnUrl: `/course/${id}` }});
+      navigate('/signin', { state: { returnUrl: `/courses/${id}` }});
       return;
     }
     

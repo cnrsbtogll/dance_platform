@@ -13,6 +13,8 @@ import HomePage from './pages/home/HomePage';
 import SchoolDetails from './features/admin/pages/SchoolDetails';
 import CourseSearchPage from './pages/courses/CourseSearchPage';
 import CourseDetailPage from './pages/courses/CourseDetailPage';
+import InstructorDetailPage from './pages/instructors/InstructorDetailPage';
+import InstructorsListPage from './pages/instructors/InstructorsListPage';
 import useAuth from './common/hooks/useAuth';
 import { auth } from './api/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -261,7 +263,9 @@ function App(): JSX.Element {
           <main className={`pt-20 pb-10 ${(isOffline || (error && !isOffline)) ? 'mt-8' : ''}`}>
             <Routes>
               <Route path="/" element={<HomePage isAuthenticated={isAuthenticated} user={user} />} />
-              <Route path="/course/:id" element={<CourseDetailPage />} />
+              <Route path="/courses/:id" element={<CourseDetailPage />} />
+              <Route path="/instructors" element={<InstructorsListPage />} />
+              <Route path="/instructors/:id" element={<InstructorDetailPage />} />
               <Route path="/partners" element={<PartnerSearchPage />} />
               <Route path="/progress" element={<ProgressPage />} />
               <Route path="/courses" element={<CourseSearchPage />} />
