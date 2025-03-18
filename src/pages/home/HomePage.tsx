@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { User, Instructor, UserWithProfile } from '../../types';
+import { User, Instructor, UserWithProfile, DanceClass, DanceSchool } from '../../types';
 import { motion } from 'framer-motion';
 import { fetchAllInstructors } from '../../api/services/userService';
+import InstructorCard from '../../common/components/instructors/InstructorCard';
+import { getFeaturedDanceCourses } from '../../api/services/courseService';
+import { getFeaturedDanceSchools } from '../../api/services/schoolService';
 
 interface HomePageProps {
   isAuthenticated: boolean;
@@ -21,49 +24,62 @@ function HomePage({ isAuthenticated, user }: HomePageProps) {
   
   // Eğitmen verilerini saklamak için state tanımlayalım
   const [instructors, setInstructors] = useState<InstructorWithUser[]>([]);
+  const [classes, setClasses] = useState<DanceClass[]>([]);
+  const [schools, setSchools] = useState<DanceSchool[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Component yüklendiğinde eğitmen verilerini çekelim
+  // Component yüklendiğinde verileri çekelim
   useEffect(() => {
-    const getInstructors = async () => {
+    const loadData = async () => {
+      // Yükleme durumunu başlat
+      setLoading(true);
+      setError(null);
+      
       try {
-        setLoading(true);
+        // 1. Önce eğitmenleri çek
         const fetchedInstructors = await fetchAllInstructors();
         console.log("Tüm eğitmenler:", fetchedInstructors);
         
         // Eğitmenleri tecrübeye göre sıralayalım (yüksekten düşüğe)
         const sortedInstructors = [...fetchedInstructors].sort((a, b) => {
-          const instructorA = a as any;
-          const instructorB = b as any;
-          
-          // Türkçe (tecrube) veya İngilizce (experience) alanını kontrol edelim
-          const experienceA = instructorA.tecrube !== undefined && instructorA.tecrube !== null
-            ? Number(instructorA.tecrube)
-            : a.experience !== undefined && a.experience !== null
-              ? Number(a.experience)
-              : 0;
-          
-          const experienceB = instructorB.tecrube !== undefined && instructorB.tecrube !== null
-            ? Number(instructorB.tecrube)
-            : b.experience !== undefined && b.experience !== null
-              ? Number(b.experience)
-              : 0;
-          
-          // Tecrübesi yüksek olan önce gelsin (azalan sıralama)
-          return experienceB - experienceA;
+          const experienceA = a.experience || a.tecrube || 0;
+          const experienceB = b.experience || b.tecrube || 0;
+          return Number(experienceB) - Number(experienceA);
         });
-        
+
+        // Eğitmenleri set et
         setInstructors(sortedInstructors);
-      } catch (err) {
-        console.error('Eğitmenler yüklenirken hata oluştu:', err);
-        setError('Eğitmen bilgileri yüklenemedi.');
-      } finally {
-        setLoading(false);
+      } catch (instructorError) {
+        console.error('Eğitmenler yüklenirken hata:', instructorError);
+        setInstructors([]);
       }
+      
+      try {  
+        // 2. Dans kurslarını çek
+        const featuredClasses = await getFeaturedDanceCourses();
+        console.log("Öne çıkan dans kursları:", featuredClasses);
+        setClasses(featuredClasses);
+      } catch (classError) {
+        console.error('Dans kursları yüklenirken hata:', classError);
+        setClasses([]);
+      }
+      
+      try {
+        // 3. Dans okullarını çek
+        const featuredSchools = await getFeaturedDanceSchools();
+        console.log("Öne çıkan dans okulları:", featuredSchools);
+        setSchools(featuredSchools);
+      } catch (schoolError) {
+        console.error('Dans okulları yüklenirken hata:', schoolError);
+        setSchools([]);
+      }
+      
+      // Her durumda yüklemeyi tamamla
+      setLoading(false);
     };
 
-    getInstructors();
+    loadData();
   }, []);
 
   return (
@@ -94,7 +110,7 @@ function HomePage({ isAuthenticated, user }: HomePageProps) {
               Partner Bul
             </Link>
             <Link 
-              to="/search" 
+              to="/courses" 
               className="inline-flex items-center justify-center rounded-md bg-white border border-indigo-200 px-6 py-3 text-base font-medium text-indigo-600 shadow-md hover:bg-indigo-50 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -107,69 +123,31 @@ function HomePage({ isAuthenticated, user }: HomePageProps) {
       </div>
 
       {/* Instructors Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 bg-gray-50">
-        <h2 className="text-2xl font-bold text-center text-gray-800 mb-10">Eğitmenlerimiz</h2>
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 bg-gray-50">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-gray-800 mb-4">Öne Çıkan Eğitmenler</h2>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Uzman eğitmenlerimizle dans becerilerinizi geliştirin ve profesyonel teknikler öğrenin.
+          </p>
+        </div>
         
         {loading ? (
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500"></div>
+          <div className="flex justify-center items-center py-10">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
             <span className="ml-3 text-gray-600">Eğitmenler yükleniyor...</span>
           </div>
-        ) : error ? (
-          <div className="text-center py-8 bg-red-50 rounded-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-red-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p className="text-red-600">{error}</p>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="mt-4 bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700"
-            >
-              Tekrar Dene
-            </button>
-          </div>
         ) : instructors.length === 0 ? (
-          <div className="text-center py-8">
+          <div className="text-center py-8 bg-gray-100 rounded-lg">
             <p className="text-gray-500">Henüz eğitmen bulunmuyor.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {instructors.slice(0, 4).map((instructor, index) => (
-              <Link 
+              <InstructorCard
                 key={instructor.id}
-                to="/instructors" 
-                className="group bg-white rounded-xl shadow-md hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 overflow-hidden"
-              >
-                <div className="h-64 bg-gray-200 relative overflow-hidden">
-                  <img 
-                    src={instructor.user.photoURL || `/assets/images/dance/egitmen${index + 1}.jpg`} 
-                    alt={instructor.user.displayName || "Eğitmen"} 
-                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
-                    style={{ objectPosition: 'center top' }}
-                  />
-                </div>
-                <div className="p-5">
-                  <h3 className="text-lg font-semibold text-gray-800">
-                    {instructor.user.displayName || "Eğitmen"}
-                  </h3>
-                  <p className="text-indigo-600 font-medium mb-1">
-                    Dans Eğitmeni
-                  </p>
-                  <div className="flex items-center mb-2">
-                    <span className="text-yellow-400 mr-1">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                    </span>
-                    <span className="text-gray-600">4.9</span>
-                    <span className="text-gray-400 text-sm ml-1">(27 değerlendirme)</span>
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    <p><span className="font-medium">Tecrübe:</span> {instructor.experience || instructor.tecrube || 0} yıl</p>
-                    <p><span className="font-medium">Uzmanlık:</span> {instructor.uzmanlık || "Çeşitli Dans Stilleri"}</p>
-                  </div>
-                </div>
-              </Link>
+                instructor={instructor}
+                index={index}
+              />
             ))}
           </div>
         )}
@@ -178,9 +156,9 @@ function HomePage({ isAuthenticated, user }: HomePageProps) {
           <div className="text-center mt-8">
             <Link 
               to="/instructors"
-              className="inline-block py-2 px-4 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition-colors duration-300"
+              className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-6 py-3 text-base font-medium text-white shadow-md hover:bg-indigo-700 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >
-              Tüm Eğitmenleri Gör
+              Tüm Eğitmenleri Keşfet
             </Link>
           </div>
         )}
@@ -195,13 +173,111 @@ function HomePage({ isAuthenticated, user }: HomePageProps) {
           </p>
         </div>
         
-        {/* Class cards would go here */}
-        <div className="mt-8 text-center">
+        {loading ? (
+          <div className="flex justify-center items-center py-10">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+            <span className="ml-3 text-gray-600">Dans kursları yükleniyor...</span>
+          </div>
+        ) : classes.length === 0 ? (
+          <div className="text-center py-8 bg-gray-100 rounded-lg">
+            <p className="text-gray-500">Henüz dans kursu bulunmuyor.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {classes.map((danceClass) => (
+              <Link
+                key={danceClass.id}
+                to={`/courses/${danceClass.id}`}
+                className="bg-white rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+              >
+                <div className="h-48 bg-gray-200 relative overflow-hidden">
+                  <img
+                    src={danceClass.imageUrl || `/assets/images/dance/class${Math.floor(Math.random() * 4) + 1}.jpg`}
+                    alt={danceClass.name}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-0 right-0 bg-indigo-500 text-white text-xs font-bold px-2 py-1 m-2 rounded">
+                    {danceClass.level || 'Tüm Seviyeler'}
+                  </div>
+                </div>
+                <div className="p-4">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-1">{danceClass.name}</h3>
+                  <p className="text-indigo-600 font-medium mb-2">{danceClass.danceStyle || 'Çeşitli'}</p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-700 font-bold">{danceClass.price || '?'} {danceClass.currency || 'TRY'}</span>
+                    <span className="text-gray-500 text-sm">{danceClass.duration || 60} dk</span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+        
+        <div className="text-center mt-8">
           <Link 
-            to="/classes"
+            to="/courses"
             className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-6 py-3 text-base font-medium text-white shadow-md hover:bg-indigo-700 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
           >
             Tüm Kursları Keşfet
+          </Link>
+        </div>
+      </div>
+
+      {/* Featured Dance Schools */}
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 bg-gray-50">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-gray-800 mb-4">Öne Çıkan Dans Okulları</h2>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Türkiye'nin her yerindeki kaliteli dans okullarını keşfedin ve size uygun olanı bulun.
+          </p>
+        </div>
+        
+        {loading ? (
+          <div className="flex justify-center items-center py-10">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+            <span className="ml-3 text-gray-600">Dans okulları yükleniyor...</span>
+          </div>
+        ) : schools.length === 0 ? (
+          <div className="text-center py-8 bg-gray-100 rounded-lg">
+            <p className="text-gray-500">Henüz dans okulu bulunmuyor.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {schools.map((school) => (
+              <Link
+                key={school.id}
+                to={`/schools/${school.id}`}
+                className="bg-white rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+              >
+                <div className="h-40 bg-gray-200 relative overflow-hidden">
+                  <img
+                    src={school.gorsel || school.logo || school.images?.[0] || `/assets/images/dance/school${Math.floor(Math.random() * 4) + 1}.jpg`}
+                    alt={school.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="p-4">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-1">{school.name}</h3>
+                  <p className="text-gray-600 text-sm mb-2 line-clamp-2">{school.aciklama || school.description || 'Şube hakkında detaylı bilgi mevcut değil.'}</p>
+                  <div className="flex items-center text-sm text-gray-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    {school.konum || school.address?.city || 'İstanbul'}, {school.ulke || school.address?.country || 'Türkiye'}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+        
+        <div className="text-center mt-8">
+          <Link 
+            to="/schools"
+            className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-6 py-3 text-base font-medium text-white shadow-md hover:bg-indigo-700 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          >
+            Tüm Dans Okullarını Keşfet
           </Link>
         </div>
       </div>
@@ -228,66 +304,6 @@ function HomePage({ isAuthenticated, user }: HomePageProps) {
                 >
                   Giriş Yap
                 </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Admin/Instructor Quick Access */}
-      {isAuthenticated && (user?.role?.length ?? 0) > 0 && (
-        <div className="bg-gray-100 py-12">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="max-w-3xl mx-auto">
-              <h2 className="text-2xl font-bold text-center text-gray-800 mb-8">Hızlı Erişim</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {hasInstructorRole && (
-                  <Link 
-                    to="/instructor" 
-                    className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow"
-                  >
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Eğitmen Paneli</h3>
-                    <p className="text-gray-600 mb-2">Kurslarınızı ve öğrencilerinizi yönetin.</p>
-                    <span className="text-indigo-600 inline-flex items-center">
-                      Panele Git
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
-                    </span>
-                  </Link>
-                )}
-                
-                {hasSchoolAdminRole && (
-                  <Link 
-                    to="/school-admin" 
-                    className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow"
-                  >
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Okul Yönetimi</h3>
-                    <p className="text-gray-600 mb-2">Dans okulunuzun bilgilerini düzenleyin.</p>
-                    <span className="text-indigo-600 inline-flex items-center">
-                      Yönetime Git
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
-                    </span>
-                  </Link>
-                )}
-                
-                {hasSuperAdminRole && (
-                  <Link 
-                    to="/admin" 
-                    className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow"
-                  >
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Admin Paneli</h3>
-                    <p className="text-gray-600 mb-2">Platform ayarlarını yapılandırın.</p>
-                    <span className="text-indigo-600 inline-flex items-center">
-                      Panele Git
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
-                    </span>
-                  </Link>
-                )}
               </div>
             </div>
           </div>

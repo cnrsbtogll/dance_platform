@@ -137,10 +137,9 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEnroll }) => {
   };
 
   return (
-    <div 
-      className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+    <Link
+      to={`/courses/${course.id}`}
+      className="bg-white rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300 overflow-hidden"
     >
       <div className="relative">
         {/* Resim Konteyner ve Overlay */}
@@ -226,7 +225,7 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEnroll }) => {
         {/* Butonlar */}
         <div className="flex space-x-2">
           <Link 
-            to={`/course/${course.id}`} 
+            to={`/courses/${course.id}`} 
             className="flex-1 py-2 px-4 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 text-center"
           >
             Detaylar
@@ -246,7 +245,7 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEnroll }) => {
           )}
         </div>
       </div>
-    </div>
+    </Link>
   );
 };
 

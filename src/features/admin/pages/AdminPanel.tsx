@@ -8,6 +8,8 @@ import {
   ContactRequestsManagement 
 } from '../components';
 import SeedUsersButton from '../../../scripts/SeedUsersButton';
+import MigrateSchoolsButton from '../../../scripts/MigrateSchoolsButton';
+import SeedCoursesButton from '../../../scripts/SeedCoursesButton';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../api/firebase/firebase';
 import { User } from '../../../types';
@@ -200,6 +202,22 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
                 bilgileri içerir.
               </p>
               <SeedUsersButton />
+              
+              <div className="mt-8 border-t pt-6">
+                <h2 className="text-xl font-semibold mb-4">Örnek Dans Kursları</h2>
+                <p className="mb-4 text-gray-700">
+                  Bu bölümde veritabanına örnek dans kursları ekleyebilirsiniz. Oluşturulan kurslar, mevcut dans okulları ve eğitmenlerle ilişkilendirilecektir.
+                </p>
+                <SeedCoursesButton courseCount={25} />
+              </div>
+              
+              <div className="mt-8 border-t pt-6">
+                <h2 className="text-xl font-semibold mb-4">Veri Migrasyon Araçları</h2>
+                <p className="mb-4 text-gray-700">
+                  Bu bölümde veritabanındaki koleksiyonlar arasında veri taşıma işlemleri yapabilirsiniz.
+                </p>
+                <MigrateSchoolsButton />
+              </div>
             </div>
           )}
         </div>

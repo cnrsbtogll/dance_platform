@@ -36,46 +36,29 @@ const CourseSearchPage: React.FC = () => {
     const fetchCourses = async () => {
       setLoading(true);
       try {
-        const coursesRef = collection(db, 'danceClasses');
-        const q = query(
-          coursesRef, 
-          orderBy('createdAt', 'desc'), 
-          limit(50)
-        );
-        
+        const coursesRef = collection(db, 'courses');
+        const q = query(coursesRef, orderBy('createdAt', 'desc'));
         const querySnapshot = await getDocs(q);
         
         const fetchedCourses: DanceClass[] = [];
+        
         querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          
-          // Firestore timestamp'ını JS Date'e çevirme
-          const createdAt = data.createdAt instanceof Timestamp 
-            ? data.createdAt.toDate() 
-            : data.createdAt;
-            
-          const date = data.date instanceof Timestamp
-            ? data.date.toDate()
-            : data.date;
-          
           fetchedCourses.push({
             id: doc.id,
-            ...data,
-            createdAt,
-            date
+            ...doc.data(),
           } as DanceClass);
         });
         
         setCourses(fetchedCourses);
         setFilteredCourses(fetchedCourses);
-      } catch (err) {
-        console.error('Kurslar yüklenirken hata oluştu:', err);
-        setError('Kurslar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+      } catch (error) {
+        console.error('Kursları getirirken hata oluştu:', error);
+        setError('Kurslar yüklenirken bir hata oluştu');
       } finally {
         setLoading(false);
       }
     };
-
+    
     fetchCourses();
   }, []);
 
@@ -171,7 +154,7 @@ const CourseSearchPage: React.FC = () => {
 
   // Kursa kayıt handler'ı
   const handleEnroll = (courseId: string) => {
-    navigate(`/course/${courseId}`);
+    navigate(`/courses/${courseId}`);
   };
 
   // Aktif filtre var mı kontrolü
