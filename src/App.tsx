@@ -13,6 +13,7 @@ import SignUp from './components/auth/SignUp';
 import ProfileEditor from './components/profile/ProfileEditor';
 import Home from './components/home/Home';
 import SchoolDetails from './components/admin/SchoolDetails';
+import SearchPage from './components/search/SearchPage';
 import useAuth from './hooks/useAuth';
 import { auth } from './config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -257,6 +258,7 @@ function App(): JSX.Element {
               <Route path="/class/:id" element={<ClassDetails />} />
               <Route path="/partners" element={<PartnerMatching />} />
               <Route path="/progress" element={<BadgeSystem />} />
+              <Route path="/search" element={<SearchPage />} />
               <Route 
                 path="/admin" 
                 element={
