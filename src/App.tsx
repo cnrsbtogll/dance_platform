@@ -1,23 +1,23 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import ClassList from './components/classes/ClassList';
-import ClassDetails from './components/classes/ClassDetails';
-import PartnerMatching from './components/partners/PartnerMatching';
-import BadgeSystem from './components/progress/BadgeSystem';
-import AdminPanel from './components/admin/AdminPanel';
-import InstructorPanel from './components/instructor/InstructorPanel';
-import BecomeInstructor from './components/instructor/BecomeInstructor';
-import Navbar from './components/layout/Navbar';
-import SignIn from './components/auth/SignIn';
-import SignUp from './components/auth/SignUp';
-import ProfileEditor from './components/profile/ProfileEditor';
-import Home from './components/home/Home';
-import SchoolDetails from './components/admin/SchoolDetails';
-import SearchPage from './components/search/SearchPage';
-import useAuth from './hooks/useAuth';
-import { auth } from './config/firebase';
+import PartnerSearchPage from './pages/partners/PartnerSearchPage';
+import ProgressPage from './pages/progress/ProgressPage';
+import AdminPanel from './features/admin/pages/AdminPanel';
+import InstructorPanel from './features/instructor/pages/InstructorPanel';
+import BecomeInstructor from './features/instructor/pages/BecomeInstructor';
+import Navbar from './common/components/layout/Navbar';
+import SignIn from './pages/auth/SignIn';
+import SignUp from './pages/auth/SignUp';
+import ProfilePage from './pages/profile/ProfilePage';
+import HomePage from './pages/home/HomePage';
+import SchoolDetails from './features/admin/pages/SchoolDetails';
+import CourseSearchPage from './pages/courses/CourseSearchPage';
+import CourseDetailPage from './pages/courses/CourseDetailPage';
+import useAuth from './common/hooks/useAuth';
+import { auth } from './api/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { AuthProvider } from './contexts/AuthContext';
+import SchoolAdmin from './features/school/pages/SchoolAdmin';
 
 console.log('🔍 App bileşeni yükleniyor');
 console.log('🔍 Firebase auth durumu:', auth ? 'Tanımlı' : 'Tanımsız', auth);
@@ -169,7 +169,7 @@ function App(): JSX.Element {
       
       // Firebase config'i kontrol et
       console.log('🔍 Firebase config modülü import ediliyor...');
-      import('./config/firebase').then(module => {
+      import('./api/firebase/firebase').then(module => {
         const app = module.default;
         console.log('🔍 Firebase app modülü yüklendi:', app);
         
@@ -192,6 +192,13 @@ function App(): JSX.Element {
       setFirebaseInitError(err instanceof Error ? err.message : 'Firebase başlatılamadı');
     }
   }, [resetTrigger]);
+
+  useEffect(() => {
+    console.log('SchoolAdmin component mounted');
+    return () => {
+      console.log('SchoolAdmin component unmounted');
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -253,12 +260,11 @@ function App(): JSX.Element {
           
           <main className={`pt-20 pb-10 ${(isOffline || (error && !isOffline)) ? 'mt-8' : ''}`}>
             <Routes>
-              <Route path="/" element={<Home isAuthenticated={isAuthenticated} user={user} />} />
-              <Route path="/classes" element={<ClassList />} />
-              <Route path="/class/:id" element={<ClassDetails />} />
-              <Route path="/partners" element={<PartnerMatching />} />
-              <Route path="/progress" element={<BadgeSystem />} />
-              <Route path="/search" element={<SearchPage />} />
+              <Route path="/" element={<HomePage isAuthenticated={isAuthenticated} user={user} />} />
+              <Route path="/course/:id" element={<CourseDetailPage />} />
+              <Route path="/partners" element={<PartnerSearchPage />} />
+              <Route path="/progress" element={<ProgressPage />} />
+              <Route path="/courses" element={<CourseSearchPage />} />
               <Route 
                 path="/admin" 
                 element={
@@ -278,6 +284,13 @@ function App(): JSX.Element {
                   <InstructorPanel user={user} /> : <Navigate to="/signin" />
                 } 
               />
+              <Route 
+                path="/school-admin" 
+                element={
+                  isAuthenticated && user?.role?.includes('school') ? 
+                  <SchoolAdmin /> : <Navigate to="/signin" />
+                } 
+              />
               <Route
                 path="/become-instructor"
                 element={<BecomeInstructor />}
@@ -285,7 +298,7 @@ function App(): JSX.Element {
               <Route 
                 path="/profile" 
                 element={
-                  isAuthenticated ? <ProfileEditor user={user} /> : <Navigate to="/signin" />
+                  isAuthenticated ? <ProfilePage user={user} /> : <Navigate to="/signin" />
                 } 
               />
               <Route path="/signin" element={isAuthenticated ? <Navigate to="/" /> : <SignIn />} />
@@ -307,7 +320,7 @@ function App(): JSX.Element {
                 <div>
                   <h3 className="text-lg font-semibold mb-3">Bağlantılar</h3>
                   <ul className="space-y-2">
-                    <li><a href="/classes" className="text-gray-300 hover:text-white">Dans Kursu Bul</a></li>
+                    <li><a href="/courses" className="text-gray-300 hover:text-white">Dans Kursu Bul</a></li>
                     <li><a href="/partners" className="text-gray-300 hover:text-white">Partner Bul</a></li>
                     <li><a href="/progress" className="text-gray-300 hover:text-white">İlerleme</a></li>
                     {isAuthenticated && (

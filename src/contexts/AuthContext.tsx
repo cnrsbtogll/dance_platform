@@ -10,7 +10,7 @@ import {
   UserCredential
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { auth, db } from '../api/firebase/firebase';
 
 interface AuthContextType {
   currentUser: User | null;
