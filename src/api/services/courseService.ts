@@ -108,8 +108,7 @@ export const getSchoolDanceCourses = async (schoolId: string): Promise<DanceClas
   try {
     const coursesQuery = query(
       collection(db, COURSES_COLLECTION),
-      where('schoolId', '==', schoolId),
-      orderBy('createdAt', 'desc')
+      where('schoolId', '==', schoolId)
     );
     
     const coursesSnapshot = await getDocs(coursesQuery);
@@ -117,7 +116,17 @@ export const getSchoolDanceCourses = async (schoolId: string): Promise<DanceClas
     
     coursesSnapshot.forEach((doc) => {
       const data = doc.data();
-      courses.push(data as DanceClass);
+      courses.push({
+        ...data,
+        id: doc.id
+      } as DanceClass);
+    });
+    
+    courses.sort((a, b) => {
+      if (a.createdAt && b.createdAt) {
+        return b.createdAt.seconds - a.createdAt.seconds;
+      }
+      return 0;
     });
     
     return courses;

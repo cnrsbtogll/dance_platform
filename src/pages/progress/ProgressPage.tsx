@@ -18,7 +18,8 @@ import {
   ListItemText,
   Button,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
+  Alert
 } from '@mui/material';
 import { 
   EmojiEvents as TrophyIcon,
@@ -27,29 +28,15 @@ import {
   CheckCircle as CheckIcon,
   ArrowUpward as LevelUpIcon,
   DirectionsRun as ActivityIcon,
-  Lightbulb as TipIcon
+  Lightbulb as TipIcon,
+  Info as InfoIcon
 } from '@mui/icons-material';
+// import { useAuth } from '../../contexts/AuthContext';
+import useAuth from '../../common/hooks/useAuth';
+import { getUserProgressSummary, getAchievements, UserProgressSummary, Achievement } from '../../api/services/progressService';
 import { dansRozet } from '../../data/dansVerileri';
 
-// Type definitions
-interface UserProgress {
-  tamamlananKurslar: number;
-  tamamlananDersler: number;
-  toplamDansSuresi: number; // saat
-  kazanilanRozetler: number[]; // rozet id'leri
-  ilerlemeYuzdesi: number;
-  seviye: number;
-  puanlar: number;
-}
-
-interface Rozet {
-  id: number;
-  ad: string;
-  aciklama: string;
-  gorsel: string;
-  seviye: number;
-}
-
+// Type definitions for props
 interface ProgressBarProps {
   value: number;
   label: string;
@@ -57,7 +44,7 @@ interface ProgressBarProps {
 }
 
 interface BadgeCardProps {
-  badge: Rozet;
+  badge: Achievement;
   earned?: boolean;
 }
 
@@ -66,26 +53,99 @@ const ProgressPage: React.FC = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
   
-  // User progress state (in a real app, this would come from Firebase/Supabase)
-  const [userProgress, setUserProgress] = useState<UserProgress>({
-    tamamlananKurslar: 3,
-    tamamlananDersler: 24,
-    toplamDansSuresi: 36, // saat
-    kazanilanRozetler: [1, 2], // rozet id'leri
-    ilerlemeYuzdesi: 65,
-    seviye: 2,
-    puanlar: 650
-  });
-
-  // All badges
-  const [badges, setBadges] = useState<Rozet[]>([]);
+  // common/hooks/useAuth user döndürüyor, currentUser değil
+  const { user, loading: authLoading } = useAuth();
+  
+  console.log("ProgressPage: Auth durumu", { user, authLoading });
+  
+  // State for progress and badges
+  const [progressSummary, setProgressSummary] = useState<UserProgressSummary | null>(null);
+  const [allBadges, setAllBadges] = useState<Achievement[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
-    // In a real app, this would be fetched from an API
-    setBadges(dansRozet);
-    setLoading(false);
-  }, []);
+    const fetchData = async () => {
+      console.log("fetchData başlıyor, auth durumu:", { authLoading, userExists: !!user });
+      if (authLoading) {
+        console.log("Auth yükleniyor, veri çekme işlemi erteleniyor");
+        return;
+      }
+      
+      if (!user) {
+        console.log("Kullanıcı oturum açmamış, hata gösteriliyor");
+        setError('Bu sayfayı görüntülemek için giriş yapmalısınız.');
+        setLoading(false);
+        return;
+      }
+      
+      console.log("Kullanıcı bilgileri:", { userId: user.uid, email: user.email });
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        console.log("Rozetleri getirme işlemi başlıyor");
+        // Tüm başarı rozetlerini getir
+        const badges = await getAchievements();
+        console.log("Getirilen rozet sayısı:", badges.length);
+        setAllBadges(badges);
+        
+        console.log("Kullanıcı ilerleme özeti getirme işlemi başlıyor, userId:", user.uid);
+        // Kullanıcının ilerleme özetini getir
+        const summary = await getUserProgressSummary(user.uid);
+        console.log("Kullanıcı ilerleme özeti:", { 
+          completedCourses: summary.completedCourses,
+          earnedAchievements: summary.earnedAchievements.length,
+          courseProgress: summary.courseProgress.length
+        });
+        setProgressSummary(summary);
+      } catch (err: any) {
+        console.error('İlerleme verileri getirilirken hata:', err);
+        console.log("Hata detayları:", {
+          code: err.code,
+          message: err.message,
+          stack: err.stack
+        });
+        
+        // Hata mesajını daha detaylı hale getir
+        if (err.code === 'permission-denied') {
+          setError('Bu verilere erişim izniniz bulunmuyor. Yönetici ile iletişime geçin.');
+        } else if (err.code === 'not-found') {
+          setError('İlerleme verileri bulunamadı. Henüz herhangi bir kursa kaydolmamış olabilirsiniz.');
+        } else if (err.message && err.message.includes('index')) {
+          setError('Veri yapısı sorunu: Firebase indeks hatası. Yönetici ile iletişime geçin.');
+        } else if (err.message && err.message.includes('network')) {
+          setError('Ağ bağlantısı sorunu: Lütfen internet bağlantınızı kontrol edin.');
+        } else {
+          setError(`İlerleme verileri yüklenirken bir hata oluştu: ${err.message || 'Bilinmeyen hata'}. Lütfen daha sonra tekrar deneyin.`);
+        }
+      } finally {
+        console.log("Veri yükleme işlemi tamamlandı, loading:", false);
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [user, authLoading]);
+
+  // Başarıların mevcut olmaması veya hata durumunda örnek verilerle geri dönüş
+  useEffect(() => {
+    if (!loading && allBadges.length === 0 && !error) {
+      // Örnek verileri dansVerileri'nden al
+      const sampleBadges = dansRozet.map(badge => ({
+        id: badge.id.toString(),
+        name: badge.ad,
+        description: badge.aciklama,
+        danceStyle: "all",
+        iconUrl: badge.gorsel,
+        points: badge.seviye * 10,
+        level: badge.seviye.toString()
+      })) as Achievement[];
+      
+      setAllBadges(sampleBadges);
+    }
+  }, [loading, allBadges, error]);
 
   // Progress bar component
   const ProgressBar: React.FC<ProgressBarProps> = ({ value, label, color = 'primary' }) => (
@@ -139,8 +199,8 @@ const ProgressPage: React.FC = () => {
         )}
         
         <Avatar 
-          src={badge.gorsel} 
-          alt={badge.ad} 
+          src={badge.iconUrl} 
+          alt={badge.name} 
           sx={{ 
             width: 80, 
             height: 80, 
@@ -150,15 +210,15 @@ const ProgressPage: React.FC = () => {
         />
         
         <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-          {badge.ad}
+          {badge.name}
         </Typography>
         
         <Typography variant="body2" color="text.secondary">
-          {badge.aciklama}
+          {badge.description}
         </Typography>
         
         <Chip 
-          label={`Seviye ${badge.seviye}`}
+          label={`Seviye ${badge.level || '1'}`}
           color="primary" 
           variant="outlined"
           size="small"
@@ -168,20 +228,11 @@ const ProgressPage: React.FC = () => {
     </Card>
   );
 
-  // Next level details
-  const nextLevelDetails = {
-    level: userProgress.seviye + 1,
-    pointsRequired: 1000,
-    pointsRemaining: 1000 - userProgress.puanlar,
-    benefits: [
-      'Daha zorlu hareketlere erişim',
-      'Gelişmiş dans teknikleri',
-      'Özel grup etkinliklerine katılım hakkı'
-    ]
+  // Check if a badge is earned
+  const isBadgeEarned = (badge: Achievement): boolean => {
+    if (!progressSummary || !progressSummary.earnedAchievements) return false;
+    return progressSummary.earnedAchievements.some(earned => earned.id === badge.id);
   };
-  
-  // Calculate progress to next level
-  const progressToNextLevel = Math.round((userProgress.puanlar / nextLevelDetails.pointsRequired) * 100);
 
   // Animation variants
   const container = {
@@ -199,14 +250,150 @@ const ProgressPage: React.FC = () => {
     show: { opacity: 1, y: 0 }
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <Container sx={{ py: 8, textAlign: 'center' }}>
         <CircularProgress />
+        <Typography variant="body1" sx={{ mt: 2 }}>İlerleme durumunuz yükleniyor...</Typography>
       </Container>
     );
   }
 
+  if (error) {
+    return (
+      <Container sx={{ py: 8 }}>
+        <Alert severity="error" sx={{ mb: 4 }}>
+          {error}
+        </Alert>
+        
+        <Button 
+          variant="contained" 
+          color="primary" 
+          onClick={() => window.location.reload()}
+        >
+          Yeniden Dene
+        </Button>
+      </Container>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Container sx={{ py: 8 }}>
+        <Alert severity="info" sx={{ mb: 4 }}>
+          İlerleme durumunuzu görmek için lütfen giriş yapın.
+        </Alert>
+        
+        <Button 
+          variant="contained" 
+          color="primary" 
+          href="/signin"
+        >
+          Giriş Yap
+        </Button>
+      </Container>
+    );
+  }
+
+  // Veri yoksa veya yeni kullanıcı ise gösterilecek içerik
+  if (!progressSummary || 
+      (!progressSummary.completedLessons && 
+       !progressSummary.earnedAchievements?.length)) {
+    return (
+      <Container maxWidth="lg" sx={{ py: { xs: 4, md: 8 } }}>
+        <motion.div 
+          variants={container} 
+          initial="hidden" 
+          animate="show"
+        >
+          <motion.div variants={item}>
+            <Typography 
+              variant="h3" 
+              component="h1" 
+              fontWeight="bold" 
+              align="center" 
+              gutterBottom
+              color="primary"
+            >
+              Dans İlerleme & Rozetler
+            </Typography>
+            
+            <Typography 
+              variant="subtitle1" 
+              align="center" 
+              color="text.secondary" 
+              paragraph 
+              sx={{ mb: 6, maxWidth: 700, mx: 'auto' }}
+            >
+              Dans yolculuğunuzdaki ilerlemelerinizi takip edin, yeni rozetler kazanın ve dans becerilerinizi geliştirin.
+            </Typography>
+          </motion.div>
+
+          <motion.div variants={item}>
+            <Paper
+              elevation={0}
+              sx={{
+                p: 4,
+                mb: 6,
+                borderRadius: 4,
+                backgroundColor: '#f5f5f5',
+                border: '1px dashed #ccc',
+                textAlign: 'center'
+              }}
+            >
+              <InfoIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
+              
+              <Typography variant="h5" gutterBottom fontWeight="bold">
+                Henüz ilerleme kaydı bulunamadı
+              </Typography>
+              
+              <Typography variant="body1" paragraph>
+                Dans kurslarına katılarak ve dersleri tamamlayarak ilerleme kaydetmeye başlayabilirsiniz.
+                Rozetler kazanarak seviyenizi yükseltebilirsiniz.
+              </Typography>
+              
+              <Button 
+                variant="contained" 
+                color="primary" 
+                href="/courses"
+                sx={{ mt: 2 }}
+              >
+                Kursları Keşfet
+              </Button>
+            </Paper>
+          </motion.div>
+          
+          {/* Mevcut tüm başarı rozetleri */}
+          <motion.div variants={item}>
+            <Typography variant="h5" fontWeight="bold" gutterBottom sx={{ mt: 6, mb: 3 }}>
+              Kazanabileceğin Rozetler
+            </Typography>
+            
+            <Grid container spacing={3}>
+              {allBadges.map((badge) => (
+                <Grid item xs={12} sm={6} md={4} lg={3} key={badge.id}>
+                  <BadgeCard badge={badge} earned={false} />
+                </Grid>
+              ))}
+            </Grid>
+          </motion.div>
+        </motion.div>
+      </Container>
+    );
+  }
+
+  // Next level details
+  const nextLevelDetails = {
+    level: progressSummary.level + 1,
+    pointsRequired: progressSummary.nextLevelPoints,
+    pointsRemaining: progressSummary.nextLevelPoints - progressSummary.points,
+    benefits: [
+      'Daha zorlu hareketlere erişim',
+      'Gelişmiş dans teknikleri',
+      'Özel grup etkinliklerine katılım hakkı'
+    ]
+  };
+  
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 4, md: 8 } }}>
       <motion.div 
@@ -251,280 +438,294 @@ const ProgressPage: React.FC = () => {
               overflow: 'hidden'
             }}
           >
-            <Box sx={{
-              position: 'absolute',
-              top: -20,
-              right: -20,
-              width: 150,
-              height: 150,
-              borderRadius: '50%',
-              backgroundColor: 'rgba(255,255,255,0.1)',
-              zIndex: 0
-            }} />
+            {/* Background decoration */}
+            <Box 
+              sx={{ 
+                position: 'absolute', 
+                top: -25, 
+                right: -25, 
+                width: 150, 
+                height: 150, 
+                borderRadius: '50%', 
+                background: 'rgba(255,255,255,0.1)' 
+              }} 
+            />
+            <Box 
+              sx={{ 
+                position: 'absolute', 
+                bottom: -50, 
+                left: -50, 
+                width: 200, 
+                height: 200, 
+                borderRadius: '50%', 
+                background: 'rgba(255,255,255,0.05)' 
+              }} 
+            />
             
-            <Box sx={{
-              position: 'absolute',
-              bottom: -30,
-              left: -30,
-              width: 200,
-              height: 200,
-              borderRadius: '50%',
-              backgroundColor: 'rgba(255,255,255,0.1)',
-              zIndex: 0
-            }} />
-
             <Grid container spacing={4}>
-              <Grid item xs={12} md={8} sx={{ position: 'relative', zIndex: 1 }}>
-                <Typography variant="h4" gutterBottom fontWeight="bold">
-                  Dans Seviyesi {userProgress.seviye}
+              <Grid item xs={12} md={7}>
+                <Typography variant="h4" fontWeight="bold" gutterBottom>
+                  Dans Seviyeniz: {progressSummary.level}
                 </Typography>
                 
                 <Typography variant="subtitle1" sx={{ mb: 3, opacity: 0.9 }}>
-                  Toplam {userProgress.puanlar} puan kazandınız
+                  Bir sonraki seviyeye {nextLevelDetails.pointsRemaining} puan kaldı!
                 </Typography>
                 
-                <Grid container spacing={2}>
+                <Box sx={{ mb: 4 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                      İlerleme: {progressSummary.points} / {progressSummary.nextLevelPoints} puan
+                    </Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                      {progressSummary.progressPercentage}%
+                    </Typography>
+                  </Box>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={progressSummary.progressPercentage} 
+                    sx={{ 
+                      height: 10, 
+                      borderRadius: 5,
+                      backgroundColor: 'rgba(255,255,255,0.3)',
+                      '& .MuiLinearProgress-bar': {
+                        backgroundColor: 'white'
+                      }
+                    }} 
+                  />
+                </Box>
+                
+                <Grid container spacing={3}>
                   <Grid item xs={6} sm={3}>
-                    <Box sx={{ textAlign: 'center', p: 1 }}>
-                      <Typography variant="h4" fontWeight="bold">
-                        {userProgress.tamamlananKurslar}
-                      </Typography>
-                      <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                        Tamamlanan Kurs
-                      </Typography>
-                    </Box>
+                    <Typography variant="h4" fontWeight="bold">{progressSummary.completedCourses}</Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.9 }}>Tamamlanan Kurslar</Typography>
                   </Grid>
-                  
                   <Grid item xs={6} sm={3}>
-                    <Box sx={{ textAlign: 'center', p: 1 }}>
-                      <Typography variant="h4" fontWeight="bold">
-                        {userProgress.tamamlananDersler}
-                      </Typography>
-                      <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                        Tamamlanan Ders
-                      </Typography>
-                    </Box>
+                    <Typography variant="h4" fontWeight="bold">{progressSummary.completedLessons}</Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.9 }}>Tamamlanan Dersler</Typography>
                   </Grid>
-                  
                   <Grid item xs={6} sm={3}>
-                    <Box sx={{ textAlign: 'center', p: 1 }}>
-                      <Typography variant="h4" fontWeight="bold">
-                        {userProgress.toplamDansSuresi}
-                      </Typography>
-                      <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                        Dans Saati
-                      </Typography>
-                    </Box>
+                    <Typography variant="h4" fontWeight="bold">{progressSummary.totalDanceHours}</Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.9 }}>Dans Saati</Typography>
                   </Grid>
-                  
                   <Grid item xs={6} sm={3}>
-                    <Box sx={{ textAlign: 'center', p: 1 }}>
-                      <Typography variant="h4" fontWeight="bold">
-                        {userProgress.kazanilanRozetler.length}
-                      </Typography>
-                      <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                        Kazanılan Rozet
-                      </Typography>
-                    </Box>
+                    <Typography variant="h4" fontWeight="bold">{progressSummary.earnedAchievements.length}</Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.9 }}>Kazanılan Rozetler</Typography>
                   </Grid>
                 </Grid>
               </Grid>
               
-              <Grid item xs={12} md={4} sx={{ position: 'relative', zIndex: 1 }}>
+              <Grid item xs={12} md={5}>
                 <Box sx={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  justifyContent: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
                   height: '100%',
-                  textAlign: { xs: 'center', md: 'right' }
+                  justifyContent: 'center',
+                  borderLeft: { xs: 'none', md: '1px solid rgba(255,255,255,0.2)' },
+                  pl: { xs: 0, md: 4 },
+                  pt: { xs: 2, md: 0 }
                 }}>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Genel İlerleme
+                  <Typography variant="h5" fontWeight="bold" gutterBottom>
+                    Seviye {nextLevelDetails.level} Avantajları:
                   </Typography>
                   
-                  <Box sx={{ position: 'relative', display: 'inline-flex', justifyContent: { xs: 'center', md: 'flex-end' } }}>
-                    <CircularProgress 
-                      variant="determinate" 
-                      value={userProgress.ilerlemeYuzdesi} 
-                      size={isMobile ? 100 : 120} 
-                      thickness={5}
-                      sx={{ 
-                        color: 'white',
-                        '& .MuiCircularProgress-circle': {
-                          strokeLinecap: 'round',
-                        }
-                      }}
-                    />
-                    <Box
-                      sx={{
-                        top: 0,
-                        left: 0,
-                        bottom: 0,
-                        right: 0,
-                        position: 'absolute',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Typography variant="h4" fontWeight="bold">
-                        {`${userProgress.ilerlemeYuzdesi}%`}
-                      </Typography>
-                    </Box>
-                  </Box>
+                  <List sx={{ opacity: 0.9 }}>
+                    {nextLevelDetails.benefits.map((benefit, index) => (
+                      <ListItem key={index} sx={{ p: 0, mb: 1 }}>
+                        <ListItemIcon sx={{ minWidth: 36, color: 'white' }}>
+                          <CheckIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText primary={benefit} />
+                      </ListItem>
+                    ))}
+                  </List>
+                  
+                  <Button 
+                    variant="outlined" 
+                    color="inherit" 
+                    startIcon={<LevelUpIcon />}
+                    sx={{ 
+                      mt: 2,
+                      borderColor: 'rgba(255,255,255,0.5)',
+                      '&:hover': {
+                        borderColor: 'white',
+                        backgroundColor: 'rgba(255,255,255,0.1)'
+                      }
+                    }}
+                  >
+                    Seviye Nasıl Yükseltilir?
+                  </Button>
                 </Box>
               </Grid>
             </Grid>
           </Paper>
         </motion.div>
-        
-        {/* Next Level Progress */}
+
+        {/* Course Progress */}
         <motion.div variants={item}>
-          <Paper 
-            elevation={1} 
-            sx={{ 
-              p: 3, 
-              mb: 6, 
-              borderRadius: 4,
-              borderLeft: '5px solid #2575fc'
-            }}
-          >
-            <Grid container spacing={3} alignItems="center">
-              <Grid item xs={12} md={7}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <LevelUpIcon color="primary" sx={{ mr: 1 }} />
-                  <Typography variant="h6" fontWeight="bold">
-                    Sonraki Seviye: {nextLevelDetails.level}
-                  </Typography>
-                </Box>
-                
-                <Box sx={{ mb: 2 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2">
-                      İlerleme
+          <Paper elevation={0} sx={{ p: 4, mb: 6, borderRadius: 4 }}>
+            <Typography variant="h5" fontWeight="bold" gutterBottom>
+              <CourseIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+              Kurs İlerlemeleri
+            </Typography>
+            
+            {progressSummary.courseProgress.length > 0 ? (
+              <Box sx={{ mt: 3 }}>
+                {progressSummary.courseProgress.map((course, index) => (
+                  <Box key={index} sx={{ mb: 4 }}>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      {course.courseName}
                     </Typography>
-                    <Typography variant="body2" fontWeight="bold">
-                      {userProgress.puanlar} / {nextLevelDetails.pointsRequired} puan
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      {course.completedLessons} / {course.totalLessons} ders tamamlandı
                     </Typography>
+                    <ProgressBar 
+                      value={course.progress} 
+                      label={`${Math.round(course.progress)}% tamamlandı`} 
+                    />
                   </Box>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={progressToNextLevel} 
-                    sx={{ height: 10, borderRadius: 5 }} 
-                  />
-                </Box>
-                
-                <Typography variant="body2" color="text.secondary">
-                  Seviye {nextLevelDetails.level} için {nextLevelDetails.pointsRemaining} puan daha kazanmanız gerekiyor.
+                ))}
+              </Box>
+            ) : (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Typography variant="body1" color="text.secondary">
+                  Henüz hiçbir kursa kaydolmadınız veya ders tamamlamadınız.
                 </Typography>
-              </Grid>
-              
-              <Grid item xs={12} md={5}>
-                <List dense sx={{ bgcolor: 'background.paper', borderRadius: 2 }}>
-                  <ListItem>
+                <Button 
+                  variant="contained" 
+                  color="primary" 
+                  href="/courses"
+                  sx={{ mt: 2 }}
+                >
+                  Kursları Keşfet
+                </Button>
+              </Box>
+            )}
+          </Paper>
+        </motion.div>
+        
+        {/* Recent Activity */}
+        <motion.div variants={item}>
+          <Paper elevation={0} sx={{ p: 4, mb: 6, borderRadius: 4 }}>
+            <Typography variant="h5" fontWeight="bold" gutterBottom>
+              <ActivityIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+              Son Aktiviteler
+            </Typography>
+            
+            {progressSummary.recentAttendance && progressSummary.recentAttendance.length > 0 ? (
+              <List sx={{ mt: 2 }}>
+                {progressSummary.recentAttendance.map((attendance, index) => (
+                  <ListItem key={index} sx={{ px: 0, py: 1.5, borderBottom: '1px solid #f0f0f0' }}>
                     <ListItemIcon>
-                      <TipIcon color="primary" />
+                      <Avatar 
+                        sx={{ 
+                          bgcolor: attendance.status === 'attended' ? 'success.light' : 
+                                  attendance.status === 'late' ? 'warning.light' : 'error.light' 
+                        }}
+                      >
+                        {attendance.status === 'attended' ? 
+                          <CheckIcon /> : 
+                          <TimeIcon />}
+                      </Avatar>
                     </ListItemIcon>
                     <ListItemText 
-                      primary="Seviye Avantajları" 
-                      secondary="Bir sonraki seviyede sizi bekleyen özellikler:"
+                      primary={attendance.courseName}
+                      secondary={`${new Date(attendance.date).toLocaleDateString('tr-TR', { 
+                        day: 'numeric', 
+                        month: 'long', 
+                        year: 'numeric' 
+                      })}, ${attendance.status === 'attended' ? 'Katıldı' : 
+                              attendance.status === 'late' ? 'Geç Kaldı' : 'Katılmadı'}`}
                     />
                   </ListItem>
-                  
-                  {nextLevelDetails.benefits.map((benefit, index) => (
-                    <ListItem key={index}>
-                      <ListItemIcon>
-                        <CheckIcon fontSize="small" color="success" />
-                      </ListItemIcon>
-                      <ListItemText primary={benefit} />
-                    </ListItem>
-                  ))}
-                </List>
-              </Grid>
-            </Grid>
+                ))}
+              </List>
+            ) : (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Typography variant="body1" color="text.secondary">
+                  Henüz kaydedilmiş katılım bilginiz bulunmuyor.
+                </Typography>
+              </Box>
+            )}
           </Paper>
         </motion.div>
 
         {/* Badges Section */}
         <motion.div variants={item}>
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="h4" fontWeight="bold" gutterBottom>
-              Rozetleriniz
+          <Paper elevation={0} sx={{ p: 4, mb: 6, borderRadius: 4 }}>
+            <Typography variant="h5" fontWeight="bold" gutterBottom>
+              <TrophyIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+              Kazanılan Rozetler
             </Typography>
-            <Typography variant="body1" color="text.secondary" paragraph>
-              Dans yolculuğunuzda kazandığınız ve hedeflediğiniz rozetler
-            </Typography>
-          </Box>
-          
-          <Grid container spacing={3}>
-            {badges.map((badge) => (
-              <Grid item xs={12} sm={6} md={4} lg={3} key={badge.id}>
-                <BadgeCard 
-                  badge={badge} 
-                  earned={userProgress.kazanilanRozetler.includes(badge.id)} 
-                />
+            
+            {progressSummary.earnedAchievements && progressSummary.earnedAchievements.length > 0 ? (
+              <Grid container spacing={3} sx={{ mt: 1 }}>
+                {progressSummary.earnedAchievements.map((badge) => (
+                  <Grid item xs={12} sm={6} md={4} lg={3} key={badge.id}>
+                    <BadgeCard badge={badge} earned={true} />
+                  </Grid>
+                ))}
               </Grid>
-            ))}
-          </Grid>
+            ) : (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Typography variant="body1" color="text.secondary">
+                  Henüz rozet kazanmadınız. Derslerinizi tamamlayarak rozetler kazanabilirsiniz.
+                </Typography>
+              </Box>
+            )}
+            
+            {/* Upcoming Badges */}
+            <Typography variant="h6" fontWeight="bold" sx={{ mt: 6, mb: 3 }}>
+              Kazanabileceğin Diğer Rozetler
+            </Typography>
+            
+            <Grid container spacing={3}>
+              {allBadges
+                .filter(badge => !isBadgeEarned(badge))
+                .slice(0, 4)
+                .map((badge) => (
+                  <Grid item xs={12} sm={6} md={4} lg={3} key={badge.id}>
+                    <BadgeCard badge={badge} earned={false} />
+                  </Grid>
+                ))}
+            </Grid>
+            
+            {allBadges.filter(badge => !isBadgeEarned(badge)).length > 4 && (
+              <Box sx={{ textAlign: 'center', mt: 3 }}>
+                <Button variant="outlined" color="primary">
+                  Tüm Rozetleri Görüntüle
+                </Button>
+              </Box>
+            )}
+          </Paper>
         </motion.div>
         
-        {/* How to Earn More Badges */}
+        {/* Tip Section */}
         <motion.div variants={item}>
           <Paper 
             elevation={0} 
             sx={{ 
-              p: 4, 
-              mt: 6,
+              p: 4,
               borderRadius: 4,
-              bgcolor: 'primary.50',
-              border: '1px dashed',
-              borderColor: 'primary.main'
+              backgroundColor: 'rgba(106, 17, 203, 0.05)',
+              border: '1px solid rgba(106, 17, 203, 0.1)'
             }}
           >
-            <Typography variant="h5" fontWeight="bold" gutterBottom>
-              Nasıl Daha Fazla Rozet Kazanabilirsiniz?
-            </Typography>
-            
-            <List dense>
-              <ListItem>
-                <ListItemIcon>
-                  <CourseIcon color="primary" />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Dans derslerine düzenli katılın" 
-                  secondary="Haftalık ders kotanızı doldurmak size ekstra puanlar kazandırır"
-                />
-              </ListItem>
-              
-              <ListItem>
-                <ListItemIcon>
-                  <TimeIcon color="primary" />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Dans pratiği yapın" 
-                  secondary="Pratik yaparak dans saatinizi arttırın ve yeni rozetlerin kilidini açın"
-                />
-              </ListItem>
-              
-              <ListItem>
-                <ListItemIcon>
-                  <ActivityIcon color="primary" />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Dans etkinliklerine katılın" 
-                  secondary="Sosyal dans etkinlikleri ve yarışmalar size özel rozetler kazandırır"
-                />
-              </ListItem>
-            </List>
-            
-            <Button 
-              variant="contained" 
-              color="primary" 
-              sx={{ mt: 2 }}
-              endIcon={<TrophyIcon />}
-            >
-              Rozet Görevlerini Göster
-            </Button>
+            <Grid container spacing={3} alignItems="center">
+              <Grid item xs={12} sm={2} sx={{ textAlign: 'center' }}>
+                <TipIcon sx={{ fontSize: 80, color: 'primary.main', opacity: 0.8 }} />
+              </Grid>
+              <Grid item xs={12} sm={10}>
+                <Typography variant="h5" fontWeight="bold" gutterBottom>
+                  Dans İpucu
+                </Typography>
+                <Typography variant="body1">
+                  Dansınızı geliştirmek için sadece kurslara katılmak yeterli değildir. Derslerin dışında da 
+                  düzenli olarak pratik yapın. Her gün 15-20 dakika ayırarak dans hareketlerini tekrar etmek, 
+                  hızlı ilerlemenize yardımcı olacaktır.
+                </Typography>
+              </Grid>
+            </Grid>
           </Paper>
         </motion.div>
       </motion.div>

@@ -10,6 +10,7 @@ import {
 import SeedUsersButton from '../../../scripts/SeedUsersButton';
 import MigrateSchoolsButton from '../../../scripts/MigrateSchoolsButton';
 import SeedCoursesButton from '../../../scripts/SeedCoursesButton';
+import CreateProgressCollectionsButton from '../../../scripts/CreateProgressCollectionsButton';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../api/firebase/firebase';
 import { User } from '../../../types';
@@ -209,6 +210,14 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
                   Bu bölümde veritabanına örnek dans kursları ekleyebilirsiniz. Oluşturulan kurslar, mevcut dans okulları ve eğitmenlerle ilişkilendirilecektir.
                 </p>
                 <SeedCoursesButton courseCount={25} />
+              </div>
+              
+              <div className="mt-8 border-t pt-6">
+                <h2 className="text-xl font-semibold mb-4">İlerleme Durumu Koleksiyonları</h2>
+                <p className="mb-4 text-gray-700">
+                  Bu bölümde İlerleme Durumu sayfası için gerekli Firebase koleksiyonlarını oluşturabilirsiniz. Bu koleksiyonlar, kullanıcıların dans kurslarındaki ilerlemelerini, başarı rozetlerini ve katılım durumlarını takip etmek için kullanılır.
+                </p>
+                <CreateProgressCollectionsButton />
               </div>
               
               <div className="mt-8 border-t pt-6">
