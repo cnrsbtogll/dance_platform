@@ -31,7 +31,30 @@ function Home({ isAuthenticated, user }: HomeProps) {
         setLoading(true);
         const fetchedInstructors = await fetchAllInstructors();
         console.log("Tüm eğitmenler:", fetchedInstructors);
-        setInstructors(fetchedInstructors);
+        
+        // Eğitmenleri tecrübeye göre sıralayalım (yüksekten düşüğe)
+        const sortedInstructors = [...fetchedInstructors].sort((a, b) => {
+          const instructorA = a as any;
+          const instructorB = b as any;
+          
+          // Türkçe (tecrube) veya İngilizce (experience) alanını kontrol edelim
+          const experienceA = instructorA.tecrube !== undefined && instructorA.tecrube !== null
+            ? Number(instructorA.tecrube)
+            : a.experience !== undefined && a.experience !== null
+              ? Number(a.experience)
+              : 0;
+          
+          const experienceB = instructorB.tecrube !== undefined && instructorB.tecrube !== null
+            ? Number(instructorB.tecrube)
+            : b.experience !== undefined && b.experience !== null
+              ? Number(b.experience)
+              : 0;
+          
+          // Tecrübesi yüksek olan önce gelsin (azalan sıralama)
+          return experienceB - experienceA;
+        });
+        
+        setInstructors(sortedInstructors);
       } catch (err) {
         console.error('Eğitmenler yüklenirken hata oluştu:', err);
         setError('Eğitmen bilgileri yüklenemedi.');
