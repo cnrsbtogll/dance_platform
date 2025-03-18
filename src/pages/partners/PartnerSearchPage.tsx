@@ -1,5 +1,5 @@
 // src/components/partners/PartnerMatching.tsx
-import React, { useState, useEffect, Fragment, ChangeEvent, FormEvent } from 'react';
+import React, { useState, useEffect, Fragment, ChangeEvent, FormEvent, useCallback, useMemo } from 'react';
 import { Transition } from '@headlessui/react';
 import { Link, useNavigate } from 'react-router-dom';
 import CustomSelect from '../../common/components/ui/CustomSelect';
@@ -99,8 +99,8 @@ function PartnerSearchPage(): JSX.Element {
   // Dans stilleri eşleştirme haritası - danceStyles ile users tablosundaki değerler arasında
   const [styleMapping, setStyleMapping] = useState<{[key: string]: DanceStyle}>({});
 
-  // Convert Firestore user to Partner format
-  const convertUserToPartner = (user: FirestoreUser): Partner => {
+  // Convert Firestore user to Partner format - memoize this function
+  const convertUserToPartner = useCallback((user: FirestoreUser): Partner => {
     // User'ın dans stillerini standartlaştır - danceStyles tablosundaki değerlere eşleştir
     const standardizedDanceStyles = user.danceStyles?.map(style => {
       if (typeof style === 'string') {
@@ -108,7 +108,8 @@ function PartnerSearchPage(): JSX.Element {
         // StyleMapping'den eşleşen dans stilini bul
         const matchedStyle = styleMapping[styleLower];
         if (matchedStyle) {
-          console.log(`Dans stili '${style}' eşleştirildi:`, matchedStyle.label);
+          // Console.log'u kaldırarak gereksiz log çıktısını önleyebiliriz
+          // console.log(`Dans stili '${style}' eşleştirildi:`, matchedStyle.label);
           return matchedStyle.label; // Standart label değerini döndür
         }
       }
@@ -133,10 +134,10 @@ function PartnerSearchPage(): JSX.Element {
       boy: user.height,
       kilo: user.weight,
     };
-  };
+  }, [styleMapping]);
 
-  // Calculate relevance score between current user and potential partner
-  const calculateRelevanceScore = (partner: Partner, currentUser: FirestoreUser | null): number => {
+  // Calculate relevance score between current user and potential partner - memoize this function
+  const calculateRelevanceScore = useCallback((partner: Partner, currentUser: FirestoreUser | null): number => {
     if (!currentUser) return 0;
     
     let score = 0;
@@ -185,10 +186,16 @@ function PartnerSearchPage(): JSX.Element {
     }
     
     return score;
-  };
+  }, []);
 
-  // Dans stilleri bilgilerini getiren fonksiyon
-  const fetchAndSetDanceStyles = async () => {
+  // Dans stilleri bilgilerini getiren fonksiyon - memoize with useCallback
+  const fetchAndSetDanceStyles = useCallback(async () => {
+    // Eğer dans stilleri zaten yüklenmişse tekrar yükleme
+    if (danceStyles.length > 0 && Object.keys(styleMapping).length > 0) {
+      console.log("Dans stilleri zaten yüklenmiş, tekrar yüklenmiyor");
+      return;
+    }
+    
     setLoadingStyles(true);
     try {
       const danceStylesRef = collection(db, 'danceStyles');
@@ -215,7 +222,8 @@ function PartnerSearchPage(): JSX.Element {
       });
       
       setStyleMapping(mapping);
-      console.log("Dans stilleri eşleştirme haritası oluşturuldu:", mapping);
+      // Gereksiz log'u kaldıralım
+      // console.log("Dans stilleri eşleştirme haritası oluşturuldu:", mapping);
       
       if (styles.length === 0) {
         // If no styles in Firestore, use default styles
@@ -278,15 +286,21 @@ function PartnerSearchPage(): JSX.Element {
     } finally {
       setLoadingStyles(false);
     }
-  };
+  }, [danceStyles.length, styleMapping]);
 
-  // Fetch dance styles from Firestore
+  // Fetch dance styles from Firestore only once
   useEffect(() => {
     fetchAndSetDanceStyles();
-  }, []);
+  }, [fetchAndSetDanceStyles]);
 
-  // Kullanıcıları getiren fonksiyon - Dans stillerini daha doğru hale getirmek için
-  const fetchAndProcessUsers = async () => {
+  // Kullanıcıları getiren fonksiyon - memoize with useCallback and optimize
+  const fetchAndProcessUsers = useCallback(async () => {
+    // Eğer dans stilleri henüz yüklenmemişse, bekleyelim
+    if (Object.keys(styleMapping).length === 0) {
+      console.log("Dans stilleri henüz yüklenmedi, kullanıcılar yüklenemiyor");
+      return;
+    }
+    
     setInitialLoading(true);
     try {
       // Get current user data
@@ -379,12 +393,14 @@ function PartnerSearchPage(): JSX.Element {
     } finally {
       setInitialLoading(false);
     }
-  };
+  }, [currentUser, styleMapping, convertUserToPartner, calculateRelevanceScore]);
 
-  // Fetch users from Firestore when component mounts
+  // Fetch users from Firestore when component mounts or currentUser changes
   useEffect(() => {
-    fetchAndProcessUsers();
-  }, [currentUser]);
+    if (Object.keys(styleMapping).length > 0) {
+      fetchAndProcessUsers();
+    }
+  }, [fetchAndProcessUsers, styleMapping]);
 
   // Mevcut iletişim taleplerini kontrol et
   const checkExistingContactRequests = async () => {

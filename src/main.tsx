@@ -11,6 +11,10 @@ if (!rootElement) {
 
 const root = createRoot(rootElement)
 
+// Not: React StrictMode, geliştirme ortamında bileşenlerin iki kez render edilmesine neden olur.
+// Bu, yan etkileri ve potansiyel problemleri tespit etmek için normal bir davranıştır ve
+// prodüksiyon ortamında oluşmaz. Çift render davranışlarını görmek istemiyorsanız,
+// StrictMode'u geçici olarak kaldırabilirsiniz (<App /> şeklinde).
 root.render(
   <StrictMode>
     <App />
