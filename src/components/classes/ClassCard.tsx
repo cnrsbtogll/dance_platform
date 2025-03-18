@@ -77,9 +77,10 @@ function ClassCard({ kurs }: ClassCardProps): JSX.Element {
         {/* Image Container with Overlay */}
         <div className="relative h-56 overflow-hidden group">
           <img 
-            src={kurs.gorsel} 
+            src={kurs.gorsel || 'https://via.placeholder.com/400x250?text=Dans+Kursu'} 
             alt={kurs.baslik} 
-            className={`w-full h-full object-cover transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'}`}
+            className={`w-full h-full object-cover object-center transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'}`}
+            style={{ objectPosition: 'center center' }}
             onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
               const target = e.currentTarget;
               target.onerror = null;
