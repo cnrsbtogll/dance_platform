@@ -1052,7 +1052,8 @@ function PartnerMatching(): JSX.Element {
           <img 
             src={partner.foto || PLACEHOLDER_PARTNER_IMAGE} 
             alt={partner.ad} 
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover object-center transition-transform duration-300"
+            style={{ objectPosition: 'center top' }}
             onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
               e.currentTarget.onerror = null;
               e.currentTarget.src = PLACEHOLDER_PARTNER_IMAGE;

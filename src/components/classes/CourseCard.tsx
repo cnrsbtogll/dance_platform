@@ -148,7 +148,8 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEnroll }) => {
           <img 
             src={course.imageUrl || `https://via.placeholder.com/400x250?text=${encodeURIComponent(getDanceStyleName(course.danceStyle))}`} 
             alt={course.name} 
-            className={`w-full h-full object-cover transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'}`}
+            className={`w-full h-full object-cover object-center transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'}`}
+            style={{ objectPosition: 'center center' }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80"></div>
           

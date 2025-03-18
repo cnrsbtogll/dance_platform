@@ -144,7 +144,8 @@ function Home({ isAuthenticated, user }: HomeProps) {
                   <img 
                     src={instructor.user.photoURL || `/assets/images/dance/egitmen${index + 1}.jpg`} 
                     alt={instructor.user.displayName || "Eğitmen"} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
+                    style={{ objectPosition: 'center top' }}
                   />
                 </div>
                 <div className="p-5">
@@ -227,7 +228,8 @@ function Home({ isAuthenticated, user }: HomeProps) {
                 <img 
                   src={`/assets/images/dance/okul${index}.jpg`} 
                   alt="Dans Okulu" 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
+                  style={{ objectPosition: 'center center' }}
                 />
               </div>
               <div className="p-6">
