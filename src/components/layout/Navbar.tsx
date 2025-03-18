@@ -158,15 +158,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                   ? 'border-indigo-500 text-indigo-700 font-medium' 
                   : 'border-transparent text-gray-500 hover:text-indigo-600 hover:border-indigo-400'} inline-flex items-center px-1 pt-1 border-b-2 text-sm transition-all duration-200`}
               >
-                Kurs Ara
-              </Link>
-              <Link 
-                to="/classes" 
-                className={`${isActive('/classes') 
-                  ? 'border-indigo-500 text-indigo-700 font-medium' 
-                  : 'border-transparent text-gray-500 hover:text-indigo-600 hover:border-indigo-400'} inline-flex items-center px-1 pt-1 border-b-2 text-sm transition-all duration-200`}
-              >
-                Dans Kursu Bul
+                Kurs Bul
               </Link>
               <Link 
                 to="/progress" 
@@ -379,14 +371,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                     className="block px-3 py-1 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    Kurs Ara
-                  </Link>
-                  <Link
-                    to="/classes"
-                    className="block px-3 py-1 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Dans Kursu Bul
+                    Kurs Bul
                   </Link>
                   <Link
                     to="/progress"
@@ -505,14 +490,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                   className="block px-3 py-1 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  Kurs Ara
-                </Link>
-                <Link 
-                  to="/classes"
-                  className="block px-3 py-1 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Dans Kursu Bul
+                  Kurs Bul
                 </Link>
                 <Link 
                   to="/progress"
