@@ -111,17 +111,6 @@ function SearchFilters({ onFilterChange }: SearchFiltersProps): JSX.Element {
   // Seviye seçenekleri
   const seviyeler: string[] = ['Başlangıç', 'Orta', 'İleri'];
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>): void => {
-    e.preventDefault();
-    onFilterChange({
-      seviye,
-      fiyatAralik,
-      arama,
-      dansTuru,
-      gun
-    });
-  };
-
   const filterTemizle = (): void => {
     setSeviye('');
     setFiyatAralik('');
@@ -148,7 +137,7 @@ function SearchFilters({ onFilterChange }: SearchFiltersProps): JSX.Element {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
+    <form className="max-w-4xl mx-auto">
       {/* Modern Search Bar */}
       <div className="mb-6">
         <div 
@@ -219,9 +208,6 @@ function SearchFilters({ onFilterChange }: SearchFiltersProps): JSX.Element {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Dans Türü
-          </label>
           {loadingStyles ? (
             <div className="p-3 flex items-center">
               <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500 mr-2"></div>
@@ -234,7 +220,16 @@ function SearchFilters({ onFilterChange }: SearchFiltersProps): JSX.Element {
                 value: style.value
               }))}
               value={dansTuru}
-              onChange={(value) => setDansTuru(value)}
+              onChange={(value) => {
+                setDansTuru(value);
+                onFilterChange({
+                  seviye,
+                  fiyatAralik,
+                  arama,
+                  dansTuru: value,
+                  gun
+                });
+              }}
               placeholder="Tüm dans türleri"
               label="Dans Türü"
             />
@@ -242,52 +237,70 @@ function SearchFilters({ onFilterChange }: SearchFiltersProps): JSX.Element {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Seviye
-          </label>
           <CustomSelect
             options={seviyeler.map(sev => ({
               label: sev,
               value: sev
             }))}
             value={seviye}
-            onChange={(value) => setSeviye(value)}
+            onChange={(value) => {
+              setSeviye(value);
+              onFilterChange({
+                seviye: value,
+                fiyatAralik,
+                arama,
+                dansTuru,
+                gun
+              });
+            }}
             placeholder="Tüm seviyeler"
             label="Seviye"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Fiyat Aralığı
-          </label>
           <CustomSelect
             options={fiyatAraliklari}
             value={fiyatAralik}
-            onChange={(value) => setFiyatAralik(value)}
+            onChange={(value) => {
+              setFiyatAralik(value);
+              onFilterChange({
+                seviye,
+                fiyatAralik: value,
+                arama,
+                dansTuru,
+                gun
+              });
+            }}
             placeholder="Tüm fiyatlar"
             label="Fiyat Aralığı"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Ders Günü
-          </label>
           <CustomSelect
             options={gunler.map(g => ({
               label: g,
               value: g
             }))}
             value={gun}
-            onChange={(value) => setGun(value)}
+            onChange={(value) => {
+              setGun(value);
+              onFilterChange({
+                seviye,
+                fiyatAralik,
+                arama,
+                dansTuru,
+                gun: value
+              });
+            }}
             placeholder="Tüm günler"
             label="Ders Günü"
           />
         </div>
       </div>
 
-      <div className="mt-5 flex justify-between">
+      <div className="mt-5 flex justify-end">
         <button
           type="button"
           onClick={filterTemizle}
@@ -298,18 +311,6 @@ function SearchFilters({ onFilterChange }: SearchFiltersProps): JSX.Element {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
             Filtreleri Temizle
-          </div>
-        </button>
-        
-        <button
-          type="submit"
-          className="px-5 py-2.5 border border-transparent rounded-xl shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-300"
-        >
-          <div className="flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
-            Filtrele
           </div>
         </button>
       </div>
