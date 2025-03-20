@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { db, auth, storage } from '../../../api/firebase/firebase';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { User } from '../../../types';
@@ -168,67 +168,90 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
   const onSubmit = async (data: InstructorProfileFormData) => {
     if (!user?.id) {
       console.error('❌ Cannot submit: User ID not found');
+      toast.error('Kullanıcı bilgisi bulunamadı');
       return;
     }
 
-    console.log('📤 Submitting form data:', data);
-    console.log('Selected specialties:', selectedSpecialties);
+    console.log('📤 Form verileri:', data);
+    console.log('📍 Seçilen dans stilleri:', selectedSpecialties);
 
     setLoading(true);
     setSaveSuccess(false);
+
     try {
       const updateTimestamp = new Date().toISOString();
 
-      // Ortak alanlar
-      const sharedFields = {
-        displayName: data.displayName,
-        photoURL: profilePhotoURL,
+      // Instructor'a özel alanlar
+      const instructorUpdates = {
+        displayName: data.displayName.trim(),
+        bio: data.bio.trim(),
+        specialties: selectedSpecialties,
+        experience: data.experience.trim(),
+        phoneNumber: data.phoneNumber.replace(/\s/g, ''),
+        location: data.location.trim(),
         updatedAt: updateTimestamp
       };
 
-      // Instructor'a özel alanlar
-      const instructorUpdates = {
-        ...sharedFields,
-        bio: data.bio,
-        specialties: selectedSpecialties,
-        experience: data.experience,
-        phoneNumber: data.phoneNumber,
-        location: data.location
+      // Users koleksiyonu için alanlar
+      const userUpdates = {
+        displayName: data.displayName.trim(),
+        updatedAt: updateTimestamp
       };
 
-      console.log('📤 Updating profiles with:', {
-        sharedFields,
-        instructorUpdates
-      });
+      console.log('📝 Güncellenecek instructor verileri:', instructorUpdates);
+      console.log('📝 Güncellenecek user verileri:', userUpdates);
 
-      // Her iki koleksiyonu paralel olarak güncelle
+      // Firestore referansları
       const instructorRef = doc(db, 'instructors', user.id);
       const userRef = doc(db, 'users', user.id);
 
-      await Promise.all([
-        updateDoc(instructorRef, instructorUpdates),
-        updateDoc(userRef, sharedFields)
-      ]);
+      // Önce instructor dokümanını güncelle
+      console.log('🔄 Instructor dokümanı güncelleniyor...');
+      await updateDoc(instructorRef, instructorUpdates);
+      console.log('✅ Instructor dokümanı güncellendi');
 
-      // Güncel verileri kontrol et
-      const [userSnap, instructorSnap] = await Promise.all([
-        getDoc(userRef),
-        getDoc(instructorRef)
-      ]);
+      // Sonra user dokümanını güncelle
+      console.log('🔄 User dokümanı güncelleniyor...');
+      await updateDoc(userRef, userUpdates);
+      console.log('✅ User dokümanı güncellendi');
 
-      console.log('📋 Updated user data:', userSnap.data());
-      console.log('📋 Updated instructor data:', instructorSnap.data());
-
-      console.log('✅ Profile updated successfully');
+      // Başarılı güncelleme
+      console.log('✅ Tüm güncellemeler tamamlandı');
       setSaveSuccess(true);
       toast.success('Profil başarıyla güncellendi');
-      
+
+      // Form verilerini yeniden yükle
+      const instructorSnap = await getDoc(instructorRef);
+      if (instructorSnap.exists()) {
+        const updatedData = instructorSnap.data();
+        console.log('📥 Güncel veriler:', updatedData);
+        reset({
+          ...data,
+          ...updatedData
+        });
+      }
+
       setTimeout(() => {
         setSaveSuccess(false);
       }, 2000);
-    } catch (error) {
-      console.error('❌ Error updating profile:', error);
-      toast.error('Profil güncellenirken bir hata oluştu');
+
+    } catch (error: any) {
+      console.error('❌ Güncelleme hatası:', error);
+      console.error('Hata detayları:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
+
+      if (error.code === 'permission-denied') {
+        toast.error('Bu işlem için yetkiniz bulunmuyor');
+      } else if (error.code === 'invalid-argument') {
+        toast.error('Geçersiz veri formatı');
+      } else if (error.code === 'not-found') {
+        toast.error('Profil bulunamadı');
+      } else {
+        toast.error('Profil güncellenirken bir hata oluştu');
+      }
     } finally {
       setLoading(false);
     }
@@ -254,7 +277,8 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
       setProfilePhotoURL(base64Image);
       setValue('photoURL', base64Image);
 
-      // Firestore'u güncelle
+      // Batch write oluştur
+      const batch = writeBatch(db);
       const instructorRef = doc(db, 'instructors', user.id);
       const userRef = doc(db, 'users', user.id);
 
@@ -264,24 +288,34 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
         updatedAt: updateTimestamp
       };
 
-      await Promise.all([
-        updateDoc(instructorRef, sharedUpdates),
-        updateDoc(userRef, sharedUpdates)
-      ]);
+      // Batch'e güncellemeleri ekle
+      batch.update(instructorRef, sharedUpdates);
+      batch.update(userRef, sharedUpdates);
 
-      console.log('✅ Firestore documents updated');
+      // Batch'i commit et
+      await batch.commit();
+      console.log('✅ Batch write completed successfully');
 
       // ImageUploader'ı sıfırla
       setResetImageUploader(true);
       setTimeout(() => setResetImageUploader(false), 100);
 
       toast.success('Profil fotoğrafı güncellendi');
-    } catch (error) {
+    } catch (error: any) {
       // Hata durumunda UI'ı eski haline getir
       setProfilePhotoURL(user.photoURL || '');
       setValue('photoURL', user.photoURL || '');
       console.error('❌ Error updating profile photo:', error);
-      toast.error('Profil fotoğrafı güncellenirken bir hata oluştu');
+
+      if (error.code === 'resource-exhausted') {
+        toast.error('Çok fazla istek gönderildi. Lütfen birkaç saniye bekleyip tekrar deneyin.');
+        // Otomatik yeniden deneme için timeout ekle
+        setTimeout(() => {
+          toast.info('Şimdi tekrar deneyebilirsiniz');
+        }, 5000);
+      } else {
+        toast.error('Profil fotoğrafı güncellenirken bir hata oluştu');
+      }
     }
   };
 
@@ -407,29 +441,47 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
                 +90
               </div>
               <input
-                type="tel"
-                pattern="[0-9]*"
-                inputMode="numeric"
+                type="text"
                 {...register('phoneNumber')}
                 onChange={(e) => {
-                  const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                  // Sadece rakamları al
+                  const rawValue = e.target.value.replace(/\D/g, '');
+                  
+                  // Maksimum 10 rakam
                   const trimmedValue = rawValue.slice(0, 10);
                   
+                  // Format: 5XX XXX XXXX
                   let formattedValue = trimmedValue;
-                  if (trimmedValue.length > 3) {
+                  if (trimmedValue.length >= 3) {
                     formattedValue = `${trimmedValue.slice(0, 3)} ${trimmedValue.slice(3)}`;
                   }
-                  if (trimmedValue.length > 6) {
+                  if (trimmedValue.length >= 6) {
                     formattedValue = `${formattedValue.slice(0, 7)} ${formattedValue.slice(7)}`;
                   }
-                  if (trimmedValue.length > 8) {
-                    formattedValue = `${formattedValue.slice(0, 10)} ${formattedValue.slice(10)}`;
-                  }
                   
+                  // Değeri güncelle
                   setValue('phoneNumber', formattedValue);
+                  
+                  // İmleci doğru pozisyona getir
+                  const input = e.target;
+                  const cursorPosition = input.selectionStart || 0;
+                  
+                  // Boşlukları hesaba kat
+                  const spacesBeforeCursor = (formattedValue.slice(0, cursorPosition).match(/ /g) || []).length;
+                  const rawCursorPosition = cursorPosition - spacesBeforeCursor;
+                  
+                  // Yeni cursor pozisyonunu hesapla
+                  let newCursorPosition = rawCursorPosition;
+                  if (rawCursorPosition > 3) newCursorPosition++;
+                  if (rawCursorPosition > 6) newCursorPosition++;
+                  
+                  // Timeout ile cursor'ı pozisyonla (React'in state güncellemesini beklemek için)
+                  setTimeout(() => {
+                    input.setSelectionRange(newCursorPosition, newCursorPosition);
+                  }, 0);
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-r-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="5XX XXX XX XX"
+                placeholder="5XX XXX XXXX"
               />
             </div>
           </div>
