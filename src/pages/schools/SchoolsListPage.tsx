@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { DanceSchool } from '../../types';
 import { getAllDanceSchools } from '../../api/services/schoolService';
+import { generateInitialsAvatar } from '../../common/utils/imageUtils';
 
 const SchoolsListPage: React.FC = () => {
   const [schools, setSchools] = useState<DanceSchool[]>([]);
@@ -95,9 +96,14 @@ const SchoolsListPage: React.FC = () => {
               >
                 <div className="h-48 bg-gray-200 relative overflow-hidden">
                   <img
-                    src={school.gorsel || school.logo || school.images?.[0] || `/assets/images/dance/school${Math.floor(Math.random() * 4) + 1}.jpg`}
+                    src={school.gorsel || school.logo || school.images?.[0] || generateInitialsAvatar(school.name, 'school')}
                     alt={school.name}
                     className="w-full h-full object-cover"
+                    onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                      const target = e.currentTarget;
+                      target.onerror = null;
+                      target.src = generateInitialsAvatar(school.name, 'school');
+                    }}
                   />
                 </div>
                 <div className="p-6">

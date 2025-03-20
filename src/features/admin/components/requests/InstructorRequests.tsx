@@ -13,7 +13,7 @@ import {
   addDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { db } from '../../../api/firebase/firebase';
+import { db } from '../../../../api/firebase/firebase';
 
 interface InstructorRequest {
   id: string;

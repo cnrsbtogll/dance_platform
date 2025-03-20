@@ -8,12 +8,15 @@ import {
   where, 
   getDocs,
   doc,
-  getDoc
+  getDoc,
+  setDoc
 } from 'firebase/firestore';
-import { db } from '../../../api/firebase/firebase';
+import { createUserWithEmailAndPassword, updateProfile, AuthError } from 'firebase/auth';
+import { db, auth } from '../../../api/firebase/firebase';
 import { useAuth } from '../../../contexts/AuthContext';
 import CustomSelect from '../../../common/components/ui/CustomSelect';
 import { motion } from 'framer-motion';
+import { getAuthErrorMessage } from '../../../pages/auth/services/authService';
 
 interface DanceStyle {
   id: string;
@@ -34,11 +37,13 @@ interface FormData {
   website: string;
   danceStyles: string[];
   establishedYear: string;
+  password?: string; // Şifre alanı opsiyonel
 }
 
 function BecomeSchool() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  // Form ve validation state'leri
   const [formData, setFormData] = useState<FormData>({
     schoolName: '',
     schoolDescription: '',
@@ -51,12 +56,14 @@ function BecomeSchool() {
     country: 'Türkiye',
     website: '',
     danceStyles: [],
-    establishedYear: ''
+    establishedYear: '',
+    password: ''
   });
   
   const [selectedDanceStyles, setSelectedDanceStyles] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [formErrors, setFormErrors] = useState<Partial<Record<keyof FormData, string>>>({});
   const [success, setSuccess] = useState(false);
   const [hasExistingApplication, setHasExistingApplication] = useState(false);
   const [isAlreadySchool, setIsAlreadySchool] = useState(false);
@@ -111,56 +118,61 @@ function BecomeSchool() {
   }, []);
 
   useEffect(() => {
-    // Redirect to login if not authenticated
-    if (!currentUser) {
-      navigate('/signin?redirect=become-school');
-      return;
-    }
-
+    // Kullanıcı bilgilerini kontrol et
     const checkUserStatus = async () => {
       try {
-        // Check if user is already a school admin
-        const userDocRef = doc(db, 'users', currentUser.uid);
-        const userDoc = await getDoc(userDocRef);
-
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          const roles = userData.role || [];
+        if (currentUser) {
+          // Kullanıcı giriş yapmışsa kontrolleri yap
           
-          // If user already has school role, redirect to school admin panel
-          if (Array.isArray(roles) && roles.includes('school')) {
-            setIsAlreadySchool(true);
-            setIsLoading(false);
-            return;
+          // Check if user is already a school admin
+          const userDocRef = doc(db, 'users', currentUser.uid);
+          const userDoc = await getDoc(userDocRef);
+
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            const roles = userData.role || [];
+            
+            // If user already has school role, redirect to school admin panel
+            if (Array.isArray(roles) && roles.includes('school')) {
+              setIsAlreadySchool(true);
+              setIsLoading(false);
+              return;
+            }
+
+            // Pre-fill form with user data if available
+            if (userData.displayName) {
+              setFormData(prev => ({
+                ...prev,
+                contactPerson: userData.displayName
+              }));
+            }
+            if (userData.phoneNumber) {
+              setFormData(prev => ({
+                ...prev,
+                contactPhone: userData.phoneNumber
+              }));
+            }
           }
 
-          // Pre-fill form with user data if available
-          if (userData.displayName) {
-            setFormData(prev => ({
-              ...prev,
-              contactPerson: userData.displayName
-            }));
+          // Check if user already has a pending application
+          const requestsRef = collection(db, 'schoolRequests');
+          const q = query(
+            requestsRef,
+            where('userId', '==', currentUser.uid),
+            where('status', '==', 'pending')
+          );
+          
+          const querySnapshot = await getDocs(q);
+          
+          if (!querySnapshot.empty) {
+            setHasExistingApplication(true);
           }
-          if (userData.phoneNumber) {
-            setFormData(prev => ({
-              ...prev,
-              contactPhone: userData.phoneNumber
-            }));
-          }
-        }
-
-        // Check if user already has a pending application
-        const requestsRef = collection(db, 'schoolRequests');
-        const q = query(
-          requestsRef,
-          where('userId', '==', currentUser.uid),
-          where('status', '==', 'pending')
-        );
-        
-        const querySnapshot = await getDocs(q);
-        
-        if (!querySnapshot.empty) {
-          setHasExistingApplication(true);
+          
+          // Email alanını currentUser'dan al
+          setFormData(prev => ({
+            ...prev,
+            contactEmail: currentUser.email || ''
+          }));
         }
         
         setIsLoading(false);
@@ -180,59 +192,134 @@ function BecomeSchool() {
       ...prev,
       [name]: value
     }));
+    
+    // Alanın hata mesajını temizle
+    if (formErrors[name as keyof FormData]) {
+      setFormErrors(prev => {
+        const updated = {...prev};
+        delete updated[name as keyof FormData];
+        return updated;
+      });
+    }
   };
 
-  const handleDanceStyleChange = (value: string) => {
-    let updatedStyles;
+  const handleDanceStyleChange = (value: string | string[]) => {
+    // value bir array olarak geldiğinde (multiple seçim) doğrudan kullan
+    // string olarak geldiğinde bir array'e dönüştür
+    const danceStylesArray = Array.isArray(value) ? value : [value];
     
-    // Check if style is already selected
-    if (selectedDanceStyles.includes(value)) {
-      // Remove style if already selected
-      updatedStyles = selectedDanceStyles.filter(style => style !== value);
-    } else {
-      // Add style if not already selected
-      updatedStyles = [...selectedDanceStyles, value];
-    }
+    // Boş seçim durumunda boş array ile güncelle
+    // Tümü seçeneği seçildiğinde boş array dönücek
+    const filteredStyles = value === '' ? [] : danceStylesArray.filter(style => style !== '');
     
-    setSelectedDanceStyles(updatedStyles);
+    setSelectedDanceStyles(filteredStyles);
     setFormData(prev => ({
       ...prev,
-      danceStyles: updatedStyles
+      danceStyles: filteredStyles
     }));
+    
+    // Dans stili seçildiğinde ilgili hatayı temizle
+    if (formErrors.danceStyles) {
+      setFormErrors(prev => {
+        const updated = {...prev};
+        delete updated.danceStyles;
+        return updated;
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
+    setFormErrors({});
     
     try {
-      if (!currentUser) {
-        throw new Error('Kullanıcı girişi yapılmamış. Lütfen giriş yapın ve tekrar deneyin.');
-      }
-      
       // Validate form data
+      const errors: Partial<Record<keyof FormData, string>> = {};
+      
       if (!formData.schoolName.trim()) {
-        throw new Error('Lütfen dans okulu adını girin.');
+        errors.schoolName = 'Bu alan zorunlu';
       }
       
       if (!formData.contactPerson.trim()) {
-        throw new Error('Lütfen yetkili kişi adını girin.');
+        errors.contactPerson = 'Bu alan zorunlu';
       }
       
       if (!formData.contactEmail.trim()) {
-        throw new Error('Lütfen iletişim e-postasını girin.');
+        errors.contactEmail = 'Bu alan zorunlu';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.contactEmail)) {
+        errors.contactEmail = 'Geçerli bir email adresi girin';
       }
       
-      if (!formData.contactPhone.trim()) {
-        throw new Error('Lütfen iletişim telefonunu girin.');
+      // Telefon numarasının kontrolü - boşlukları kaldır ve doğrula
+      const cleanPhone = formData.contactPhone.replace(/\s/g, '');
+      
+      if (!cleanPhone) {
+        errors.contactPhone = 'Bu alan zorunlu';
+      } else if (cleanPhone.length !== 10) {
+        errors.contactPhone = '10 rakam girmelisiniz';
       }
       
       if (formData.danceStyles.length === 0) {
-        throw new Error('Lütfen en az bir dans stilini seçin.');
+        errors.danceStyles = 'En az bir dans stili seçmelisiniz';
       }
       
-      // Create school request
+      // Kullanıcı giriş yapmamışsa şifre kontrolü
+      if (!currentUser) {
+        if (!formData.password) {
+          errors.password = 'Bu alan zorunlu';
+        } else if (formData.password.length < 6) {
+          errors.password = 'En az 6 karakter girmelisiniz';
+        }
+      }
+      
+      // Hata varsa, formu göndermeyi durdur
+      if (Object.keys(errors).length > 0) {
+        setFormErrors(errors);
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Kullanıcı hesabı ve okul başvurusu oluşturma işlemi
+      let userId = currentUser?.uid;
+      let userEmail = currentUser?.email || formData.contactEmail;
+      
+      // Kullanıcı giriş yapmamışsa yeni hesap oluştur
+      if (!currentUser) {
+        try {
+          // Firebase Authentication ile kullanıcı oluştur
+          const userCredential = await createUserWithEmailAndPassword(
+            auth, 
+            formData.contactEmail, 
+            formData.password as string
+          );
+          
+          // Kullanıcı profiline displayName ekle
+          await updateProfile(userCredential.user, { displayName: formData.contactPerson });
+          
+          // User ID'sini güncelle
+          userId = userCredential.user.uid;
+          
+          // Firestore'a kullanıcı bilgilerini kaydet
+          await setDoc(doc(db, 'users', userId), {
+            id: userId,
+            email: formData.contactEmail,
+            displayName: formData.contactPerson,
+            photoURL: '',
+            phoneNumber: formData.contactPhone,
+            role: ['school_applicant'], // Başlangıçta başvuru rolü
+            createdAt: serverTimestamp()
+          });
+          
+        } catch (authError) {
+          // Kimlik doğrulama hatasını işle
+          const error = authError as AuthError;
+          throw new Error(getAuthErrorMessage(error));
+        }
+      }
+      
+      // Okul başvurusu oluştur
       await addDoc(collection(db, 'schoolRequests'), {
         schoolName: formData.schoolName,
         schoolDescription: formData.schoolDescription,
@@ -246,15 +333,15 @@ function BecomeSchool() {
         website: formData.website,
         danceStyles: formData.danceStyles,
         establishedYear: formData.establishedYear,
-        userId: currentUser.uid,
-        userEmail: currentUser.email,
+        userId: userId,
+        userEmail: userEmail,
         status: 'pending',
         createdAt: serverTimestamp()
       });
       
       setSuccess(true);
       
-      // Reset form
+      // Formu sıfırla
       setFormData({
         schoolName: '',
         schoolDescription: '',
@@ -267,7 +354,8 @@ function BecomeSchool() {
         country: 'Türkiye',
         website: '',
         danceStyles: [],
-        establishedYear: ''
+        establishedYear: '',
+        password: ''
       });
       setSelectedDanceStyles([]);
       
@@ -342,7 +430,10 @@ function BecomeSchool() {
             </svg>
           </div>
           <h2 className="text-2xl font-semibold text-gray-800 mb-2">Başvurunuz Alındı!</h2>
-          <p className="text-gray-600 mb-6">Dans okulu başvurunuz başarıyla alındı. Başvurunuz incelendikten sonra size e-posta ile bilgilendirme yapılacaktır.</p>
+          <p className="text-gray-600 mb-6">
+            {!currentUser ? "Hesabınız oluşturuldu ve " : ""}
+            Dans okulu başvurunuz başarıyla alındı. Başvurunuz incelendikten sonra size e-posta ile bilgilendirme yapılacaktır.
+          </p>
           <button 
             onClick={() => navigate('/')}
             className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
@@ -383,7 +474,7 @@ function BecomeSchool() {
           </div>
         )}
         
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-700 mb-4 border-b pb-2">Okul Bilgileri</h3>
             
@@ -397,9 +488,12 @@ function BecomeSchool() {
                 name="schoolName"
                 value={formData.schoolName}
                 onChange={handleChange}
-                required
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+                placeholder="Okul adını giriniz"
+                className={`w-full p-2 border ${formErrors.schoolName ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-indigo-500`}
               />
+              {formErrors.schoolName && (
+                <p className="text-red-500 text-xs mt-1">{formErrors.schoolName}</p>
+              )}
             </div>
             
             <div className="mb-4">
@@ -444,26 +538,16 @@ function BecomeSchool() {
                   <span className="text-gray-600">Dans stilleri yükleniyor...</span>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {danceStyleOptions.map(style => (
-                    <div key={style.value} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id={`style-${style.value}`}
-                        value={style.value}
-                        checked={selectedDanceStyles.includes(style.value)}
-                        onChange={() => handleDanceStyleChange(style.value)}
-                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                      />
-                      <label htmlFor={`style-${style.value}`} className="ml-2 text-sm text-gray-700">
-                        {style.label}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {formData.danceStyles.length === 0 && (
-                <p className="text-red-500 text-xs mt-1">Lütfen en az bir dans stili seçin</p>
+                <CustomSelect
+                  label=""
+                  options={danceStyleOptions}
+                  value={selectedDanceStyles}
+                  onChange={handleDanceStyleChange}
+                  placeholder="Dans stillerinizi seçin"
+                  className="w-full"
+                  error={formErrors.danceStyles}
+                  multiple={true}
+                />
               )}
             </div>
           </div>
@@ -481,9 +565,12 @@ function BecomeSchool() {
                 name="contactPerson"
                 value={formData.contactPerson}
                 onChange={handleChange}
-                required
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+                placeholder="Yetkili kişi adını giriniz"
+                className={`w-full p-2 border ${formErrors.contactPerson ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-indigo-500`}
               />
+              {formErrors.contactPerson && (
+                <p className="text-red-500 text-xs mt-1">{formErrors.contactPerson}</p>
+              )}
             </div>
             
             <div className="mb-4">
@@ -496,41 +583,107 @@ function BecomeSchool() {
                 name="contactEmail"
                 value={formData.contactEmail}
                 onChange={handleChange}
-                required
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+                placeholder="E-posta adresinizi giriniz"
+                className={`w-full p-2 border ${formErrors.contactEmail ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-indigo-500`}
               />
+              {formErrors.contactEmail && (
+                <p className="text-red-500 text-xs mt-1">{formErrors.contactEmail}</p>
+              )}
             </div>
             
             <div className="mb-4">
               <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700 mb-1">
                 İletişim Telefonu*
               </label>
-              <input
-                type="tel"
-                id="contactPhone"
-                name="contactPhone"
-                value={formData.contactPhone}
-                onChange={handleChange}
-                required
-                placeholder="Örn: 05XX XXX XX XX"
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
-              />
+              <div className="flex items-center">
+                <div className={`bg-gray-100 p-2 border ${formErrors.contactPhone ? 'border-red-500' : 'border-gray-300'} border-r-0 rounded-l-md`}>
+                  +90
+                </div>
+                <input
+                  type="tel"
+                  pattern="[0-9]*"
+                  inputMode="numeric"
+                  id="contactPhone"
+                  name="contactPhone"
+                  value={formData.contactPhone}
+                  onChange={(e) => {
+                    // Sadece rakam girişine izin ver
+                    const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                    
+                    // 10 karakterden uzun olmasını engelleyin (Türkiye formatında)
+                    const trimmedValue = rawValue.slice(0, 10);
+                    
+                    // Telefon numarasına maske uygula (5XX XXX XX XX formatında)
+                    let formattedValue = trimmedValue;
+                    
+                    if (trimmedValue.length > 3) {
+                      formattedValue = `${trimmedValue.slice(0, 3)} ${trimmedValue.slice(3)}`;
+                    }
+                    if (trimmedValue.length > 6) {
+                      formattedValue = `${formattedValue.slice(0, 7)} ${formattedValue.slice(7)}`;
+                    }
+                    if (trimmedValue.length > 8) {
+                      formattedValue = `${formattedValue.slice(0, 10)} ${formattedValue.slice(10)}`;
+                    }
+                    
+                    setFormData(prev => ({
+                      ...prev,
+                      contactPhone: formattedValue
+                    }));
+                    
+                    // Hata mesajını temizle
+                    if (formErrors.contactPhone) {
+                      setFormErrors(prev => {
+                        const updated = {...prev};
+                        delete updated.contactPhone;
+                        return updated;
+                      });
+                    }
+                  }}
+                  placeholder="5XX XXX XX XX"
+                  className={`w-full p-2 border ${formErrors.contactPhone ? 'border-red-500' : 'border-gray-300'} rounded-r-md focus:ring-2 focus:ring-indigo-500`}
+                />
+              </div>
+              {formErrors.contactPhone && (
+                <p className="text-red-500 text-xs mt-1">{formErrors.contactPhone}</p>
+              )}
             </div>
             
             <div className="mb-4">
-              <label htmlFor="website" className="block text-sm font-medium text-gray-700 mb-1">
-                Web Sitesi
-              </label>
-              <input
-                type="url"
-                id="website"
-                name="website"
-                value={formData.website}
-                onChange={handleChange}
-                placeholder="Örn: https://www.dansokulum.com"
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
-              />
+            <label htmlFor="website" className="block text-sm font-medium text-gray-700 mb-1">
+            Web Sitesi
+            </label>
+            <input
+            type="url"
+            id="website"
+            name="website"
+            value={formData.website}
+            onChange={handleChange}
+            placeholder="Örn: https://www.dansokulum.com"
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+            />
             </div>
+
+              {/* Giriş yapmamış kullanıcı için şifre alanı */}
+              {!currentUser && (
+                <div className="mb-4">
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                    Şifre*
+                  </label>
+                  <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="En az 6 karakter şifre giriniz"
+                    className={`w-full p-2 border ${formErrors.password ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-indigo-500`}
+                  />
+                  {formErrors.password && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.password}</p>
+                  )}
+                </div>
+              )}
           </div>
           
           <div className="mb-6">

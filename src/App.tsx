@@ -5,12 +5,12 @@ import ProgressPage from './pages/progress/ProgressPage';
 import AdminPanel from './features/admin/pages/AdminPanel';
 import InstructorPanel from './features/instructor/pages/InstructorPanel';
 import BecomeInstructor from './features/instructor/pages/BecomeInstructor';
+import BecomeSchool from './features/school/pages/BecomeSchool';
 import Navbar from './common/components/layout/Navbar';
 import SignIn from './pages/auth/SignIn';
 import SignUp from './pages/auth/SignUp';
 import ProfilePage from './pages/profile/ProfilePage';
 import HomePage from './pages/home/HomePage';
-import SchoolDetails from './features/admin/pages/SchoolDetails';
 import CourseSearchPage from './pages/courses/CourseSearchPage';
 import CourseDetailPage from './pages/courses/CourseDetailPage';
 import InstructorDetailPage from './pages/instructors/InstructorDetailPage';
@@ -284,12 +284,7 @@ function App(): JSX.Element {
                     isAuthenticated ? <AdminPanel user={user} /> : <Navigate to="/signin" />
                   } 
                 />
-                <Route 
-                  path="/admin/schools/:id" 
-                  element={
-                    isAuthenticated ? <SchoolDetails /> : <Navigate to="/signin" />
-                  } 
-                />
+                
                 <Route 
                   path="/instructor" 
                   element={
@@ -307,6 +302,10 @@ function App(): JSX.Element {
                 <Route
                   path="/become-instructor"
                   element={<BecomeInstructor />}
+                />
+                <Route
+                  path="/become-school"
+                  element={<BecomeSchool />}
                 />
                 <Route 
                   path="/profile" 

@@ -12,7 +12,7 @@ import {
   getDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { db } from "../../../api/firebase/firebase";
+import { db } from "../../../../api/firebase/firebase";
 import { motion } from 'framer-motion';
 
 interface ContactRequest {

@@ -20,32 +20,50 @@ import {
   updateProfile,
   sendPasswordResetEmail
 } from 'firebase/auth';
-import { db, auth } from '../../../api/firebase/firebase';
+import { db, auth } from '../../../../api/firebase/firebase';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import SchoolPhotoUploader from './SchoolPhotoUploader';
-import { resizeImageFromBase64 } from '../../../api/services/userService';
+import { ImageUploader } from '../../../../common/components/ImageUploader';
+import { resizeImageFromBase64 } from '../../../../api/services/userService';
+import { generateInitialsAvatar } from '../../../../common/utils/imageUtils';
 
 // Tip tanımlamaları
 interface Okul {
   id: string;
-  ad: string;
-  aciklama: string;
-  konum: string;
-  iletisim: string;
-  telefon: string;
-  gorsel: string;
+  name: string;
+  description: string;
+  address: string;
+  city: string;
+  country: string;
+  zipCode: string;
+  contactEmail: string;
+  contactPerson: string;
+  contactPhone: string;
+  website: string;
+  establishedYear: string;
+  danceStyles: string[];
+  status: string;
+  userId: string;
+  gorsel?: string;
+  silinmis?: boolean;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
 
 interface FormData {
-  ad: string;
-  aciklama: string;
-  konum: string;
-  iletisim: string;
-  telefon: string;
-  gorsel: string;
+  name: string;
+  description: string;
+  address: string;
+  city: string;
+  country: string;
+  zipCode: string;
+  contactEmail: string;
+  contactPerson: string;
+  contactPhone: string;
+  website: string;
+  establishedYear: string;
+  danceStyles: string[];
+  gorsel?: string;
   password?: string;
 }
 
@@ -55,12 +73,18 @@ function SchoolManagement(): JSX.Element {
   const [seciliOkul, setSeciliOkul] = useState<Okul | null>(null);
   const [aramaTerimi, setAramaTerimi] = useState<string>('');
   const [formVeri, setFormVeri] = useState<FormData>({
-    ad: '',
-    aciklama: '',
-    konum: '',
-    iletisim: '',
-    telefon: '',
-    gorsel: '',
+    name: '',
+    description: '',
+    address: '',
+    city: '',
+    country: '',
+    zipCode: '',
+    contactEmail: '',
+    contactPerson: '',
+    contactPhone: '',
+    website: '',
+    establishedYear: '',
+    danceStyles: [],
     password: ''
   });
   const [loading, setLoading] = useState<boolean>(true);
@@ -68,10 +92,23 @@ function SchoolManagement(): JSX.Element {
   const [success, setSuccess] = useState<string | null>(null);
 
   // Arama sonuçları
-  const filtrelenmisOkullar = okullar.filter(okul => 
-    okul.ad.toLowerCase().includes(aramaTerimi.toLowerCase()) ||
-    okul.konum?.toLowerCase().includes(aramaTerimi.toLowerCase())
-  );
+  const filtrelenmisOkullar = okullar
+    .filter(okul => 
+      // Sadece arama terimine göre filtrele
+      okul.name?.toLowerCase().includes(aramaTerimi.toLowerCase()) ||
+      okul.city?.toLowerCase().includes(aramaTerimi.toLowerCase())
+    );
+
+  useEffect(() => {
+    console.log('📊 Filtrelenmiş okul sayısı:', filtrelenmisOkullar.length);
+    console.log('📊 Filtrelenmiş okullar:', filtrelenmisOkullar.map(okul => ({
+      id: okul.id,
+      name: okul.name,
+      status: okul.status,
+      city: okul.city,
+      contactEmail: okul.contactEmail
+    })));
+  }, [filtrelenmisOkullar]);
 
   // Manuel kullanıcı rehber görünürlüğünü kontrol etmek için
   const [rehberGoster, setRehberGoster] = useState<boolean>(false);
@@ -111,7 +148,7 @@ function SchoolManagement(): JSX.Element {
                     <li>createdAt ve updatedAt: serverTimestamp()</li>
                   </ul>
                 </li>
-                <li>Firestore'da "dansOkullari" koleksiyonundaki okul belgesine yeni oluşturduğunuz kullanıcının uid'sini "userId" alanına ekleyin</li>
+                <li>Firestore'da "schools" koleksiyonundaki okul belgesine yeni oluşturduğunuz kullanıcının uid'sini "userId" alanına ekleyin</li>
               </ol>
               <p className="mt-2 font-semibold">Bu adımları tamamladıktan sonra, okul yöneticisi oluşturduğunuz kullanıcı bilgileriyle sisteme giriş yapabilecektir.</p>
               <button 
@@ -133,22 +170,84 @@ function SchoolManagement(): JSX.Element {
     setLoading(true);
     setError(null);
     try {
-      const okullarRef = collection(db, 'dansOkullari');
-      const q = query(okullarRef, orderBy('ad'));
+      console.log('🔍 Okullar verisi çekiliyor...');
+      const okullarRef = collection(db, 'schools');
+      console.log('📌 Koleksiyon referansı alındı:', okullarRef.path);
+      
+      const q = query(okullarRef);
+      console.log('📌 Sorgu oluşturuldu - Tüm okullar için');
+      
       const querySnapshot = await getDocs(q);
+      console.log(`📌 Veri çekildi. Toplam döküman sayısı: ${querySnapshot.size}`);
+      
+      if (querySnapshot.empty) {
+        console.log('⚠️ Koleksiyon boş veya erişilemiyor');
+        setError('Henüz kayıtlı okul bulunmuyor veya verilere erişilemiyor.');
+        setOkullar([]);
+        return;
+      }
       
       const okullarData: Okul[] = [];
       querySnapshot.forEach((doc: QueryDocumentSnapshot<DocumentData>) => {
-        okullarData.push({
+        const data = doc.data();
+        console.log(`📌 Ham okul verisi:`, data);
+        
+        // Eski format ile yeni format arasında dönüşüm yap
+        const mappedData = {
           id: doc.id,
-          ...doc.data()
-        } as Okul);
+          name: data.name || data.ad || '', // Eski format: ad
+          description: data.description || data.aciklama || '', // Eski format: aciklama
+          address: data.address || '',
+          city: data.city || data.konum || '', // Eski format: konum
+          country: data.country || '',
+          zipCode: data.zipCode || '',
+          contactEmail: data.contactEmail || data.iletisim || '', // Eski format: iletisim
+          contactPerson: data.contactPerson || '',
+          contactPhone: data.contactPhone || data.telefon || '', // Eski format: telefon
+          website: data.website || '',
+          establishedYear: data.establishedYear || '',
+          danceStyles: data.danceStyles || [],
+          status: data.status || 'ACTIVE', // Varsayılan olarak aktif
+          userId: data.userId || '',
+          gorsel: data.gorsel || '',
+          silinmis: data.silinmis || false,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt
+        };
+
+        console.log(`📌 Dönüştürülmüş okul verisi:`, {
+          id: mappedData.id,
+          name: mappedData.name,
+          status: mappedData.status,
+          city: mappedData.city,
+          contactEmail: mappedData.contactEmail
+        });
+        
+        okullarData.push(mappedData as Okul);
       });
       
+      console.log(`✅ İşlenen okul sayısı: ${okullarData.length}`);
+      console.log('📊 Okulların durumları:', okullarData.map(okul => ({
+        id: okul.id,
+        name: okul.name,
+        status: okul.status,
+        city: okul.city,
+        contactEmail: okul.contactEmail
+      })));
+      
       setOkullar(okullarData);
-    } catch (err) {
-      console.error('Okulları getirirken hata oluştu:', err);
-      setError('Okullar yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
+    } catch (err: any) {
+      console.error('❌ Okulları getirirken hata oluştu:', err);
+      console.error('Hata detayı:', {
+        code: err.code,
+        message: err.message,
+        stack: err.stack
+      });
+      setError(
+        'Okullar yüklenirken bir hata oluştu. ' +
+        'Lütfen internet bağlantınızı kontrol edin ve sayfayı yenileyin. ' +
+        'Sorun devam ederse sistem yöneticisiyle iletişime geçin.'
+      );
     } finally {
       setLoading(false);
     }
@@ -163,12 +262,18 @@ function SchoolManagement(): JSX.Element {
   const okulDuzenle = (okul: Okul): void => {
     setSeciliOkul(okul);
     setFormVeri({
-      ad: okul.ad,
-      aciklama: okul.aciklama || '',
-      konum: okul.konum || '',
-      iletisim: okul.iletisim || '',
-      telefon: okul.telefon || '',
-      gorsel: okul.gorsel || '',
+      name: okul.name,
+      description: okul.description || '',
+      address: okul.address || '',
+      city: okul.city || '',
+      country: okul.country || '',
+      zipCode: okul.zipCode || '',
+      contactEmail: okul.contactEmail || '',
+      contactPerson: okul.contactPerson || '',
+      contactPhone: okul.contactPhone || '',
+      website: okul.website || '',
+      establishedYear: okul.establishedYear || '',
+      danceStyles: okul.danceStyles || [],
       password: ''
     });
     setDuzenlemeModu(true);
@@ -178,12 +283,18 @@ function SchoolManagement(): JSX.Element {
   const yeniOkulEkle = (): void => {
     setSeciliOkul(null);
     setFormVeri({
-      ad: '',
-      aciklama: '',
-      konum: '',
-      iletisim: '',
-      telefon: '',
-      gorsel: '',
+      name: '',
+      description: '',
+      address: '',
+      city: '',
+      country: '',
+      zipCode: '',
+      contactEmail: '',
+      contactPerson: '',
+      contactPhone: '',
+      website: '',
+      establishedYear: '',
+      danceStyles: [],
       password: ''
     });
     setDuzenlemeModu(true);
@@ -213,7 +324,7 @@ function SchoolManagement(): JSX.Element {
       
       // Eğer mevcut bir okul düzenleniyorsa, doğrudan Firebase'e kaydet
       if (seciliOkul) {
-        const okulRef = doc(db, 'dansOkullari', seciliOkul.id);
+        const okulRef = doc(db, 'schools', seciliOkul.id);
         
         // Okul dokümanının görsel alanını güncelle
         await updateDoc(okulRef, {
@@ -266,24 +377,11 @@ function SchoolManagement(): JSX.Element {
     setError(null);
     setSuccess(null);
     
-    // Görsel yoksa varsayılan görsel oluştur - harici servis kullanmak yerine inline base64
+    // Görsel yoksa varsayılan avatar oluştur
     let gorselData = formVeri.gorsel;
     
     if (!gorselData || gorselData === '/assets/images/dance/okul_default.jpg') {
-      // Base64 formatında basit bir SVG avatar oluştur (okulun baş harfiyle)
-      const initialLetter = formVeri.ad ? formVeri.ad.charAt(0).toUpperCase() : 'O';
-      const backgroundColor = '#8B5CF6'; // Mor
-      const textColor = '#FFFFFF'; // Beyaz
-      
-      const svgContent = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
-          <rect width="200" height="200" fill="${backgroundColor}"/>
-          <text x="50%" y="50%" dy=".1em" font-family="Arial" font-size="100" fill="${textColor}" text-anchor="middle" dominant-baseline="middle">${initialLetter}</text>
-        </svg>
-      `;
-      
-      // SVG'yi base64 formatına dönüştür
-      gorselData = `data:image/svg+xml;base64,${btoa(svgContent)}`;
+      gorselData = generateInitialsAvatar(formVeri.name, 'school');
     }
     
     // Form verisini güncelle
@@ -300,7 +398,7 @@ function SchoolManagement(): JSX.Element {
     try {
       if (seciliOkul) {
         // Mevcut okulu güncelle - görsel zaten yüklenmiş olabilir
-        const okulRef = doc(db, 'dansOkullari', seciliOkul.id);
+        const okulRef = doc(db, 'schools', seciliOkul.id);
         
         // Tüm form verilerini güncelle, zaten yüklenen görsel varsa o korunacak
         await updateDoc(okulRef, {
@@ -340,7 +438,7 @@ function SchoolManagement(): JSX.Element {
         }
       } else {
         // Yeni okul ekle
-        const yeniOkulRef = await addDoc(collection(db, 'dansOkullari'), {
+        const yeniOkulRef = await addDoc(collection(db, 'schools'), {
           ...formData,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
@@ -348,7 +446,7 @@ function SchoolManagement(): JSX.Element {
         
         // Okul için kullanıcı hesabı oluştur
         // E-posta adresini okul iletişim adresinden al
-        const okulEmail = formData.iletisim;
+        const okulEmail = formData.contactEmail;
         
         // E-posta formatını kontrol et
         if (!okulEmail || !okulEmail.includes('@')) {
@@ -361,7 +459,7 @@ function SchoolManagement(): JSX.Element {
           
           // Şifre girilmemişse otomatik oluştur
           if (!kullaniciSifresi || kullaniciSifresi.length < 6) {
-            kullaniciSifresi = `${formData.ad.replace(/\s+/g, '').toLowerCase()}${new Date().getFullYear()}`;
+            kullaniciSifresi = `${formData.name.replace(/\s+/g, '').toLowerCase()}${new Date().getFullYear()}`;
             console.log("Otomatik oluşturulan şifre:", kullaniciSifresi);
           }
           
@@ -380,7 +478,7 @@ function SchoolManagement(): JSX.Element {
             
             // Kullanıcı profil bilgilerini güncelleyelim
             await updateProfile(userCredential.user, {
-              displayName: formData.ad
+              displayName: formData.name
             });
             
             console.log("Kullanıcı profili güncellendi");
@@ -388,9 +486,9 @@ function SchoolManagement(): JSX.Element {
             // Firestore'da kullanıcı belgesini oluştur
             await setDoc(doc(db, 'users', userCredential.user.uid), {
               id: userCredential.user.uid,
-              displayName: formData.ad,
+              displayName: formData.name,
               email: okulEmail,
-              phoneNumber: formData.telefon || '',
+              phoneNumber: formData.contactPhone || '',
               role: ['school'],  // Okul rolü
               photoURL: formData.gorsel || '',
               createdAt: serverTimestamp(),
@@ -401,7 +499,7 @@ function SchoolManagement(): JSX.Element {
             console.log("Firestore'da kullanıcı belgesi oluşturuldu");
             
             // Okul belgesine kullanıcı ID'sini ekle
-            await updateDoc(doc(db, 'dansOkullari', yeniOkulRef.id), {
+            await updateDoc(doc(db, 'schools', yeniOkulRef.id), {
               userId: userCredential.user.uid
             });
             
@@ -447,7 +545,7 @@ function SchoolManagement(): JSX.Element {
               `Yeni okul eklendi ancak kullanıcı hesabı oluşturulamadı. Hata: ${hataDetayi}\n\n` +
               `Okul Bilgileri:\n` +
               `- ID: ${yeniOkulRef.id}\n` +
-              `- Ad: ${formData.ad}\n` +
+              `- Ad: ${formData.name}\n` +
               `- E-posta: ${okulEmail}\n\n` + 
               `Lütfen yönetici panelinden manuel olarak bir kullanıcı hesabı oluşturun.`
             );
@@ -481,7 +579,7 @@ function SchoolManagement(): JSX.Element {
       
       try {
         // Önce okul verisini al ve ilişkili kullanıcı ID'sini bul
-        const okulRef = doc(db, 'dansOkullari', id);
+        const okulRef = doc(db, 'schools', id);
         const okulDoc = await getDoc(okulRef);
         
         if (okulDoc.exists()) {
@@ -564,45 +662,45 @@ function SchoolManagement(): JSX.Element {
           <form onSubmit={formGonder}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label htmlFor="ad" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
                   Okul Adı*
                 </label>
                 <input
                   type="text"
-                  id="ad"
-                  name="ad"
+                  id="name"
+                  name="name"
                   required
-                  value={formVeri.ad}
+                  value={formVeri.name}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                 />
               </div>
               
               <div>
-                <label htmlFor="konum" className="block text-sm font-medium text-gray-700 mb-1">
-                  Konum*
+                <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                  Şehir*
                 </label>
                 <input
                   type="text"
-                  id="konum"
-                  name="konum"
+                  id="city"
+                  name="city"
                   required
-                  value={formVeri.konum}
+                  value={formVeri.city}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                 />
               </div>
               
               <div>
-                <label htmlFor="iletisim" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="contactEmail" className="block text-sm font-medium text-gray-700 mb-1">
                   E-posta Adresi*
                 </label>
                 <input
                   type="email"
-                  id="iletisim"
-                  name="iletisim"
+                  id="contactEmail"
+                  name="contactEmail"
                   required
-                  value={formVeri.iletisim}
+                  value={formVeri.contactEmail}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                   placeholder="okul@ornek.com"
@@ -613,14 +711,14 @@ function SchoolManagement(): JSX.Element {
               </div>
               
               <div>
-                <label htmlFor="telefon" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700 mb-1">
                   Telefon
                 </label>
                 <input
                   type="text"
-                  id="telefon"
-                  name="telefon"
-                  value={formVeri.telefon}
+                  id="contactPhone"
+                  name="contactPhone"
+                  value={formVeri.contactPhone}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                 />
@@ -653,14 +751,14 @@ function SchoolManagement(): JSX.Element {
               </div>
               
               <div className="md:col-span-2">
-                <label htmlFor="aciklama" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
                   Açıklama
                 </label>
                 <textarea
-                  id="aciklama"
-                  name="aciklama"
+                  id="description"
+                  name="description"
                   rows={3}
-                  value={formVeri.aciklama}
+                  value={formVeri.description}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                 ></textarea>
@@ -670,8 +768,8 @@ function SchoolManagement(): JSX.Element {
                 <label htmlFor="gorsel" className="block text-sm font-medium text-gray-700 mb-1">
                   Okul Fotoğrafı
                 </label>
-                <SchoolPhotoUploader 
-                  currentPhotoURL={formVeri.gorsel} 
+                <ImageUploader
+                  currentPhotoURL={formVeri.gorsel}
                   onImageChange={(base64Image: string | null) => {
                     if (base64Image !== null) {
                       handleImageChange(base64Image);
@@ -682,7 +780,11 @@ function SchoolManagement(): JSX.Element {
                         gorsel: ''
                       }));
                     }
-                  }} 
+                  }}
+                  title="Okul Fotoğrafı"
+                  shape="square"
+                  width={300}
+                  height={200}
                 />
               </div>
             </div>
@@ -711,7 +813,7 @@ function SchoolManagement(): JSX.Element {
           <div className="mb-4">
             <input
               type="text"
-              placeholder="Okul adı veya konum ara..."
+              placeholder="Okul adı veya şehir ara..."
               value={aramaTerimi}
               onChange={(e) => setAramaTerimi(e.target.value)}
               className="w-full p-2 border border-gray-300 rounded-md"
@@ -733,10 +835,13 @@ function SchoolManagement(): JSX.Element {
                       Okul
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Konum
+                      Şehir
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       İletişim
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Durum
                     </th>
                     <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       İşlemler
@@ -757,38 +862,54 @@ function SchoolManagement(): JSX.Element {
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-10 w-10 relative bg-indigo-100 rounded-full overflow-hidden">
                               {okul.gorsel ? (
-                                <>
-                                  <div className="h-10 w-10 rounded-full flex items-center justify-center bg-indigo-100 text-indigo-500 absolute inset-0">
-                                    {okul.ad.charAt(0).toUpperCase()}
-                                  </div>
-                                  <img 
-                                    className="h-10 w-10 rounded-full object-cover absolute inset-0" 
-                                    src={okul.gorsel}
-                                    alt={okul.ad}
-                                    onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                                      const target = e.currentTarget;
-                                      target.onerror = null;
-                                      target.style.display = 'none';
-                                    }}
-                                  />
-                                </>
+                                <img 
+                                  className="h-10 w-10 rounded-full object-cover absolute inset-0" 
+                                  src={okul.gorsel}
+                                  alt={okul.name}
+                                  onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                    const target = e.currentTarget;
+                                    target.onerror = null;
+                                    // Hata durumunda baş harf avatarını göster
+                                    target.src = generateInitialsAvatar(okul.name, 'school');
+                                  }}
+                                />
                               ) : (
-                                <div className="h-10 w-10 rounded-full flex items-center justify-center bg-indigo-100 text-indigo-500">
-                                  {okul.ad.charAt(0).toUpperCase()}
-                                </div>
+                                <img 
+                                  className="h-10 w-10 rounded-full object-cover" 
+                                  src={generateInitialsAvatar(okul.name, 'school')}
+                                  alt={okul.name}
+                                />
                               )}
                             </div>
                             <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">{okul.ad}</div>
+                              <div className="text-sm font-medium text-gray-900">{okul.name}</div>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{okul.konum}</div>
+                          <div className="text-sm text-gray-900">{okul.city}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{okul.telefon}</div>
-                          <div className="text-sm text-gray-500">{okul.iletisim}</div>
+                          <div className="text-sm text-gray-900">{okul.contactPhone}</div>
+                          <div className="text-sm text-gray-500">{okul.contactEmail}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            !okul.status ? 'bg-yellow-100 text-yellow-800' :
+                            okul.status.toUpperCase() === 'ACTIVE' 
+                              ? 'bg-green-100 text-green-800' 
+                              : okul.status.toUpperCase() === 'INACTIVE'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {!okul.status
+                              ? 'Belirsiz'
+                              : okul.status.toUpperCase() === 'ACTIVE'
+                              ? 'Aktif' 
+                              : okul.status.toUpperCase() === 'INACTIVE'
+                              ? 'Pasif'
+                              : 'Belirsiz'}
+                          </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button 
@@ -808,7 +929,7 @@ function SchoolManagement(): JSX.Element {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
+                      <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
                         {aramaTerimi ? 'Aramanıza uygun okul bulunamadı.' : 'Henüz hiç okul kaydı bulunmamaktadır.'}
                       </td>
                     </tr>
