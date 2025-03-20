@@ -1,22 +1,30 @@
-import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
-import { Box, Typography, CircularProgress, IconButton, Backdrop, Avatar, TextField, Button, Tooltip } from '@mui/material';
-import { CloudUpload, Close, Edit, AddAPhoto, Check, DeleteOutline } from '@mui/icons-material';
+import React, { useState, useRef, useEffect } from 'react';
+import { Box, Typography, CircularProgress, IconButton, Button } from '@mui/material';
+import { AddAPhoto, Edit, DeleteOutline, Check, Close } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 
-interface SchoolPhotoUploaderProps {
+interface ImageUploaderProps {
   currentPhotoURL?: string;
   onImageChange: (base64Image: string | null) => void;
   maxSizeKB?: number;
   maxWidth?: number;
   maxHeight?: number;
+  title?: string;
+  shape?: 'circle' | 'square';
+  width?: number;
+  height?: number;
 }
 
-const SchoolPhotoUploader: React.FC<SchoolPhotoUploaderProps> = ({
+const ImageUploader: React.FC<ImageUploaderProps> = ({
   currentPhotoURL,
   onImageChange,
   maxSizeKB = 500,
   maxWidth = 800,
   maxHeight = 800,
+  title = 'Fotoğraf',
+  shape = 'circle',
+  width = 200,
+  height = 200,
 }) => {
   const [previewURL, setPreviewURL] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -144,8 +152,6 @@ const SchoolPhotoUploader: React.FC<SchoolPhotoUploaderProps> = ({
     
     if (previewURL) {
       onImageChange(previewURL);
-      // İsterseniz önizlemeyi koruyabilir veya temizleyebilirsiniz
-      // setPreviewURL(null);
     }
   };
 
@@ -190,7 +196,7 @@ const SchoolPhotoUploader: React.FC<SchoolPhotoUploaderProps> = ({
   return (
     <Box sx={{ width: '100%', mb: 2 }}>
       <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
-        Okul Fotoğrafı
+        {title}
       </Typography>
       
       <input
@@ -212,9 +218,9 @@ const SchoolPhotoUploader: React.FC<SchoolPhotoUploaderProps> = ({
           onClick={handleImageClick}
           sx={{
             position: 'relative',
-            width: 200,
-            height: 200,
-            borderRadius: '8px',
+            width: width,
+            height: height,
+            borderRadius: shape === 'circle' ? '50%' : '8px',
             overflow: 'hidden',
             boxShadow: '0 8px 24px rgba(149, 157, 165, 0.2)',
             cursor: 'pointer',
@@ -250,7 +256,7 @@ const SchoolPhotoUploader: React.FC<SchoolPhotoUploaderProps> = ({
             }}>
               <AddAPhoto sx={{ fontSize: 40, color: '#8B5CF6', mb: 2 }} />
               <Typography variant="body1" align="center" sx={{ color: '#4F46E5', fontWeight: 500 }}>
-                Fotoğraf Yükle
+                {title} Yükle
               </Typography>
             </Box>
           )}
@@ -399,11 +405,11 @@ const SchoolPhotoUploader: React.FC<SchoolPhotoUploaderProps> = ({
       {/* User guidance message */}
       {!previewURL && !currentPhotoURL && (
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Fotoğraf yüklemek için yukarıdaki alana tıklayın veya bir dosyayı sürükleyip bırakın.
+          {title} yüklemek için yukarıdaki alana tıklayın veya bir dosyayı sürükleyip bırakın.
         </Typography>
       )}
     </Box>
   );
 };
 
-export default SchoolPhotoUploader; 
+export default ImageUploader; 

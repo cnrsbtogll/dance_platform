@@ -6,6 +6,7 @@ import { fetchAllInstructors } from '../../api/services/userService';
 import InstructorCard from '../../common/components/instructors/InstructorCard';
 import { getFeaturedDanceCourses } from '../../api/services/courseService';
 import { getFeaturedDanceSchools } from '../../api/services/schoolService';
+import { generateInitialsAvatar } from '../../common/utils/imageUtils';
 
 interface HomePageProps {
   isAuthenticated: boolean;
@@ -249,16 +250,23 @@ function HomePage({ isAuthenticated, user }: HomePageProps) {
                 to={`/schools/${school.id}`}
                 className="bg-white rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300 overflow-hidden"
               >
-                <div className="h-40 bg-gray-200 relative overflow-hidden">
+                <div className="h-48 bg-gray-200 relative overflow-hidden">
                   <img
-                    src={school.gorsel || school.logo || school.images?.[0] || `/assets/images/dance/school${Math.floor(Math.random() * 4) + 1}.jpg`}
+                    src={school.gorsel || school.logo || school.images?.[0] || generateInitialsAvatar(school.name, 'school')}
                     alt={school.name}
                     className="w-full h-full object-cover"
+                    onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                      const target = e.currentTarget;
+                      target.onerror = null;
+                      target.src = generateInitialsAvatar(school.name, 'school');
+                    }}
                   />
                 </div>
                 <div className="p-4">
                   <h3 className="text-lg font-semibold text-gray-800 mb-1">{school.name}</h3>
-                  <p className="text-gray-600 text-sm mb-2 line-clamp-2">{school.aciklama || school.description || 'Şube hakkında detaylı bilgi mevcut değil.'}</p>
+                  <p className="text-gray-600 text-sm mb-2 line-clamp-2">
+                    {school.aciklama || school.description || 'Bu dans okulu hakkında detaylı bilgi bulunmamaktadır.'}
+                  </p>
                   <div className="flex items-center text-sm text-gray-500">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />

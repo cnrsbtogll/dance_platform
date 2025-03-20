@@ -19,10 +19,11 @@ import {
   updateProfile,
   sendEmailVerification 
 } from 'firebase/auth';
-import { db, auth } from '../../../api/firebase/firebase';
+import { db, auth } from '../../../../api/firebase/firebase';
 import { motion } from 'framer-motion';
-import InstructorPhotoUploader from './InstructorPhotoUploader';
-import { resizeImageFromBase64 } from '../../../api/services/userService';
+import { ImageUploader } from '../../../../common/components/ImageUploader';
+import { resizeImageFromBase64 } from '../../../../api/services/userService';
+import { generateInitialsAvatar } from '../../../../common/utils/imageUtils';
 
 // Tip tanımlamaları
 interface Egitmen {
@@ -356,8 +357,21 @@ function InstructorManagement(): JSX.Element {
     setError(null);
     setSuccess(null);
     
+    // Görsel yoksa varsayılan avatar oluştur
+    let gorselData = formVeri.gorsel;
+    
+    if (!gorselData) {
+      gorselData = generateInitialsAvatar(formVeri.ad, 'instructor');
+    }
+    
+    // Form verisini güncelle
+    const formData = {
+      ...formVeri,
+      gorsel: gorselData
+    };
+    
     // parseInt'a gerek yok çünkü okul_id artık string
-    const okul_id = formVeri.okul_id;
+    const okul_id = formData.okul_id;
     
     try {
       if (seciliEgitmen) {
@@ -365,14 +379,14 @@ function InstructorManagement(): JSX.Element {
         const egitmenRef = doc(db, 'instructors', seciliEgitmen.id);
         
         await updateDoc(egitmenRef, {
-          ad: formVeri.ad,
-          uzmanlık: formVeri.uzmanlık,
-          tecrube: formVeri.tecrube,
-          biyografi: formVeri.biyografi,
+          ad: formData.ad,
+          uzmanlık: formData.uzmanlık,
+          tecrube: formData.tecrube,
+          biyografi: formData.biyografi,
           okul_id: okul_id,
-          gorsel: formVeri.gorsel,
-          email: formVeri.email,
-          phoneNumber: formVeri.phoneNumber,
+          gorsel: formData.gorsel,
+          email: formData.email,
+          phoneNumber: formData.phoneNumber,
           updatedAt: serverTimestamp()
         });
         
@@ -380,14 +394,14 @@ function InstructorManagement(): JSX.Element {
         const guncellenenEgitmenler = egitmenler.map(egitmen => 
           egitmen.id === seciliEgitmen.id ? { 
             ...egitmen, 
-            ad: formVeri.ad,
-            uzmanlık: formVeri.uzmanlık,
-            tecrube: formVeri.tecrube,
-            biyografi: formVeri.biyografi,
+            ad: formData.ad,
+            uzmanlık: formData.uzmanlık,
+            tecrube: formData.tecrube,
+            biyografi: formData.biyografi,
             okul_id: okul_id,
-            gorsel: formVeri.gorsel,
-            email: formVeri.email,
-            phoneNumber: formVeri.phoneNumber
+            gorsel: formData.gorsel,
+            email: formData.email,
+            phoneNumber: formData.phoneNumber
           } : egitmen
         );
         setEgitmenler(guncellenenEgitmenler);
@@ -398,13 +412,13 @@ function InstructorManagement(): JSX.Element {
         let userId = '';
         let geciciSifre = '';
         
-        if (!formVeri.email) {
+        if (!formData.email) {
           throw new Error('Eğitmen hesabı oluşturmak için geçerli bir e-posta adresi gereklidir.');
         }
         
         // Email'in zaten kullanılıp kullanılmadığını kontrol et
         const usersRef = collection(db, 'users');
-        const emailQuery = query(usersRef, where('email', '==', formVeri.email));
+        const emailQuery = query(usersRef, where('email', '==', formData.email));
         const emailQuerySnapshot = await getDocs(emailQuery);
         
         if (!emailQuerySnapshot.empty) {
@@ -412,12 +426,12 @@ function InstructorManagement(): JSX.Element {
         }
         
         // Geçici şifre oluştur - eğitmen ismine göre basit bir şifre
-        geciciSifre = formVeri.password || `${formVeri.ad.replace(/\s+/g, '').toLowerCase()}${new Date().getFullYear()}`;
+        geciciSifre = formData.password || `${formData.ad.replace(/\s+/g, '').toLowerCase()}${new Date().getFullYear()}`;
         
         // Firebase Auth ile yeni kullanıcı oluştur
         const userCredential = await createUserWithEmailAndPassword(
           auth, 
-          formVeri.email, 
+          formData.email, 
           geciciSifre
         );
         
@@ -425,7 +439,7 @@ function InstructorManagement(): JSX.Element {
         
         // Kullanıcı profilini güncelle
         await updateProfile(userCredential.user, {
-          displayName: formVeri.ad
+          displayName: formData.ad
         });
         
         // E-posta doğrulama gönder
@@ -434,12 +448,12 @@ function InstructorManagement(): JSX.Element {
         // Firestore'da users koleksiyonuna yeni kullanıcı ekle
         await setDoc(doc(db, 'users', userId), {
           id: userId,
-          email: formVeri.email,
-          displayName: formVeri.ad,
-          phoneNumber: formVeri.phoneNumber || '',
+          email: formData.email,
+          displayName: formData.ad,
+          phoneNumber: formData.phoneNumber || '',
           role: ['instructor'], // Eğitmen rolü ekle
           level: 'advanced', // Eğitmenler için varsayılan seviye 
-          photoURL: formVeri.gorsel || '',
+          photoURL: formData.gorsel || '',
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           schoolId: okul_id // Eğitmenin bağlı olduğu okul
@@ -447,14 +461,14 @@ function InstructorManagement(): JSX.Element {
         
         // Yeni eğitmen ekle
         const newInstructorData = {
-          ad: formVeri.ad,
-          uzmanlık: formVeri.uzmanlık,
-          tecrube: formVeri.tecrube,
-          biyografi: formVeri.biyografi,
+          ad: formData.ad,
+          uzmanlık: formData.uzmanlık,
+          tecrube: formData.tecrube,
+          biyografi: formData.biyografi,
           okul_id: okul_id,
-          gorsel: formVeri.gorsel,
-          email: formVeri.email || '',
-          phoneNumber: formVeri.phoneNumber || '',
+          gorsel: formData.gorsel,
+          email: formData.email || '',
+          phoneNumber: formData.phoneNumber || '',
           userId: userId || null, // Eğer kullanıcı oluşturulduysa, userId'yi kaydet
           createdBy: auth.currentUser?.uid || null,
           createdAt: serverTimestamp(),
@@ -476,7 +490,7 @@ function InstructorManagement(): JSX.Element {
         setSuccess(
           `Yeni eğitmen ve hesabı başarıyla oluşturuldu!\n\n` +
           `Eğitmen Giriş Bilgileri:\n` +
-          `E-posta: ${formVeri.email}\n` +
+          `E-posta: ${formData.email}\n` +
           `Geçici Şifre: ${geciciSifre}\n\n` +
           `ÖNEMLİ: Lütfen bu şifreyi not alın, daha sonra görüntüleyemeyeceksiniz.`
         );
@@ -723,19 +737,13 @@ function InstructorManagement(): JSX.Element {
                 <label htmlFor="gorsel" className="block text-sm font-medium text-gray-700 mb-1">
                   Eğitmen Fotoğrafı
                 </label>
-                <InstructorPhotoUploader 
-                  currentPhotoURL={formVeri.gorsel} 
-                  onImageChange={(base64Image: string | null) => {
-                    if (base64Image !== null) {
-                      handleImageChange(base64Image);
-                    } else {
-                      // Fotoğraf silindiğinde işlem
-                      setFormVeri(prev => ({
-                        ...prev,
-                        gorsel: '/assets/images/dance/egitmen_default.jpg'
-                      }));
-                    }
-                  }} 
+                <ImageUploader
+                  currentPhotoURL={formVeri.gorsel}
+                  onImageChange={(base64Image) => handleImageChange(base64Image)}
+                  title="Eğitmen Fotoğrafı"
+                  shape="circle"
+                  width={200}
+                  height={200}
                 />
               </div>
             </div>
@@ -810,15 +818,26 @@ function InstructorManagement(): JSX.Element {
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10">
-                            <img
-                              className="h-10 w-10 rounded-full object-cover"
-                              src={egitmen.gorsel}
-                              alt={egitmen.ad}
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = "/assets/images/dance/egitmen_default.jpg";
-                              }}
-                            />
+                          <div className="flex-shrink-0 h-10 w-10 relative bg-blue-100 rounded-full overflow-hidden">
+                            {egitmen.gorsel ? (
+                              <img 
+                                className="h-10 w-10 rounded-full object-cover absolute inset-0" 
+                                src={egitmen.gorsel}
+                                alt={egitmen.ad}
+                                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                  const target = e.currentTarget;
+                                  target.onerror = null;
+                                  // Hata durumunda baş harf avatarını göster
+                                  target.src = generateInitialsAvatar(egitmen.ad, 'instructor');
+                                }}
+                              />
+                            ) : (
+                              <img 
+                                className="h-10 w-10 rounded-full object-cover" 
+                                src={generateInitialsAvatar(egitmen.ad, 'instructor')}
+                                alt={egitmen.ad}
+                              />
+                            )}
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">{egitmen.ad}</div>

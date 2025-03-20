@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import SchoolManagement from '../components/SchoolManagement';
 import { 
+  SchoolManagement,
   InstructorManagement, 
   InstructorRequests, 
   DanceStyleManagement, 
   StudentManagement,
-  ContactRequestsManagement 
+  ContactRequests,
+  SchoolRequests,
+  UserManagement
 } from '../components';
 import SeedUsersButton from '../../../scripts/SeedUsersButton';
 import MigrateSchoolsButton from '../../../scripts/MigrateSchoolsButton';
@@ -16,7 +18,7 @@ import { db } from '../../../api/firebase/firebase';
 import { User } from '../../../types';
 import { motion } from 'framer-motion';
 
-type TabType = 'okullar' | 'egitmenler' | 'egitmen-talepleri' | 'kurslar' | 'ogrenciler' | 'dans-stilleri' | 'ornek-veri' | 'okul-basvurulari' | 'iletisim-talepleri';
+type TabType = 'okullar' | 'egitmenler' | 'egitmen-talepleri' | 'kurslar' | 'ogrenciler' | 'dans-stilleri' | 'ornek-veri' | 'okul-basvurulari' | 'iletisim-talepleri' | 'kullanicilar';
 
 interface AdminPanelProps {
   user?: User | null;
@@ -80,6 +82,16 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="border-b overflow-x-auto">
           <nav className="flex -mb-px">
+            <button
+              onClick={() => setActiveTab('kullanicilar')}
+              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
+                activeTab === 'kullanicilar'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Tüm Kullanıcılar
+            </button>
             <button
               onClick={() => setActiveTab('okullar')}
               className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
@@ -176,6 +188,7 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
         </div>
         
         <div className="p-6">
+          {activeTab === 'kullanicilar' && <UserManagement />}
           {activeTab === 'okullar' && <SchoolManagement />}
           {activeTab === 'egitmenler' && <InstructorManagement />}
           {activeTab === 'ogrenciler' && <StudentManagement />}
@@ -186,14 +199,9 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
             </div>
           )}
           {activeTab === 'egitmen-talepleri' && <InstructorRequests />}
-          {activeTab === 'okul-basvurulari' && (
-            <div className="text-center py-4">
-              <h2 className="text-xl font-semibold">Okul Başvuru Yönetimi</h2>
-              <p className="text-gray-500 mt-2">Bu bölüm henüz yapım aşamasındadır.</p>
-            </div>
-          )}
+          {activeTab === 'okul-basvurulari' && <SchoolRequests />}
           {activeTab === 'dans-stilleri' && <DanceStyleManagement />}
-          {activeTab === 'iletisim-talepleri' && <ContactRequestsManagement />}
+          {activeTab === 'iletisim-talepleri' && <ContactRequests />}
           {activeTab === 'ornek-veri' && isSuperAdmin && (
             <div>
               <h2 className="text-xl font-semibold mb-4">Örnek Veri Ekleme</h2>

@@ -10,7 +10,7 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
-import { db } from '../../../api/firebase/firebase';
+import { db } from '../../../../api/firebase/firebase';
 
 interface DanceStyle {
   id: string;

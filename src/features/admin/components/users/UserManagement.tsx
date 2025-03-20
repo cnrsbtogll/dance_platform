@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   collection, 
   getDocs, 
@@ -21,14 +21,10 @@ import {
   getAuth,
   signInWithEmailAndPassword
 } from 'firebase/auth';
-import { db, auth } from '../../../api/firebase/firebase';
+import { db, auth } from '../../../../api/firebase/firebase';
 import { motion } from 'framer-motion';
-import { User, UserRole, DanceLevel, DanceStyle } from '../../../types';
-import { useAuth } from '../../../contexts/AuthContext';
-import { resizeImageFromBase64 } from '../../../api/services/userService';
-
-// Default placeholder image for students
-const DEFAULT_STUDENT_IMAGE = '/assets/placeholders/default-student.png';
+import { User, UserRole, DanceLevel, DanceStyle } from '../../../../types';
+import { useAuth } from '../../../../contexts/AuthContext';
 
 // Student interface with instructor and school
 interface Student {
@@ -92,227 +88,7 @@ interface School {
   email: string;
 }
 
-// Photo Modal Component
-interface PhotoModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  photoURL: string;
-  studentName: string;
-  defaultImagePath: string;
-}
-
-const PhotoModal: React.FC<PhotoModalProps> = ({ isOpen, onClose, photoURL, studentName, defaultImagePath }) => {
-  if (!isOpen) return null;
-  
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-lg overflow-hidden max-w-3xl max-h-[90vh] w-full" onClick={(e) => e.stopPropagation()}>
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-          <h3 className="text-lg font-semibold">{studentName} - Fotoğraf</h3>
-          <button 
-            className="text-gray-500 hover:text-gray-700"
-            onClick={onClose}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="p-6 flex justify-center">
-          <img 
-            src={photoURL} 
-            alt={`${studentName} fotoğrafı`} 
-            className="max-h-[70vh] max-w-full object-contain"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = defaultImagePath;
-            }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Student Photo Uploader Component
-interface StudentPhotoUploaderProps {
-  currentPhotoURL?: string;
-  onImageChange: (base64Image: string | null) => void;
-}
-
-const StudentPhotoUploader: React.FC<StudentPhotoUploaderProps> = ({
-  currentPhotoURL,
-  onImageChange
-}) => {
-  const [previewURL, setPreviewURL] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const MAX_FILE_SIZE_MB = 5; // Maximum file size in MB
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setIsUploading(true);
-      setError(null);
-
-      // Check file size
-      if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-        setError(`Dosya boyutu çok büyük. Lütfen ${MAX_FILE_SIZE_MB}MB'dan küçük bir görsel seçin.`);
-        setIsUploading(false);
-        return;
-      }
-
-      // Check file type
-      if (!file.type.startsWith('image/')) {
-        setError('Lütfen geçerli bir görsel dosyası seçin (JPEG, PNG, GIF, vs.)');
-        setIsUploading(false);
-        return;
-      }
-
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        setPreviewURL(result);
-        setIsUploading(false);
-      };
-
-      reader.readAsDataURL(file);
-    } catch (err) {
-      setError('Fotoğraf yüklenirken bir hata oluştu.');
-      console.error('Fotoğraf yükleme hatası:', err);
-      setIsUploading(false);
-    }
-  };
-
-  const confirmUpload = () => {
-    if (previewURL) {
-      onImageChange(previewURL);
-    }
-  };
-
-  const cancelUpload = () => {
-    setPreviewURL(null);
-    setError(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const handleRemoveCurrentPhoto = () => {
-    onImageChange(DEFAULT_STUDENT_IMAGE);
-  };
-
-  return (
-    <div className="w-full">
-      <label className="block text-sm font-medium text-gray-700 mb-2">
-        Öğrenci Fotoğrafı
-      </label>
-      
-      <input
-        type="file"
-        hidden
-        ref={fileInputRef}
-        accept="image/*"
-        onChange={handleFileChange}
-      />
-      
-      <div className="relative mb-3">
-        {/* Image preview area */}
-        <div
-          className="relative w-32 h-32 rounded-full overflow-hidden shadow-md cursor-pointer border-2 border-indigo-500 hover:border-indigo-600 transition-colors"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          {/* Current or preview image */}
-          <img 
-            src={previewURL || currentPhotoURL || DEFAULT_STUDENT_IMAGE} 
-            alt="Öğrenci fotoğrafı" 
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = DEFAULT_STUDENT_IMAGE;
-            }}
-          />
-          
-          {/* Hover overlay */}
-          <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </div>
-        </div>
-
-        {/* Delete button */}
-        {currentPhotoURL && currentPhotoURL !== DEFAULT_STUDENT_IMAGE && !previewURL && (
-          <button
-            type="button"
-            onClick={handleRemoveCurrentPhoto}
-            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        )}
-      </div>
-      
-      {/* Preview controls */}
-      {previewURL && (
-        <div className="flex flex-col items-center gap-2 mt-2">
-          <p className="text-xs text-gray-500 text-center">
-            Seçilen fotoğrafı kaydetmek için onaylayın veya iptal edin.
-          </p>
-          
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={confirmUpload}
-              className="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 transition-colors"
-              disabled={isUploading}
-            >
-              Onayla
-            </button>
-            
-            <button
-              type="button"
-              onClick={cancelUpload}
-              className="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300 transition-colors"
-              disabled={isUploading}
-            >
-              İptal
-            </button>
-          </div>
-        </div>
-      )}
-      
-      {/* Error message */}
-      {error && (
-        <p className="text-xs text-red-500 mt-1">
-          {error}
-        </p>
-      )}
-      
-      {/* Loading indicator */}
-      {isUploading && (
-        <div className="flex justify-center mt-2">
-          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500"></div>
-        </div>
-      )}
-      
-      {/* Help text */}
-      {!previewURL && (
-        <p className="text-xs text-gray-500 mt-1">
-          Fotoğraf yüklemek için yukarıdaki alana tıklayın.
-        </p>
-      )}
-    </div>
-  );
-};
-
-export const StudentManagement: React.FC = () => {
+export const UserManagement: React.FC = () => {
   const { currentUser } = useAuth();
   const [students, setStudents] = useState<FirebaseUser[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<FirebaseUser[]>([]);
@@ -325,9 +101,6 @@ export const StudentManagement: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
-  // Photo modal state
-  const [photoModalOpen, setPhotoModalOpen] = useState<boolean>(false);
-  const [selectedPhoto, setSelectedPhoto] = useState<{url: string, name: string} | null>(null);
   const [formData, setFormData] = useState<FormData>({
     id: '',
     displayName: '',
@@ -368,87 +141,11 @@ export const StudentManagement: React.FC = () => {
     checkIfSuperAdmin();
   }, []);
 
-  // Fetch all users (students, instructors, schools) from Firestore
-  const fetchAllUsers = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Get all users from Firestore
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, orderBy('createdAt', 'desc'));
-      const querySnapshot = await getDocs(q);
-      
-      const studentsData: FirebaseUser[] = [];
-      const instructorsData: Instructor[] = [];
-      const schoolsData: School[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        const id = doc.id;
-        
-        // Role değerini kontrol et - string veya array olabilir
-        let role = data.role;
-        
-        // Test için her rolü 
-        if (Array.isArray(role)) {
-          // Role bir array ise her role türüne göre işlem yap
-          if (role.includes('student')) {
-            studentsData.push({ id, ...data } as FirebaseUser);
-          }
-          if (role.includes('instructor')) {
-            instructorsData.push({
-              id,
-              displayName: data.displayName || 'İsimsiz Eğitmen',
-              email: data.email || ''
-            });
-          }
-          if (role.includes('school')) {
-            schoolsData.push({
-              id,
-              displayName: data.displayName || 'İsimsiz Okul',
-              email: data.email || ''
-            });
-          }
-        } else {
-          // Role bir string ise
-          if (role === 'student') {
-            studentsData.push({ id, ...data } as FirebaseUser);
-          } else if (role === 'instructor') {
-            instructorsData.push({
-              id,
-              displayName: data.displayName || 'İsimsiz Eğitmen',
-              email: data.email || ''
-            });
-          } else if (role === 'school') {
-            schoolsData.push({
-              id,
-              displayName: data.displayName || 'İsimsiz Okul',
-              email: data.email || ''
-            });
-          }
-        }
-      });
-      
-      console.log(`${studentsData.length} öğrenci bulundu`);
-      console.log(`${instructorsData.length} eğitmen bulundu:`, instructorsData.map(i => i.displayName));
-      console.log(`${schoolsData.length} okul bulundu:`, schoolsData.map(s => s.displayName));
-      
-      setStudents(studentsData);
-      setFilteredStudents(studentsData);
-      setInstructors(instructorsData);
-      setSchools(schoolsData);
-    } catch (err) {
-      console.error('Kullanıcılar yüklenirken hata oluştu:', err);
-      setError(`Kullanıcılar yüklenirken bir hata oluştu: ${err instanceof Error ? err.message : 'Bilinmeyen hata'}. Lütfen sayfayı yenileyin.`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Fetch students, instructors and schools on initial load
   useEffect(() => {
-    fetchAllUsers();
+    fetchStudents();
+    fetchInstructors();
+    fetchSchools();
   }, []);
 
   // Update filtered students when search term changes
@@ -470,6 +167,90 @@ export const StudentManagement: React.FC = () => {
     }
     
     setFilteredStudents(filtered);
+  };
+
+  // Fetch students from Firestore
+  const fetchStudents = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Get all users from Firestore
+      const usersRef = collection(db, 'users');
+      const q = query(
+        usersRef, 
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      
+      const studentsData: FirebaseUser[] = [];
+      querySnapshot.forEach((doc) => {
+        studentsData.push({
+          id: doc.id,
+          ...doc.data()
+        } as FirebaseUser);
+      });
+      
+      setStudents(studentsData);
+      setFilteredStudents(studentsData);
+    } catch (err) {
+      console.error('Kullanıcılar yüklenirken hata oluştu:', err);
+      setError('Kullanıcılar yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch instructors from Firestore
+  const fetchInstructors = async () => {
+    try {
+      const usersRef = collection(db, 'users');
+      const q = query(
+        usersRef, 
+        where("role", "==", "instructor")
+      );
+      const querySnapshot = await getDocs(q);
+      
+      const instructorsData: Instructor[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        instructorsData.push({
+          id: doc.id,
+          displayName: data.displayName || 'İsimsiz Eğitmen',
+          email: data.email || ''
+        });
+      });
+      
+      setInstructors(instructorsData);
+    } catch (err) {
+      console.error('Eğitmenler yüklenirken hata oluştu:', err);
+    }
+  };
+
+  // Fetch schools from Firestore
+  const fetchSchools = async () => {
+    try {
+      const usersRef = collection(db, 'users');
+      const q = query(
+        usersRef, 
+        where("role", "==", "school")
+      );
+      const querySnapshot = await getDocs(q);
+      
+      const schoolsData: School[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        schoolsData.push({
+          id: doc.id,
+          displayName: data.displayName || 'İsimsiz Okul',
+          email: data.email || ''
+        });
+      });
+      
+      setSchools(schoolsData);
+    } catch (err) {
+      console.error('Okullar yüklenirken hata oluştu:', err);
+    }
   };
 
   // Edit student
@@ -499,7 +280,7 @@ export const StudentManagement: React.FC = () => {
       email: '',
       phoneNumber: '',
       level: 'beginner',
-      photoURL: '/assets/placeholders/default-student.jpg',
+      photoURL: '',
       instructorId: '',
       schoolId: '',
       password: '',
@@ -523,41 +304,6 @@ export const StudentManagement: React.FC = () => {
         ...prev,
         [name]: value
       }));
-    }
-  };
-
-  // Open Photo Modal
-  const openPhotoModal = (photoURL: string, studentName: string) => {
-    setSelectedPhoto({
-      url: photoURL || DEFAULT_STUDENT_IMAGE,
-      name: studentName
-    });
-    setPhotoModalOpen(true);
-  };
-
-  // Handle photo change
-  const handlePhotoChange = async (base64Image: string | null): Promise<void> => {
-    try {
-      if (base64Image === null) {
-        // If photo is removed, set to default
-        setFormData(prev => ({
-          ...prev,
-          photoURL: DEFAULT_STUDENT_IMAGE
-        }));
-        return;
-      }
-      
-      // Resize image to reduce size
-      const resizedImage = await resizeImageFromBase64(base64Image, 400, 400, 0.75);
-      
-      // Update form state
-      setFormData(prev => ({
-        ...prev,
-        photoURL: resizedImage
-      }));
-    } catch (err) {
-      console.error('Fotoğraf işlenirken hata oluştu:', err);
-      setError('Fotoğraf işlenirken bir hata oluştu. Lütfen tekrar deneyin.');
     }
   };
 
@@ -587,8 +333,7 @@ export const StudentManagement: React.FC = () => {
           schoolName = selectedSchool?.displayName || '';
         }
         
-        // Öğrenci güncellenirken role değeri korunur (değiştirilmez)
-        const updateData = {
+        await updateDoc(userRef, {
           displayName: formData.displayName,
           phoneNumber: formData.phoneNumber,
           level: formData.level,
@@ -596,39 +341,28 @@ export const StudentManagement: React.FC = () => {
           instructorName: instructorName || null,
           schoolId: formData.schoolId || null,
           schoolName: schoolName || null,
-          photoURL: formData.photoURL || DEFAULT_STUDENT_IMAGE,
           updatedAt: serverTimestamp()
-        };
+        });
         
-        try {
-          await updateDoc(userRef, updateData);
-          console.log('Öğrenci güncellendi:', selectedStudent.id);
-          
-          // Update the students array
-          const updatedStudents = students.map(student => 
-            student.id === selectedStudent.id 
-              ? { 
-                  ...student, 
-                  displayName: formData.displayName,
-                  phoneNumber: formData.phoneNumber,
-                  level: formData.level,
-                  instructorId: formData.instructorId || null,
-                  instructorName: instructorName || null,
-                  schoolId: formData.schoolId || null,
-                  schoolName: schoolName || null,
-                  photoURL: formData.photoURL || DEFAULT_STUDENT_IMAGE,
-                  updatedAt: serverTimestamp() as Timestamp 
-                } 
-              : student
-          );
-          
-          setStudents(updatedStudents);
-          setSuccess('Öğrenci bilgileri başarıyla güncellendi.');
-        } catch (updateError) {
-          console.error('Öğrenci güncellenirken hata:', updateError);
-          throw new Error('Öğrenci güncellenirken bir hata oluştu: ' + 
-            (updateError instanceof Error ? updateError.message : 'Bilinmeyen hata'));
-        }
+        // Update the students array
+        const updatedStudents = students.map(student => 
+          student.id === selectedStudent.id 
+            ? { 
+                ...student, 
+                displayName: formData.displayName,
+                phoneNumber: formData.phoneNumber,
+                level: formData.level,
+                instructorId: formData.instructorId || null,
+                instructorName: instructorName || null,
+                schoolId: formData.schoolId || null,
+                schoolName: schoolName || null,
+                updatedAt: serverTimestamp() as Timestamp 
+              } 
+            : student
+        );
+        
+        setStudents(updatedStudents);
+        setSuccess('Öğrenci bilgileri başarıyla güncellendi.');
       } else {
         // Create new student
         if (!formData.email || !formData.displayName) {
@@ -666,7 +400,7 @@ export const StudentManagement: React.FC = () => {
           // Update user profile
           await updateProfile(userCredential.user, {
             displayName: formData.displayName,
-            photoURL: formData.photoURL || DEFAULT_STUDENT_IMAGE
+            photoURL: formData.photoURL || null
           });
           
           // Send email verification
@@ -702,35 +436,28 @@ export const StudentManagement: React.FC = () => {
           instructorName: instructorName || null,
           schoolId: formData.schoolId || null,
           schoolName: schoolName || null,
-          photoURL: formData.photoURL || DEFAULT_STUDENT_IMAGE,
+          photoURL: formData.photoURL || '',
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         };
         
-        try {
-          await setDoc(doc(db, 'users', userId), newStudentData);
-          console.log('Yeni öğrenci kaydedildi:', userId);
-          
-          // Add to students array
-          const newStudent: FirebaseUser = {
-            ...newStudentData,
-            role: 'student' as UserRole,
-            level: formData.level,
-            instructorId: formData.instructorId || null,
-            instructorName: instructorName || null,
-            schoolId: formData.schoolId || null,
-            schoolName: schoolName || null,
-            createdAt: serverTimestamp() as Timestamp,
-            updatedAt: serverTimestamp() as Timestamp
-          };
-          
-          setStudents([newStudent, ...students]);
-          setSuccess('Yeni öğrenci başarıyla oluşturuldu.');
-        } catch (docError) {
-          console.error('Firestore dökümanı oluşturulurken hata:', docError);
-          throw new Error('Öğrenci bilgileri kaydedilirken bir hata oluştu: ' + 
-            (docError instanceof Error ? docError.message : 'Bilinmeyen hata'));
-        }
+        await setDoc(doc(db, 'users', userId), newStudentData);
+        
+        // Add to students array
+        const newStudent: FirebaseUser = {
+          ...newStudentData,
+          role: 'student' as UserRole,
+          level: formData.level,
+          instructorId: formData.instructorId || null,
+          instructorName: instructorName || null,
+          schoolId: formData.schoolId || null,
+          schoolName: schoolName || null,
+          createdAt: serverTimestamp() as Timestamp,
+          updatedAt: serverTimestamp() as Timestamp
+        };
+        
+        setStudents([newStudent, ...students]);
+        setSuccess('Yeni öğrenci başarıyla oluşturuldu.');
       }
       
       // Close the form
@@ -773,6 +500,43 @@ export const StudentManagement: React.FC = () => {
     }
   };
 
+  // Get role badge color
+  const getRoleBadgeColor = (role: string): string => {
+    switch (role) {
+      case 'admin':
+        return 'bg-red-100 text-red-800';
+      case 'instructor':
+        return 'bg-blue-100 text-blue-800';
+      case 'school':
+        return 'bg-purple-100 text-purple-800';
+      case 'student':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Render role badges
+  const renderRoleBadges = (roles: UserRole | UserRole[]) => {
+    const roleArray = Array.isArray(roles) ? roles : [roles];
+    return (
+      <div className="flex flex-wrap gap-1">
+        {roleArray.map((role, index) => (
+          <span
+            key={index}
+            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(role)}`}
+          >
+            {role === 'admin' && 'Admin'}
+            {role === 'instructor' && 'Eğitmen'}
+            {role === 'school' && 'Dans Okulu'}
+            {role === 'student' && 'Öğrenci'}
+            {!['admin', 'instructor', 'school', 'student'].includes(role) && role}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
   // Render student row
   const renderStudent = (student: FirebaseUser) => {
     return (
@@ -787,12 +551,11 @@ export const StudentManagement: React.FC = () => {
           <div className="flex items-center">
             <div className="flex-shrink-0 h-10 w-10">
               <img
-                className="h-10 w-10 rounded-full object-cover cursor-pointer hover:opacity-80"
-                src={student.photoURL || DEFAULT_STUDENT_IMAGE}
+                className="h-10 w-10 rounded-full object-cover"
+                src={student.photoURL || 'https://via.placeholder.com/40?text=User'}
                 alt={student.displayName}
-                onClick={() => openPhotoModal(student.photoURL || DEFAULT_STUDENT_IMAGE, student.displayName)}
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = DEFAULT_STUDENT_IMAGE;
+                  (e.target as HTMLImageElement).src = "https://via.placeholder.com/40?text=User";
                 }}
               />
             </div>
@@ -806,6 +569,9 @@ export const StudentManagement: React.FC = () => {
         </td>
         <td className="px-6 py-4 whitespace-nowrap">
           <div className="text-sm text-gray-900">{student.email}</div>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap">
+          {renderRoleBadges(student.role)}
         </td>
         <td className="px-6 py-4 whitespace-nowrap">
           <div className="text-sm text-gray-900">
@@ -868,26 +634,15 @@ export const StudentManagement: React.FC = () => {
         </div>
       )}
       
-      {/* Photo Modal */}
-      {selectedPhoto && (
-        <PhotoModal 
-          isOpen={photoModalOpen}
-          onClose={() => setPhotoModalOpen(false)}
-          photoURL={selectedPhoto.url}
-          studentName={selectedPhoto.name}
-          defaultImagePath={DEFAULT_STUDENT_IMAGE}
-        />
-      )}
-      
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Öğrenci Yönetimi</h2>
+        <h2 className="text-xl font-semibold">Kullanıcı Yönetimi</h2>
         {!editMode && (
           <button 
             onClick={addNewStudent}
             className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
             disabled={loading}
           >
-            {loading ? 'Yükleniyor...' : 'Yeni Öğrenci Ekle'}
+            {loading ? 'Yükleniyor...' : 'Yeni Kullanıcı Ekle'}
           </button>
         )}
       </div>
@@ -895,7 +650,7 @@ export const StudentManagement: React.FC = () => {
       {editMode ? (
         <div className="bg-gray-50 p-6 rounded-lg">
           <h3 className="text-lg font-semibold mb-4">
-            {selectedStudent ? 'Öğrenci Düzenle' : 'Yeni Öğrenci Ekle'}
+            {selectedStudent ? 'Kullanıcı Düzenle' : 'Yeni Kullanıcı Ekle'}
           </h3>
           
           <form onSubmit={handleSubmit}>
@@ -965,13 +720,6 @@ export const StudentManagement: React.FC = () => {
                   <option value="advanced">İleri</option>
                   <option value="professional">Profesyonel</option>
                 </select>
-              </div>
-              
-              <div>
-                <StudentPhotoUploader 
-                  currentPhotoURL={formData.photoURL || DEFAULT_STUDENT_IMAGE}
-                  onImageChange={handlePhotoChange}
-                />
               </div>
               
               <div>
@@ -1103,10 +851,13 @@ export const StudentManagement: React.FC = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Öğrenci
+                    Kullanıcı
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     E-posta
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Roller
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Dans Seviyesi
