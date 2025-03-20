@@ -10,8 +10,8 @@ import {
   doc,
   Timestamp
 } from 'firebase/firestore';
-import { db } from '../../api/firebase/firebase';
-import useAuth from '../../common/hooks/useAuth';
+import { db } from '../../../api/firebase/firebase';
+import useAuth from '../../hooks/useAuth';
 import BadgeNotification from './BadgeNotification';
 
 interface Notification {

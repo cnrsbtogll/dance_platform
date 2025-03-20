@@ -39,7 +39,17 @@ function SignIn() {
     
     try {
       await signIn(email, password);
-      navigate('/'); // Başarılı girişten sonra ana sayfaya yönlendir
+      
+      // URL parametrelerini kontrol et
+      const params = new URLSearchParams(location.search);
+      const redirectPath = params.get('redirect');
+      
+      // Redirect var ise, o yola yönlendir, yoksa ana sayfaya yönlendir
+      if (redirectPath) {
+        navigate(`/${redirectPath}`);
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       const authError = err as AuthError;
       setError(getAuthErrorMessage(authError));

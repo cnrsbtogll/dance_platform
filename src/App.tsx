@@ -22,7 +22,7 @@ import { auth } from './api/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { AuthProvider } from './contexts/AuthContext';
 import SchoolAdmin from './features/school/pages/SchoolAdmin';
-import NotificationsCenter from './components/badges/NotificationsCenter';
+import NotificationsCenter from './common/components/badges/NotificationsCenter';
 import { ThemeProvider } from '@mui/material/styles';
 import theme from './styles/theme';
 
