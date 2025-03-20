@@ -4,7 +4,7 @@ export type DanceStyle = 'salsa' | 'bachata' | 'kizomba' | 'other';
 
 export type DanceLevel = 'beginner' | 'intermediate' | 'advanced' | 'professional';
 
-export type UserRole = 'student' | 'instructor' | 'school' | 'admin';
+export type UserRole = 'student' | 'instructor' | 'school' | 'school_admin' | 'admin';
 
 export interface User {
   id: string;
@@ -12,11 +12,11 @@ export interface User {
   displayName: string;
   photoURL?: string;
   phoneNumber?: string;
-  role: UserRole;
+  role: UserRole[];
   danceStyles?: DanceStyle[];
   level?: DanceLevel;
-  createdAt: Date;
-  updatedAt?: Date;
+  createdAt: string;
+  updatedAt: string;
   schoolId?: string;  // Kullanıcının bağlı olduğu okul ID'si
   instructorId?: string; // Öğrencinin bağlı olduğu eğitmen ID'si
 }
@@ -25,23 +25,15 @@ export interface UserWithProfile extends User {
   bio?: string;
 }
 
-export interface Instructor {
-  id: string;
-  userId: string;
-  biography: string;
-  specialties: DanceStyle[];
-  uzmanlık?: DanceStyle[]; // Alternatif alan adı - Türkçe (doğru yazım)
-  experience: number; // Years
-  tecrube?: number; // Alternatif alan adı - Türkçe
-  certifications: string[];
-  socialMediaLinks: {
-    instagram?: string;
-    facebook?: string;
-    youtube?: string;
-    tiktok?: string;
-  };
-  rating: number;
-  reviewCount: number;
+export interface Instructor extends User {
+  bio?: string;
+  specialties?: string[];
+  experience?: string;
+  phoneNumber?: string;
+  location?: string;
+  rating?: number;
+  reviewCount?: number;
+  status?: 'active' | 'inactive' | 'pending' | 'rejected';
 }
 
 export interface Badge {
