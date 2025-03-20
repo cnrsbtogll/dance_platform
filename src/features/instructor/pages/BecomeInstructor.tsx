@@ -26,9 +26,11 @@ interface DanceStyle {
 interface FormData {
   fullName: string;
   experience: string;
-  danceStyles: string;
+  danceStyles: string[];
   contactNumber: string;
   bio: string;
+  email?: string; // Email alanı opsiyonel
+  password?: string; // Şifre alanı opsiyonel
 }
 
 function BecomeInstructor() {
@@ -37,13 +39,16 @@ function BecomeInstructor() {
   const [formData, setFormData] = useState<FormData>({
     fullName: '',
     experience: '',
-    danceStyles: '',
+    danceStyles: [],
     contactNumber: '',
-    bio: ''
+    bio: '',
+    email: '',
+    password: ''
   });
-  const [selectedDanceStyle, setSelectedDanceStyle] = useState<string>('');
+  const [selectedDanceStyles, setSelectedDanceStyles] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [formErrors, setFormErrors] = useState<Partial<Record<keyof FormData, string>>>({});
+  const [generalError, setGeneralError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [hasExistingApplication, setHasExistingApplication] = useState(false);
   const [isAlreadyInstructor, setIsAlreadyInstructor] = useState(false);
@@ -99,14 +104,23 @@ function BecomeInstructor() {
   }, []);
 
   useEffect(() => {
-    // Redirect to login if not authenticated
-    if (!currentUser) {
-      navigate('/login?redirect=become-instructor');
-      return;
+    // Artık login yapmamış kişi için yönlendirme yapmıyoruz
+    // Burada formData'yı güncelleyebiliriz
+    if (currentUser) {
+      // Email alanını currentUser'dan al
+      setFormData(prev => ({
+        ...prev,
+        email: currentUser.email || ''
+      }));
     }
 
     const checkUserStatus = async () => {
-      try {
+    try {
+      if (!currentUser) {
+        // Giriş yapmamış kullanıcı için başvuru oluyor, normal devam et
+        setIsLoading(false);
+        return;
+      }
         // Check if user is already an instructor
         const userDocRef = doc(db, 'users', currentUser.uid);
         const userDoc = await getDoc(userDocRef);
@@ -154,7 +168,7 @@ function BecomeInstructor() {
         setIsLoading(false);
       } catch (err) {
         console.error('Error checking user status:', err);
-        setError('Kullanıcı durumu kontrol edilirken bir hata oluştu. Lütfen tekrar deneyin.');
+        setGeneralError('Kullanıcı durumu kontrol edilirken bir hata oluştu. Lütfen tekrar deneyin.');
         setIsLoading(false);
       }
     };
@@ -168,63 +182,124 @@ function BecomeInstructor() {
       ...prev,
       [name]: value
     }));
+    
+    // Kullanıcı bir alanı güncellediğinde o alandaki hatayı temizle
+    if (formErrors[name as keyof FormData]) {
+      setFormErrors(prev => {
+        const updated = {...prev};
+        delete updated[name as keyof FormData];
+        return updated;
+      });
+    }
   };
 
-  const handleDanceStyleChange = (value: string) => {
-    setSelectedDanceStyle(value);
+  const handleDanceStyleChange = (value: string | string[]) => {
+    // value bir array olarak geldiğinde (multiple seçim) doğrudan kullan
+    // string olarak geldiğinde bir array'e dönüştür
+    const danceStylesArray = Array.isArray(value) ? value : [value];
+    
+    // Boş seçim durumunda boş array ile güncelle
+    // Tümü seçeneği seçildiğinde boş array dönücek
+    const filteredStyles = value === '' ? [] : danceStylesArray.filter(style => style !== '');
+    
+    setSelectedDanceStyles(filteredStyles);
     setFormData(prev => ({
       ...prev,
-      danceStyles: value
+      danceStyles: filteredStyles
     }));
+    
+    // Dans stili seçildiğinde ilgili hatayı temizle
+    if (formErrors.danceStyles) {
+      setFormErrors(prev => {
+        const updated = {...prev};
+        delete updated.danceStyles;
+        return updated;
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setError(null);
+    setGeneralError(null);
+    setFormErrors({});
     
+    // Form validasyon kontrolü
+    const errors: Partial<Record<keyof FormData, string>> = {};
+    
+    if (!formData.fullName.trim()) {
+      errors.fullName = 'Bu alan zorunlu';
+    }
+    
+    if (!formData.danceStyles || formData.danceStyles.length === 0) {
+      errors.danceStyles = 'En az bir dans stili seçmelisiniz';
+    }
+    
+    // Telefon numarasının kontrolü - boşlukları kaldır ve doğrula
+    const cleanPhone = formData.contactNumber.replace(/\s/g, '');
+    
+    if (!cleanPhone) {
+      errors.contactNumber = 'Bu alan zorunlu';
+    } else if (cleanPhone.length !== 10) {
+      errors.contactNumber = '10 rakam girmelisiniz';
+    }
+    
+    if (!currentUser) {
+      if (!formData.email) {
+        errors.email = 'Bu alan zorunlu';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+        errors.email = 'Geçerli bir email adresi girin';
+      }
+      
+      if (!formData.password) {
+        errors.password = 'Bu alan zorunlu';
+      } else if (formData.password.length < 6) {
+        errors.password = 'En az 6 karakter girmelisiniz';
+      }
+    }
+    
+    // Hata varsa, formu göndermeyi durdur
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
-      if (!currentUser) {
-        throw new Error('Kullanıcı girişi yapılmamış. Lütfen giriş yapın ve tekrar deneyin.');
-      }
+      // Kullanıcı ID'si ve email
+      const userId = currentUser?.uid || 'guest-' + Date.now();
+      const userEmail = currentUser?.email || formData.email;
       
-      // Validate form data
-      if (!formData.fullName.trim()) {
-        throw new Error('Lütfen adınızı ve soyadınızı girin.');
-      }
-      
-      if (!formData.danceStyles) {
-        throw new Error('Lütfen uzmanlık alanınızı seçin.');
-      }
-      
-      // Create instructor request
+      // Eğitmen isteği oluştur
       await addDoc(collection(db, 'instructorRequests'), {
         fullName: formData.fullName,
         experience: formData.experience,
-        danceStyles: formData.danceStyles,
+        danceStyles: formData.danceStyles, // Artık bir array olduğu için direkt kullanabiliyoruz
         contactNumber: formData.contactNumber,
         bio: formData.bio,
-        userId: currentUser.uid,
-        userEmail: currentUser.email,
+        userId: userId,
+        userEmail: userEmail,
         status: 'pending',
         createdAt: serverTimestamp()
       });
       
       setSuccess(true);
       
-      // Reset form
+      // Formu sıfırla
       setFormData({
         fullName: '',
         experience: '',
-        danceStyles: '',
+        danceStyles: [],
         contactNumber: '',
-        bio: ''
+        bio: '',
+        email: '',
+        password: ''
       });
-      setSelectedDanceStyle('');
+      setSelectedDanceStyles([]);
       
     } catch (err) {
       console.error('Error submitting instructor application:', err);
-      setError(`Başvuru gönderilirken bir hata oluştu: ${err instanceof Error ? err.message : 'Bilinmeyen bir hata'}`);
+      setGeneralError(`Başvuru gönderilirken bir hata oluştu: ${err instanceof Error ? err.message : 'Bilinmeyen bir hata'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -328,13 +403,13 @@ function BecomeInstructor() {
       </motion.div>
       
       <div className="bg-white p-8 rounded-lg shadow-md">
-        {error && (
+        {generalError && (
           <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6" role="alert">
-            <p>{error}</p>
+            <p>{generalError}</p>
           </div>
         )}
         
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <div className="mb-4">
             <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">
               Adınız Soyadınız*
@@ -345,10 +420,55 @@ function BecomeInstructor() {
               name="fullName"
               value={formData.fullName}
               onChange={handleChange}
-              required
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+              placeholder="Adınızı ve soyadınızı giriniz"
+              className={`w-full p-2 border ${formErrors.fullName ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-indigo-500`}
             />
+            {formErrors.fullName && (
+              <p className="text-red-500 text-xs mt-1">{formErrors.fullName}</p>
+            )}
           </div>
+          
+        {/* Email alanı - sadece giriş yapmamış kullanıcılara göster */}
+        {!currentUser && (
+          <div className="mb-4">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              E-mail Adresiniz*
+            </label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="E-mail adresinizi giriniz"
+              className={`w-full p-2 border ${formErrors.email ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-indigo-500`}
+            />
+            {formErrors.email && (
+              <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>
+            )}
+          </div>
+        )}
+        
+        {/* Şifre alanı - sadece giriş yapmamış kullanıcılara göster */}
+        {!currentUser && (
+          <div className="mb-4">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              Şifre*
+            </label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="En az 6 karakter şifre giriniz"
+              className={`w-full p-2 border ${formErrors.password ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-indigo-500`}
+            />
+            {formErrors.password && (
+              <p className="text-red-500 text-xs mt-1">{formErrors.password}</p>
+            )}
+          </div>
+        )}
           
           <div className="mb-4">
             {loadingStyles ? (
@@ -358,14 +478,17 @@ function BecomeInstructor() {
               </div>
             ) : (
               <CustomSelect
-                label="Uzmanlık Alanınız (Dans Stili)*"
+                label="Uzmanlık Alanlarınız (Dans Stilleri)*"
                 options={danceStyleOptions}
-                value={selectedDanceStyle}
+                value={selectedDanceStyles}
                 onChange={handleDanceStyleChange}
-                placeholder="Dans stilinizi seçin"
+                placeholder="Dans stillerinizi seçin"
                 className="w-full"
+                error={formErrors.danceStyles}
+                multiple={true}
               />
             )}
+            {/* multiple={true} ile dans stillerinin birden fazla seçilebilmesi sağlanmıştır */}
           </div>
           
           <div className="mb-4">
@@ -385,17 +508,60 @@ function BecomeInstructor() {
           
           <div className="mb-4">
             <label htmlFor="contactNumber" className="block text-sm font-medium text-gray-700 mb-1">
-              İletişim Numarası
+              İletişim Numarası*
             </label>
-            <input
-              type="text"
-              id="contactNumber"
-              name="contactNumber"
-              value={formData.contactNumber}
-              onChange={handleChange}
-              placeholder="Örn: 05XX XXX XX XX"
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
-            />
+            <div className="flex items-center">
+            <div className={`bg-gray-100 p-2 border ${formErrors.contactNumber ? 'border-red-500' : 'border-gray-300'} border-r-0 rounded-l-md`}>
+            +90
+            </div>
+              <input
+                type="tel"
+                pattern="[0-9]*"
+                inputMode="numeric"
+                id="contactNumber"
+                name="contactNumber"
+                value={formData.contactNumber}
+                onChange={(e) => {
+                  // Sadece rakam girişine izin ver
+                  const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                  
+                  // 10 karakterden uzun olmasını engelleyin (Türkiye formatında)
+                  const trimmedValue = rawValue.slice(0, 10);
+                  
+                  // Telefon numarasına maske uygula (5XX XXX XX XX formatında)
+                  let formattedValue = trimmedValue;
+                  
+                  if (trimmedValue.length > 3) {
+                    formattedValue = `${trimmedValue.slice(0, 3)} ${trimmedValue.slice(3)}`;
+                  }
+                  if (trimmedValue.length > 6) {
+                    formattedValue = `${formattedValue.slice(0, 7)} ${formattedValue.slice(7)}`;
+                  }
+                  if (trimmedValue.length > 8) {
+                    formattedValue = `${formattedValue.slice(0, 10)} ${formattedValue.slice(10)}`;
+                  }
+                  
+                  setFormData(prev => ({
+                    ...prev,
+                    contactNumber: formattedValue
+                  }));
+                  
+                  // Hata mesajını temizle
+                  if (formErrors.contactNumber) {
+                    setFormErrors(prev => {
+                      const updated = {...prev};
+                      delete updated.contactNumber;
+                      return updated;
+                    });
+                  }
+                }}
+                placeholder="5XX XXX XX XX"
+                className={`w-full p-2 border ${formErrors.contactNumber ? 'border-red-500' : 'border-gray-300'} rounded-r-md focus:ring-2 focus:ring-indigo-500`}
+              />
+            </div>
+            {formErrors.contactNumber && (
+              <p className="text-red-500 text-xs mt-1">{formErrors.contactNumber}</p>
+            )}
           </div>
           
           <div className="mb-6">
