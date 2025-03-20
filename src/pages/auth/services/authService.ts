@@ -49,25 +49,10 @@ export const signUp = async (
 };
 
 // Kullanıcı girişi işlemini gerçekleştiren fonksiyon
-export const signIn = async (email: string, password: string): Promise<User> => {
+export const signIn = async (email: string, password: string): Promise<UserCredential> => {
   try {
-    // Firebase Authentication ile kullanıcı girişi
-    const userCredential: UserCredential = await signInWithEmailAndPassword(auth, email, password);
-    
-    // Firestore'dan kullanıcı bilgilerini çek
-    const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-    
-    if (userDoc.exists()) {
-      const userData = userDoc.data() as Omit<User, 'createdAt'> & { createdAt: Timestamp };
-      
-      // Timestamp'i Date'e çevir
-      return {
-        ...userData,
-        createdAt: userData.createdAt ? userData.createdAt.toDate() : new Date(),
-      } as User;
-    } else {
-      throw new Error('User data not found in Firestore');
-    }
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    return userCredential;
   } catch (error) {
     throw error;
   }

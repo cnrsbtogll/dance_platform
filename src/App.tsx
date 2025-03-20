@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { FirebaseApp } from 'firebase/app';
 import PartnerSearchPage from './pages/partners/PartnerSearchPage';
 import ProgressPage from './pages/progress/ProgressPage';
 import AdminPanel from './features/admin/pages/AdminPanel';
@@ -38,6 +39,17 @@ function App(): JSX.Element {
   const isAuthenticated = !!user;
   const [firebaseInitError, setFirebaseInitError] = useState<string | null>(null);
   const [resetTrigger, setResetTrigger] = useState<number>(0);
+
+  // Instructor redirect component
+  const InstructorRedirect: React.FC = () => {
+    const location = useLocation();
+    
+    if (user?.role?.includes('instructor') && location.pathname !== '/instructor') {
+      return <Navigate to="/instructor" replace />;
+    }
+    
+    return null;
+  };
 
   // Profil fotoğrafının güncellendiğini log'la (debug için)
   useEffect(() => {
@@ -176,8 +188,8 @@ function App(): JSX.Element {
       
       // Firebase config'i kontrol et
       console.log('🔍 Firebase config modülü import ediliyor...');
-      import('./api/firebase/firebase').then(module => {
-        const app = module.default;
+      import('./api/firebase/firebase').then((module: { default: FirebaseApp }) => {
+        const app: FirebaseApp = module.default;
         console.log('🔍 Firebase app modülü yüklendi:', app);
         
         if (!app || Object.keys(app).length === 0) {
@@ -249,6 +261,7 @@ function App(): JSX.Element {
 
   return (
     <Router>
+      {isAuthenticated && <InstructorRedirect />}
       <AuthProvider>
         <ThemeProvider theme={theme}>
           <NotificationsCenter />

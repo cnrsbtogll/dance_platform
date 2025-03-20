@@ -1,13 +1,14 @@
 import React, { useState, FormEvent } from 'react';
 import { User } from '../../../types';
 import { motion } from 'framer-motion';
+import InstructorProfileForm from '../components/InstructorProfileForm';
 
 interface InstructorPanelProps {
   user?: User | null;
 }
 
 function InstructorPanel({ user }: InstructorPanelProps) {
-  const [activeTab, setActiveTab] = useState<'courses' | 'students' | 'schedule'>('courses');
+  const [activeTab, setActiveTab] = useState<'profile' | 'courses' | 'students' | 'schedule'>('profile');
   const [showAddClassForm, setShowAddClassForm] = useState(false);
   const [refreshCounter, setRefreshCounter] = useState(0);
 
@@ -19,6 +20,10 @@ function InstructorPanel({ user }: InstructorPanelProps) {
     console.log('refreshClassList çağrıldı, yeni refreshCounter:', refreshCounter + 1);
     setRefreshCounter((prev) => prev + 1);
   };
+
+  if (!user) {
+    return <div>Yükleniyor...</div>;
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -40,29 +45,42 @@ function InstructorPanel({ user }: InstructorPanelProps) {
         <div className="border-b">
           <nav className="flex -mb-px">
             <button
-              onClick={() => setActiveTab('courses')}
-              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 ${activeTab === 'courses'
+              onClick={() => setActiveTab('profile')}
+              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 ${
+                activeTab === 'profile'
                   ? 'border-indigo-500 text-indigo-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+              }`}
+            >
+              Profilim
+            </button>
+            <button
+              onClick={() => setActiveTab('courses')}
+              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 ${
+                activeTab === 'courses'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
             >
               Kurslarım
             </button>
             <button
               onClick={() => setActiveTab('students')}
-              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 ${activeTab === 'students'
+              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 ${
+                activeTab === 'students'
                   ? 'border-indigo-500 text-indigo-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+              }`}
             >
               Öğrencilerim
             </button>
             <button
               onClick={() => setActiveTab('schedule')}
-              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 ${activeTab === 'schedule'
+              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 ${
+                activeTab === 'schedule'
                   ? 'border-indigo-500 text-indigo-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+              }`}
             >
               Ders Programım
             </button>
@@ -70,6 +88,10 @@ function InstructorPanel({ user }: InstructorPanelProps) {
         </div>
 
         <div className="p-6">
+          {activeTab === 'profile' && (
+            <InstructorProfileForm user={user} />
+          )}
+
           {activeTab === 'courses' && (
             <div>
               <div className="flex justify-between items-center mb-4">

@@ -18,9 +18,9 @@ interface ImageUploaderProps {
 const ImageUploader: React.FC<ImageUploaderProps> = ({
   currentPhotoURL,
   onImageChange,
-  maxSizeKB = 500,
-  maxWidth = 800,
-  maxHeight = 800,
+  maxSizeKB = 10240,
+  maxWidth = 3840,
+  maxHeight = 2160,
   title = 'Fotoğraf',
   shape = 'circle',
   width = 200,
@@ -30,10 +30,11 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const MAX_FILE_SIZE_MB = 5; // Maximum file size in MB
-  const MAX_DIMENSIONS = 2048; // Maximum width/height in pixels
+  const MAX_FILE_SIZE_MB = 20; // Maximum file size in MB
+  const MAX_DIMENSIONS = 4096; // Maximum width/height in pixels
 
   // Clean up any blob URLs when component unmounts
   useEffect(() => {
@@ -82,8 +83,16 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         return;
       }
       
-      setPreviewURL(objectUrl);
-      setError(null);
+      // Convert to base64
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        setPreviewURL(result);
+        setError(null);
+      };
+      reader.readAsDataURL(file);
+      
+      URL.revokeObjectURL(objectUrl);
     };
     
     img.onerror = () => {
@@ -109,14 +118,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         return;
       }
 
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        setPreviewURL(result);
-      };
-
-      reader.readAsDataURL(file);
+      validateAndSetImage(file);
     } catch (err) {
       setError('Fotoğraf yüklenirken bir hata oluştu.');
       console.error('Fotoğraf yükleme hatası:', err);
@@ -152,6 +154,12 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     
     if (previewURL) {
       onImageChange(previewURL);
+      setUploadSuccess(true);
+      
+      // Sadece başarı durumunu sıfırla, preview'ı temizleme
+      setTimeout(() => {
+        setUploadSuccess(false);
+      }, 1500);
     }
   };
 
@@ -159,6 +167,9 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     e.preventDefault();
     e.stopPropagation();
     
+    if (previewURL && previewURL.startsWith('blob:')) {
+      URL.revokeObjectURL(previewURL);
+    }
     setPreviewURL(null);
     setError(null);
     if (fileInputRef.current) {
@@ -224,7 +235,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
             overflow: 'hidden',
             boxShadow: '0 8px 24px rgba(149, 157, 165, 0.2)',
             cursor: 'pointer',
-            border: dragActive ? '3px dashed #8B5CF6' : '3px solid #8B5CF6',
+            border: uploadSuccess ? '3px solid #22C55E' : (dragActive ? '3px dashed #8B5CF6' : '3px solid #8B5CF6'),
             transition: 'all 0.3s ease',
             '&:hover': {
               boxShadow: '0 12px 28px rgba(149, 157, 165, 0.3)',
@@ -261,8 +272,32 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
             </Box>
           )}
           
+          {/* Success overlay */}
+          {uploadSuccess && (
+            <Box
+              component={motion.div}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.6) 0%, rgba(21, 128, 61, 0.6) 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                zIndex: 2
+              }}
+            >
+              <Check sx={{ fontSize: 48 }} />
+            </Box>
+          )}
+          
           {/* Gradient overlay on hover */}
-          {!previewURL && currentPhotoURL && (
+          {!previewURL && currentPhotoURL && !uploadSuccess && (
             <Box
               component={motion.div}
               initial={{ opacity: 0 }}
@@ -361,18 +396,34 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           <Box sx={{ display: 'flex', gap: 2 }}>
             <Button
               variant="contained"
-              color="primary"
-              startIcon={<Check />}
+              color={uploadSuccess ? "success" : "primary"}
+              startIcon={uploadSuccess ? <Check /> : null}
               onClick={confirmUpload}
-              disabled={isUploading}
+              disabled={isUploading || uploadSuccess}
               sx={{
-                backgroundColor: '#8B5CF6',
+                backgroundColor: uploadSuccess ? '#22C55E' : '#8B5CF6',
                 '&:hover': {
-                  backgroundColor: '#7C3AED',
+                  backgroundColor: uploadSuccess ? '#15803D' : '#7C3AED',
                 },
+                transition: 'all 0.3s ease',
+                position: 'relative',
+                minWidth: 140
               }}
             >
-              Fotoğrafı Onayla
+              {uploadSuccess ? 'Kaydedildi!' : 'Fotoğrafı Onayla'}
+              {isUploading && (
+                <CircularProgress
+                  size={24}
+                  sx={{
+                    color: 'white',
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    marginTop: '-12px',
+                    marginLeft: '-12px',
+                  }}
+                />
+              )}
             </Button>
             
             <Button
@@ -380,7 +431,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
               color="error"
               startIcon={<Close />}
               onClick={cancelUpload}
-              disabled={isUploading}
+              disabled={isUploading || uploadSuccess}
             >
               İptal
             </Button>
