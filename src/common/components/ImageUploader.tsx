@@ -33,15 +33,83 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     }
   }, [resetState]);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const compressImage = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 200;  // Reduced from 400
+          const MAX_HEIGHT = 200; // Reduced from 400
+          
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Could not get canvas context'));
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Daha düşük JPEG kalitesi (0.4'ten 0.2'ye)
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.2);
+          
+          // Base64 header'ı kaldır ve tekrar ekle (optimize etmek için)
+          const base64Data = compressedBase64.split(',')[1];
+          const optimizedBase64 = `data:image/jpeg;base64,${base64Data}`;
+          
+          resolve(optimizedBase64);
+        };
+        
+        img.onerror = (error) => {
+          reject(error);
+        };
+      };
+      
+      reader.onerror = (error) => {
+        reject(error);
+      };
+    });
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewURL(reader.result as string);
-        setIsEditing(true); // Yeni fotoğraf seçildiğinde düzenleme modunu aktif et
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressedBase64 = await compressImage(file);
+        setPreviewURL(compressedBase64);
+        setIsEditing(true);
+      } catch (error) {
+        console.error('Error compressing image:', error);
+        // Sıkıştırma başarısız olursa normal yöntemi dene
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPreviewURL(reader.result as string);
+          setIsEditing(true);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -58,7 +126,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
   const handleCancel = () => {
     setPreviewURL(null);
-    setIsEditing(false); // İptal edildiğinde düzenleme modunu kapat
+    setIsEditing(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
