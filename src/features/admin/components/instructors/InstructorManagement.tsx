@@ -21,9 +21,11 @@ import {
 } from 'firebase/auth';
 import { db, auth } from '../../../../api/firebase/firebase';
 import { motion } from 'framer-motion';
-import { ImageUploader } from '../../../../common/components/ImageUploader';
+import ImageUploader from '../../../../common/components/ui/ImageUploader';
 import { resizeImageFromBase64 } from '../../../../api/services/userService';
 import { generateInitialsAvatar } from '../../../../common/utils/imageUtils';
+import CustomSelect from '../../../../common/components/ui/CustomSelect';
+import CustomPhoneInput from '../../../../common/components/ui/CustomPhoneInput';
 
 // Tip tanımlamaları
 interface Egitmen {
@@ -60,6 +62,7 @@ interface DanceStyle {
   value: string;
 }
 
+// Form verisi için tip tanımı
 interface FormData {
   ad: string;
   uzmanlık: string;
@@ -67,9 +70,9 @@ interface FormData {
   biyografi: string;
   okul_id: string;
   gorsel: string;
-  email?: string;
-  phoneNumber?: string;
-  password?: string; // Şifre alanı
+  email: string;
+  phoneNumber: string;
+  password: string;
 }
 
 function InstructorManagement(): JSX.Element {
@@ -172,31 +175,88 @@ function InstructorManagement(): JSX.Element {
 
   // İlk yüklemede verileri çek
   useEffect(() => {
+    console.log('useEffect tetiklendi');
     fetchInstructors();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchInstructors = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Firestore'dan eğitmenleri çek
+      console.log('1. Eğitmenler getiriliyor...');
       const instructorsRef = collection(db, 'instructors');
-      const q = query(instructorsRef, orderBy('createdAt', 'desc'));
-      const querySnapshot = await getDocs(q);
       
+      const querySnapshot = await getDocs(instructorsRef);
+      console.log('3. Veriler alındı, döküman sayısı:', querySnapshot.size);
+      
+      // Tüm dökümanları logla
+      console.log('Firestore\'daki tüm dökümanlar:');
+      querySnapshot.forEach((doc) => {
+        console.log('Döküman ID:', doc.id);
+        console.log('Döküman verisi:', JSON.stringify(doc.data(), null, 2));
+      });
+
       const instructorsData: Egitmen[] = [];
       querySnapshot.forEach((doc) => {
-        instructorsData.push({
+        const data = doc.data();
+        
+        // Her dökümanı detaylı logla
+        console.log('4. Döküman işleniyor:', {
           id: doc.id,
-          ...doc.data()
-        } as Egitmen);
+          ad: data.displayName || data.ad || 'İsimsiz Eğitmen',
+          uzmanlık: (data.specialties && data.specialties[0]) || data.uzmanlık || 'Belirtilmemiş',
+          okul_id: data.okul_id || data.schoolId || '',
+          email: data.email,
+          userId: data.userId,
+          createdAt: data.createdAt,
+          tümVeri: data
+        });
+
+        // Eksik alanları varsayılan değerlerle doldur
+        const instructorData = {
+          id: doc.id,
+          ad: data.displayName || data.ad || 'İsimsiz Eğitmen',
+          uzmanlık: (data.specialties && data.specialties[0]) || data.uzmanlık || 'Belirtilmemiş',
+          tecrube: data.experience || data.tecrube || 'Belirtilmemiş',
+          biyografi: data.bio || data.biyografi || '',
+          okul_id: data.okul_id || data.schoolId || '',
+          gorsel: data.photoURL || data.gorsel || '/assets/images/dance/egitmen_default.jpg',
+          userId: data.userId || null,
+          email: data.email || '',
+          displayName: data.displayName || data.ad || 'İsimsiz Eğitmen',
+          phoneNumber: data.phoneNumber || '',
+          createdBy: data.createdBy || null,
+          createdAt: data.createdAt || null,
+          updatedAt: data.updatedAt || null
+        };
+
+        instructorsData.push(instructorData);
       });
+      
+      // Client-side sıralama
+      instructorsData.sort((a, b) => {
+        return a.ad.localeCompare(b.ad, 'tr');
+      });
+      
+      console.log('5. Toplam işlenen eğitmen:', instructorsData.length);
+      console.log('6. Tüm eğitmenler:', instructorsData.map(e => ({ 
+        id: e.id, 
+        ad: e.ad,
+        email: e.email,
+        okul: e.okul_id 
+      })));
       
       setEgitmenler(instructorsData);
       setLoading(false);
-    } catch (err) {
-      console.error('Eğitmenler getirilirken hata oluştu:', err);
+    } catch (error: any) {
+      console.error('7. Hata oluştu:', {
+        error,
+        message: error instanceof Error ? error.message : 'Bilinmeyen hata',
+        code: error.code,
+        details: error.details,
+        stack: error instanceof Error ? error.stack : undefined
+      });
       setError('Eğitmenler yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
       setLoading(false);
     }
@@ -206,21 +266,30 @@ function InstructorManagement(): JSX.Element {
   useEffect(() => {
     const fetchDansOkullari = async () => {
       try {
-        const okullarRef = collection(db, 'dansOkullari');
+        console.log('Dans okulları getiriliyor...');
+        const okullarRef = collection(db, 'schools');
         const q = query(okullarRef, orderBy('ad'));
         const querySnapshot = await getDocs(q);
         
+        console.log('Dans okulları snapshot alındı, sayı:', querySnapshot.size);
+        
         const okullarData: Okul[] = [];
         querySnapshot.forEach((doc) => {
+          console.log('Okul işleniyor, ID:', doc.id);
           okullarData.push({
             id: doc.id,
             ...doc.data()
           } as Okul);
         });
         
+        console.log('İşlenen toplam okul sayısı:', okullarData.length);
         setDansOkullari(okullarData);
       } catch (err) {
-        console.error('Dans okulları yüklenirken hata oluştu:', err);
+        console.error('Dans okulları yüklenirken detaylı hata:', {
+          error: err,
+          errorMessage: err instanceof Error ? err.message : 'Bilinmeyen hata',
+          errorStack: err instanceof Error ? err.stack : undefined
+        });
         setError('Dans okulları yüklenirken bir hata oluştu.');
       }
     };
@@ -347,6 +416,16 @@ function InstructorManagement(): JSX.Element {
       setError('Fotoğraf yüklenirken bir hata oluştu. Lütfen tekrar deneyin.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // CustomSelect için handleSelectChange fonksiyonu
+  const handleSelectChange = (fieldName: keyof FormData) => (selectedValue: string | string[]) => {
+    if (typeof selectedValue === 'string') {
+      setFormVeri(prev => ({
+        ...prev,
+        [fieldName]: selectedValue
+      }));
     }
   };
 
@@ -603,25 +682,17 @@ function InstructorManagement(): JSX.Element {
               </div>
               
               <div>
-                <label htmlFor="uzmanlık" className="block text-sm font-medium text-gray-700 mb-1">
-                  Uzmanlık Alanı*
-                </label>
-                <select
-                  id="uzmanlık"
-                  name="uzmanlık"
-                  required
+                <CustomSelect
+                  label="Uzmanlık Alanı"
                   value={formVeri.uzmanlık}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="">Dans Stili Seçin</option>
-                  {danceStyles.map(style => (
-                    <option key={style.id} value={style.value}>{style.label}</option>
-                  ))}
-                </select>
-                {loadingStyles && (
-                  <div className="text-xs text-gray-500 mt-1">Dans stilleri yükleniyor...</div>
-                )}
+                  onChange={handleSelectChange('uzmanlık')}
+                  options={danceStyles.map(style => ({
+                    value: style.value,
+                    label: style.label
+                  }))}
+                  placeholder="Dans Stili Seçin"
+                  error={loadingStyles ? "Dans stilleri yükleniyor..." : undefined}
+                />
               </div>
               
               <div>
@@ -640,27 +711,17 @@ function InstructorManagement(): JSX.Element {
               </div>
               
               <div>
-                <label htmlFor="okul_id" className="block text-sm font-medium text-gray-700 mb-1">
-                  Çalıştığı Okul*
-                </label>
-                <select
-                  id="okul_id"
-                  name="okul_id"
-                  required
+                <CustomSelect
+                  label="Çalıştığı Okul"
                   value={formVeri.okul_id}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="">Okul Seçin</option>
-                  {dansOkullari.map(okul => (
-                    <option key={okul.id} value={okul.id}>{okul.ad}</option>
-                  ))}
-                </select>
-                {dansOkullari.length === 0 && (
-                  <p className="mt-1 text-xs text-red-500">
-                    Henüz hiç dans okulu bulunmamaktadır. Önce dans okulu eklemelisiniz.
-                  </p>
-                )}
+                  onChange={handleSelectChange('okul_id')}
+                  options={dansOkullari.map(okul => ({
+                    value: okul.id,
+                    label: okul.ad
+                  }))}
+                  placeholder="Okul Seçin"
+                  error={dansOkullari.length === 0 ? "Henüz hiç dans okulu bulunmamaktadır. Önce dans okulu eklemelisiniz." : undefined}
+                />
               </div>
               
               <div>
@@ -684,16 +745,12 @@ function InstructorManagement(): JSX.Element {
               </div>
               
               <div>
-                <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
-                  Telefon
-                </label>
-                <input
-                  type="text"
+                <CustomPhoneInput
                   id="phoneNumber"
                   name="phoneNumber"
                   value={formVeri.phoneNumber}
                   onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  label="Telefon"
                 />
               </div>
               

@@ -13,6 +13,7 @@ interface ImageUploaderProps {
   shape?: 'circle' | 'square';
   width?: number;
   height?: number;
+  resetState?: boolean;
 }
 
 const ImageUploader: React.FC<ImageUploaderProps> = ({
@@ -25,6 +26,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   shape = 'circle',
   width = 200,
   height = 200,
+  resetState = false,
 }) => {
   const [previewURL, setPreviewURL] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -35,6 +37,21 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
   const MAX_FILE_SIZE_MB = 20; // Maximum file size in MB
   const MAX_DIMENSIONS = 4096; // Maximum width/height in pixels
+
+  // Reset state when resetState prop changes
+  useEffect(() => {
+    if (resetState) {
+      if (previewURL && previewURL.startsWith('blob:')) {
+        URL.revokeObjectURL(previewURL);
+      }
+      setPreviewURL(null);
+      setError(null);
+      setUploadSuccess(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [resetState]);
 
   // Clean up any blob URLs when component unmounts
   useEffect(() => {

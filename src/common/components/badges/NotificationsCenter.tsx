@@ -38,22 +38,27 @@ const NotificationsCenter: React.FC = () => {
     const notificationsQuery = query(
       collection(db, 'notifications'),
       where('userId', '==', user.id),
-      where('read', '==', false),
       orderBy('createdAt', 'desc'),
-      limit(10)
+      limit(20)
     );
 
     const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
       const newNotifications: Notification[] = [];
       
       snapshot.forEach((doc) => {
-        newNotifications.push({
+        const notification = {
           id: doc.id,
           ...doc.data()
-        } as Notification);
+        } as Notification;
+        
+        // Client-side filtreleme
+        if (!notification.read) {
+          newNotifications.push(notification);
+        }
       });
       
-      setNotifications(newNotifications);
+      // Sadece son 10 okunmamış bildirimi göster
+      setNotifications(newNotifications.slice(0, 10));
       
       // Yeni bir rozet bildirimi varsa göster
       const badgeNotification = newNotifications.find(n => n.type === 'badge_earned');

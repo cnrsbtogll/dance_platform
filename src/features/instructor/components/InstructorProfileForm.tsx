@@ -4,7 +4,7 @@ import { doc, updateDoc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { db, auth, storage } from '../../../api/firebase/firebase';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { User } from '../../../types';
-import { ImageUploader } from '../../../common/components/ImageUploader';
+import ImageUploader from '../../../common/components/ui/ImageUploader';
 import { toast } from 'react-hot-toast';
 import CustomSelect from '../../../common/components/ui/CustomSelect';
 import { useNavigate } from 'react-router-dom';
@@ -311,7 +311,7 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
         toast.error('Çok fazla istek gönderildi. Lütfen birkaç saniye bekleyip tekrar deneyin.');
         // Otomatik yeniden deneme için timeout ekle
         setTimeout(() => {
-          toast.info('Şimdi tekrar deneyebilirsiniz');
+          toast.success('Şimdi tekrar deneyebilirsiniz');
         }, 5000);
       } else {
         toast.error('Profil fotoğrafı güncellenirken bir hata oluştu');
