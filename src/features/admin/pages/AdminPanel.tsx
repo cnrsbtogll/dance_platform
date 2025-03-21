@@ -17,16 +17,25 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../api/firebase/firebase';
 import { User } from '../../../types';
 import { motion } from 'framer-motion';
+import CustomSelect from '../../../common/components/ui/CustomSelect';
 
-type TabType = 'okullar' | 'egitmenler' | 'egitmen-talepleri' | 'kurslar' | 'ogrenciler' | 'dans-stilleri' | 'ornek-veri' | 'okul-basvurulari' | 'iletisim-talepleri' | 'kullanicilar';
+type TabType = 'okullar' | 'egitmenler' | 'kurslar' | 'ogrenciler' | 'ornek-veri' | 'talepler' | 'kullanicilar';
+type RequestType = 'egitmen-talepleri' | 'okul-basvurulari' | 'iletisim-talepleri';
+
+const requestTypeOptions = [
+  { label: 'Eğitmenlik Başvuruları', value: 'egitmen-talepleri' },
+  { label: 'Okul Başvuruları', value: 'okul-basvurulari' },
+  { label: 'İletişim Talepleri', value: 'iletisim-talepleri' }
+];
 
 interface AdminPanelProps {
-  user?: User | null;
+  user: User;
 }
 
 function AdminPanel({ user }: AdminPanelProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<TabType>('okullar');
-  const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
+  const [activeRequestType, setActiveRequestType] = useState<RequestType>('egitmen-talepleri');
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   
   // Check if the current user should be promoted to super admin
   useEffect(() => {
@@ -133,44 +142,14 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
               Kurslar
             </button>
             <button
-              onClick={() => setActiveTab('egitmen-talepleri')}
+              onClick={() => setActiveTab('talepler')}
               className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
-                activeTab === 'egitmen-talepleri'
+                activeTab === 'talepler'
                   ? 'border-indigo-500 text-indigo-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Eğitmenlik Başvuruları
-            </button>
-            <button
-              onClick={() => setActiveTab('okul-basvurulari')}
-              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
-                activeTab === 'okul-basvurulari'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Okul Başvuruları
-            </button>
-            <button
-              onClick={() => setActiveTab('dans-stilleri')}
-              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
-                activeTab === 'dans-stilleri'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Dans Stilleri
-            </button>
-            <button
-              onClick={() => setActiveTab('iletisim-talepleri')}
-              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
-                activeTab === 'iletisim-talepleri'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              İletişim Talepleri
+              Talepler
             </button>
             {isSuperAdmin && (
               <button
@@ -198,19 +177,41 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
               <p className="text-gray-500 mt-2">Bu bölüm henüz yapım aşamasındadır.</p>
             </div>
           )}
-          {activeTab === 'egitmen-talepleri' && <InstructorRequests />}
-          {activeTab === 'okul-basvurulari' && <SchoolRequests />}
-          {activeTab === 'dans-stilleri' && <DanceStyleManagement />}
-          {activeTab === 'iletisim-talepleri' && <ContactRequests />}
+          {activeTab === 'talepler' && (
+            <div>
+              <div className="mb-6">
+                <CustomSelect
+                  label="Talep Türü"
+                  options={requestTypeOptions}
+                  value={activeRequestType}
+                  onChange={(value) => setActiveRequestType(value as RequestType)}
+                  placeholder="Talep türü seçin"
+                />
+              </div>
+              {activeRequestType === 'egitmen-talepleri' && <InstructorRequests />}
+              {activeRequestType === 'okul-basvurulari' && <SchoolRequests />}
+              {activeRequestType === 'iletisim-talepleri' && <ContactRequests />}
+            </div>
+          )}
           {activeTab === 'ornek-veri' && isSuperAdmin && (
             <div>
-              <h2 className="text-xl font-semibold mb-4">Örnek Veri Ekleme</h2>
-              <p className="mb-4 text-gray-700">
-                Bu panel ile veritabanına örnek kullanıcılar ekleyebilirsiniz. Eklenen kullanıcılar dans partneri eşleştirme 
-                sistemi için kullanılabilir. Her bir örnek kullanıcı çeşitli dans stilleri, seviyeler, boy, kilo ve konum 
-                bilgileri içerir.
-              </p>
-              <SeedUsersButton />
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold mb-4">Dans Stilleri Yönetimi</h2>
+                <p className="mb-4 text-gray-700">
+                  Dans stillerini ekleyebilir, düzenleyebilir ve silebilirsiniz. Eklenen dans stilleri, kurs oluşturma ve eğitmen profillerinde kullanılabilir.
+                </p>
+                <DanceStyleManagement />
+              </div>
+
+              <div className="mt-8 border-t pt-6">
+                <h2 className="text-xl font-semibold mb-4">Örnek Veri Ekleme</h2>
+                <p className="mb-4 text-gray-700">
+                  Bu panel ile veritabanına örnek kullanıcılar ekleyebilirsiniz. Eklenen kullanıcılar dans partneri eşleştirme 
+                  sistemi için kullanılabilir. Her bir örnek kullanıcı çeşitli dans stilleri, seviyeler, boy, kilo ve konum 
+                  bilgileri içerir.
+                </p>
+                <SeedUsersButton />
+              </div>
               
               <div className="mt-8 border-t pt-6">
                 <h2 className="text-xl font-semibold mb-4">Örnek Dans Kursları</h2>

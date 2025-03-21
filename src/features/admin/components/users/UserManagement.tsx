@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   collection, 
   getDocs, 
@@ -25,6 +25,8 @@ import { db, auth } from '../../../../api/firebase/firebase';
 import { motion } from 'framer-motion';
 import { User, UserRole, DanceLevel, DanceStyle } from '../../../../types';
 import { useAuth } from '../../../../contexts/AuthContext';
+import CustomSelect from '../../../../common/components/ui/CustomSelect';
+import CustomPhoneInput from '../../../../common/components/ui/CustomPhoneInput';
 
 // Student interface with instructor and school
 interface Student {
@@ -56,6 +58,12 @@ interface FormData {
   createAccount: boolean;
 }
 
+// Form errors interface
+interface FormErrors {
+  phoneNumber?: string;
+  [key: string]: string | undefined;
+}
+
 // Define Firebase user type
 interface FirebaseUser {
   id: string;
@@ -84,14 +92,14 @@ interface Instructor {
 // School type
 interface School {
   id: string;
-  displayName: string;
+  name: string;
   email: string;
 }
 
 export const UserManagement: React.FC = () => {
+  console.log('UserManagement component rendered');
   const { currentUser } = useAuth();
   const [students, setStudents] = useState<FirebaseUser[]>([]);
-  const [filteredStudents, setFilteredStudents] = useState<FirebaseUser[]>([]);
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [editMode, setEditMode] = useState<boolean>(false);
@@ -113,11 +121,16 @@ export const UserManagement: React.FC = () => {
     password: '',
     createAccount: true
   });
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
 
   // Check if current user is super admin
   useEffect(() => {
+    console.log('Checking super admin status...');
     const checkIfSuperAdmin = async () => {
-      if (!auth.currentUser) return;
+      if (!auth.currentUser) {
+        console.log('No current user found');
+        return;
+      }
       
       try {
         const userRef = doc(db, 'users', auth.currentUser.uid);
@@ -125,6 +138,7 @@ export const UserManagement: React.FC = () => {
         
         if (userSnap.exists()) {
           const userData = userSnap.data();
+          console.log('Current user data:', userData);
           let roles = userData.role || [];
           
           if (!Array.isArray(roles)) {
@@ -132,6 +146,7 @@ export const UserManagement: React.FC = () => {
           }
           
           setIsSuperAdmin(roles.includes('admin'));
+          console.log('Is super admin:', roles.includes('admin'));
         }
       } catch (err) {
         console.error('Süper admin kontrolü yapılırken hata oluştu:', err);
@@ -143,45 +158,40 @@ export const UserManagement: React.FC = () => {
 
   // Fetch students, instructors and schools on initial load
   useEffect(() => {
+    console.log('Initial data fetch effect triggered');
     fetchStudents();
     fetchInstructors();
     fetchSchools();
   }, []);
 
-  // Update filtered students when search term changes
-  useEffect(() => {
-    filterStudents();
+  // Replace the useEffect with useMemo for filtering students
+  const filteredStudents = useMemo(() => {
+    console.log('Filtering students...');
+    if (!students.length) return [];
+    
+    const term = searchTerm.toLowerCase();
+    return searchTerm
+      ? students.filter(student => 
+          student.displayName?.toLowerCase().includes(term) || 
+          student.email?.toLowerCase().includes(term)
+        )
+      : students;
   }, [searchTerm, students]);
-
-  // Filter students based on search term
-  const filterStudents = () => {
-    let filtered = [...students];
-    
-    // Apply search filter
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(student => 
-        student.displayName.toLowerCase().includes(term) || 
-        student.email.toLowerCase().includes(term)
-      );
-    }
-    
-    setFilteredStudents(filtered);
-  };
 
   // Fetch students from Firestore
   const fetchStudents = async () => {
+    console.log('Fetching students...');
     setLoading(true);
     setError(null);
     
     try {
-      // Get all users from Firestore
       const usersRef = collection(db, 'users');
       const q = query(
         usersRef, 
         orderBy('createdAt', 'desc')
       );
       const querySnapshot = await getDocs(q);
+      console.log('Total students found:', querySnapshot.size);
       
       const studentsData: FirebaseUser[] = [];
       querySnapshot.forEach((doc) => {
@@ -191,8 +201,8 @@ export const UserManagement: React.FC = () => {
         } as FirebaseUser);
       });
       
+      console.log('Processed students data:', studentsData);
       setStudents(studentsData);
-      setFilteredStudents(studentsData);
     } catch (err) {
       console.error('Kullanıcılar yüklenirken hata oluştu:', err);
       setError('Kullanıcılar yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
@@ -204,89 +214,105 @@ export const UserManagement: React.FC = () => {
   // Fetch instructors from Firestore
   const fetchInstructors = async () => {
     try {
+      console.log('Fetching instructors...');
       const usersRef = collection(db, 'users');
-      const q = query(
-        usersRef, 
-        where("role", "==", "instructor")
-      );
-      const querySnapshot = await getDocs(q);
+      const querySnapshot = await getDocs(usersRef);
+      
+      console.log('Total users found:', querySnapshot.size);
       
       const instructorsData: Instructor[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        instructorsData.push({
-          id: doc.id,
-          displayName: data.displayName || 'İsimsiz Eğitmen',
-          email: data.email || ''
-        });
+        
+        // Check if user has instructor role (either as single role or in array)
+        const roles = Array.isArray(data.role) ? data.role : [data.role];
+        if (roles.includes('instructor')) {
+          console.log('Found instructor:', {
+            id: doc.id,
+            displayName: data.displayName,
+            email: data.email
+          });
+
+          instructorsData.push({
+            id: doc.id,
+            displayName: data.displayName || 'İsimsiz Eğitmen',
+            email: data.email || ''
+          });
+        }
       });
       
+      console.log('Total instructors processed:', instructorsData.length);
+      console.log('Instructors list:', instructorsData);
       setInstructors(instructorsData);
     } catch (err) {
       console.error('Eğitmenler yüklenirken hata oluştu:', err);
+      setError('Eğitmenler yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
     }
   };
 
   // Fetch schools from Firestore
   const fetchSchools = async () => {
     try {
-      const usersRef = collection(db, 'users');
-      const q = query(
-        usersRef, 
-        where("role", "==", "school")
-      );
+      console.log('=== SCHOOLS FETCH START ===');
+      const schoolsRef = collection(db, 'schools');
+      const q = query(schoolsRef, orderBy('name'));
       const querySnapshot = await getDocs(q);
       
+      console.log('Total schools found:', querySnapshot.size);
+      
       const schoolsData: School[] = [];
+      console.log('=== RAW SCHOOLS DATA ===');
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        schoolsData.push({
-          id: doc.id,
-          displayName: data.displayName || 'İsimsiz Okul',
-          email: data.email || ''
+        console.log(`School Document [${doc.id}]:`, {
+          rawData: data,
+          fields: {
+            name: data.name,
+            ad: data.ad,
+            email: data.email,
+            contactEmail: data.contactEmail
+          }
         });
+        
+        // Hem 'name' hem de 'ad' alanlarını kontrol et
+        const schoolName = data.name || data.ad || 'İsimsiz Okul';
+        
+        const schoolEntry = {
+          id: doc.id,
+          name: schoolName,
+          email: data.email || data.contactEmail || ''
+        };
+        
+        console.log('Processed school entry:', schoolEntry);
+        schoolsData.push(schoolEntry);
       });
+      
+      // Okul adına göre alfabetik sırala
+      schoolsData.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+      
+      console.log('=== FINAL SCHOOLS LIST ===');
+      console.log('Processed and sorted schools:', schoolsData);
+      console.log('=== SCHOOLS FETCH END ===');
       
       setSchools(schoolsData);
     } catch (err) {
-      console.error('Okullar yüklenirken hata oluştu:', err);
+      console.error('=== SCHOOLS FETCH ERROR ===', {
+        error: err,
+        message: err instanceof Error ? err.message : 'Bilinmeyen hata',
+        stack: err instanceof Error ? err.stack : undefined
+      });
+      setError('Okullar yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
     }
   };
 
-  // Edit student
-  const editStudent = (student: FirebaseUser): void => {
-    setSelectedStudent(student);
-    setFormData({
-      id: student.id,
-      displayName: student.displayName,
-      email: student.email,
-      phoneNumber: student.phoneNumber || '',
-      level: student.level || 'beginner',
-      photoURL: student.photoURL || '',
-      instructorId: student.instructorId || '',
-      schoolId: student.schoolId || '',
-      password: '',
-      createAccount: false
-    });
-    setEditMode(true);
-  };
-
-  // Add new student
-  const addNewStudent = (): void => {
-    setSelectedStudent(null);
-    setFormData({
-      id: '',
-      displayName: '',
-      email: '',
-      phoneNumber: '',
-      level: 'beginner',
-      photoURL: '',
-      instructorId: '',
-      schoolId: '',
-      password: '',
-      createAccount: true
-    });
-    setEditMode(true);
+  // CustomSelect için handleSelectChange fonksiyonu
+  const handleSelectChange = (fieldName: keyof FormData) => (selectedValue: string | string[]) => {
+    if (typeof selectedValue === 'string') {
+      setFormData(prev => ({
+        ...prev,
+        [fieldName]: selectedValue
+      }));
+    }
   };
 
   // Handle input change
@@ -307,9 +333,74 @@ export const UserManagement: React.FC = () => {
     }
   };
 
+  // Handle phone validation
+  const handlePhoneValidation = (isValid: boolean, errorMessage?: string) => {
+    if (!isValid && errorMessage) {
+      setFormErrors(prev => ({
+        ...prev,
+        phoneNumber: errorMessage
+      }));
+    } else {
+      setFormErrors(prev => {
+        const { phoneNumber, ...rest } = prev;
+        return rest;
+      });
+    }
+  };
+
+  // Reset form
+  const resetForm = () => {
+    setFormData({
+      id: '',
+      displayName: '',
+      email: '',
+      phoneNumber: '',
+      level: 'beginner',
+      photoURL: '',
+      instructorId: '',
+      schoolId: '',
+      password: '',
+      createAccount: true
+    });
+    setFormErrors({});
+  };
+
+  // Edit student
+  const editStudent = (student: FirebaseUser): void => {
+    setSelectedStudent(student);
+    setFormData({
+      id: student.id,
+      displayName: student.displayName,
+      email: student.email,
+      phoneNumber: student.phoneNumber || '',
+      level: student.level || 'beginner',
+      photoURL: student.photoURL || '',
+      instructorId: student.instructorId || '',
+      schoolId: student.schoolId || '',
+      password: '',
+      createAccount: false
+    });
+    setFormErrors({});
+    setEditMode(true);
+  };
+
+  // Add new student
+  const addNewStudent = (): void => {
+    setSelectedStudent(null);
+    resetForm();
+    setEditMode(true);
+  };
+
   // Form submission
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
+    
+    // Check for form errors
+    if (Object.keys(formErrors).length > 0) {
+      setError('Lütfen form hatalarını düzeltin.');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -330,7 +421,7 @@ export const UserManagement: React.FC = () => {
         let schoolName = '';
         if (formData.schoolId) {
           const selectedSchool = schools.find(s => s.id === formData.schoolId);
-          schoolName = selectedSchool?.displayName || '';
+          schoolName = selectedSchool?.name || '';
         }
         
         await updateDoc(userRef, {
@@ -421,7 +512,7 @@ export const UserManagement: React.FC = () => {
         let schoolName = '';
         if (formData.schoolId) {
           const selectedSchool = schools.find(s => s.id === formData.schoolId);
-          schoolName = selectedSchool?.displayName || '';
+          schoolName = selectedSchool?.name || '';
         }
         
         // Create user document in Firestore
@@ -648,7 +739,7 @@ export const UserManagement: React.FC = () => {
       </div>
       
       {editMode ? (
-        <div className="bg-gray-50 p-6 rounded-lg">
+        <div className="bg-gray-50 p-6 rounded-lg relative">
           <h3 className="text-lg font-semibold mb-4">
             {selectedStudent ? 'Kullanıcı Düzenle' : 'Yeni Kullanıcı Ekle'}
           </h3>
@@ -690,76 +781,57 @@ export const UserManagement: React.FC = () => {
               </div>
               
               <div>
-                <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
-                  Telefon
-                </label>
-                <input
-                  type="text"
-                  id="phoneNumber"
-                  name="phoneNumber"
-                  value={formData.phoneNumber}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                <CustomSelect
+                  label="Okul"
+                  value={formData.schoolId}
+                  onChange={handleSelectChange('schoolId')}
+                  options={schools.map(school => ({
+                    value: school.id,
+                    label: school.name
+                  }))}
+                  placeholder="Okul Seç..."
                 />
               </div>
               
               <div>
-                <label htmlFor="level" className="block text-sm font-medium text-gray-700 mb-1">
-                  Dans Seviyesi*
-                </label>
-                <select
-                  id="level"
-                  name="level"
-                  required
-                  value={formData.level}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="beginner">Başlangıç</option>
-                  <option value="intermediate">Orta</option>
-                  <option value="advanced">İleri</option>
-                  <option value="professional">Profesyonel</option>
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="instructorId" className="block text-sm font-medium text-gray-700 mb-1">
-                  Eğitmen
-                </label>
-                <select
-                  id="instructorId"
-                  name="instructorId"
+                <CustomSelect
+                  label="Eğitmen"
                   value={formData.instructorId}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="">Eğitmen Seç...</option>
-                  {instructors.map(instructor => (
-                    <option key={instructor.id} value={instructor.id}>
-                      {instructor.displayName}
-                    </option>
-                  ))}
-                </select>
+                  onChange={handleSelectChange('instructorId')}
+                  options={instructors.map(instructor => ({
+                    value: instructor.id,
+                    label: instructor.displayName
+                  }))}
+                  placeholder="Eğitmen Seç..."
+                />
               </div>
               
               <div>
-                <label htmlFor="schoolId" className="block text-sm font-medium text-gray-700 mb-1">
-                  Okul
-                </label>
-                <select
-                  id="schoolId"
-                  name="schoolId"
-                  value={formData.schoolId}
+                <CustomSelect
+                  label="Dans Seviyesi"
+                  value={formData.level}
+                  onChange={handleSelectChange('level')}
+                  options={[
+                    { value: 'beginner', label: 'Başlangıç' },
+                    { value: 'intermediate', label: 'Orta' },
+                    { value: 'advanced', label: 'İleri' },
+                    { value: 'professional', label: 'Profesyonel' }
+                  ]}
+                  placeholder="Seviye Seçin"
+                />
+              </div>
+              
+              <div>
+                <CustomPhoneInput
+                  id="phoneNumber"
+                  name="phoneNumber"
+                  value={formData.phoneNumber}
                   onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="">Okul Seç...</option>
-                  {schools.map(school => (
-                    <option key={school.id} value={school.id}>
-                      {school.displayName}
-                    </option>
-                  ))}
-                </select>
+                  onValidation={handlePhoneValidation}
+                  error={formErrors.phoneNumber}
+                  label="Telefon"
+                  required
+                />
               </div>
               
               {!selectedStudent && (

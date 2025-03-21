@@ -27,7 +27,8 @@ import { User, UserRole, DanceLevel, DanceStyle } from '../../../../types';
 import { useAuth } from '../../../../contexts/AuthContext';
 import { resizeImageFromBase64 } from '../../../../api/services/userService';
 import { generateInitialsAvatar } from '../../../../common/utils/imageUtils';
-import { ImageUploader } from '../../../../common/components/ImageUploader';
+import ImageUploader from '../../../../common/components/ui/ImageUploader';
+import { Button, Card, CardContent, Dialog, DialogActions, DialogContent, DialogTitle, Grid, IconButton, TextField } from '@mui/material';
 
 // Default placeholder image for students
 const DEFAULT_STUDENT_IMAGE = '/assets/placeholders/default-student.png';

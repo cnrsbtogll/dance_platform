@@ -23,7 +23,10 @@ import {
 import { db, auth } from '../../../../api/firebase/firebase';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { ImageUploader } from '../../../../common/components/ImageUploader';
+import ImageUploader from '../../../../common/components/ui/ImageUploader';
+import Button from '../../../../common/components/ui/Button';
+import CustomPhoneInput from '../../../../common/components/ui/CustomPhoneInput';
+import CustomSelect from '../../../../common/components/ui/CustomSelect';
 import { resizeImageFromBase64 } from '../../../../api/services/userService';
 import { generateInitialsAvatar } from '../../../../common/utils/imageUtils';
 
@@ -90,6 +93,7 @@ function SchoolManagement(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Arama sonuçları
   const filtrelenmisOkullar = okullar
@@ -619,13 +623,13 @@ function SchoolManagement(): JSX.Element {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Dans Okulu Yönetimi</h2>
         {!duzenlemeModu && (
-          <button 
+          <Button
             onClick={yeniOkulEkle}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+            variant="primary"
             disabled={loading}
           >
             {loading ? 'Yükleniyor...' : 'Yeni Okul Ekle'}
-          </button>
+          </Button>
         )}
       </div>
       
@@ -664,6 +668,7 @@ function SchoolManagement(): JSX.Element {
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
                   Okul Adı*
+                  <span className="text-red-500 ml-1">*</span>
                 </label>
                 <input
                   type="text"
@@ -672,13 +677,14 @@ function SchoolManagement(): JSX.Element {
                   required
                   value={formVeri.name}
                   onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
               
               <div>
                 <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
                   Şehir*
+                  <span className="text-red-500 ml-1">*</span>
                 </label>
                 <input
                   type="text"
@@ -687,13 +693,14 @@ function SchoolManagement(): JSX.Element {
                   required
                   value={formVeri.city}
                   onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
               
               <div>
                 <label htmlFor="contactEmail" className="block text-sm font-medium text-gray-700 mb-1">
                   E-posta Adresi*
+                  <span className="text-red-500 ml-1">*</span>
                 </label>
                 <input
                   type="email"
@@ -702,25 +709,40 @@ function SchoolManagement(): JSX.Element {
                   required
                   value={formVeri.contactEmail}
                   onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className={`w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 ${seciliOkul ? 'bg-gray-100' : ''}`}
                   placeholder="okul@ornek.com"
+                  readOnly={seciliOkul !== null}
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  Bu e-posta adresi, okul için otomatik olarak oluşturulacak kullanıcı hesabı için kullanılacaktır.
+                  {seciliOkul 
+                    ? 'E-posta adresi değiştirilemez.' 
+                    : 'Bu e-posta adresi, okul için otomatik olarak oluşturulacak kullanıcı hesabı için kullanılacaktır.'}
                 </p>
               </div>
               
               <div>
-                <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700 mb-1">
-                  Telefon
-                </label>
-                <input
-                  type="text"
+                <CustomPhoneInput
                   id="contactPhone"
                   name="contactPhone"
                   value={formVeri.contactPhone}
                   onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  onValidation={(isValid, errorMessage) => {
+                    if (!isValid && errorMessage) {
+                      setFormErrors(prev => ({
+                        ...prev,
+                        contactPhone: errorMessage
+                      }));
+                    } else {
+                      setFormErrors(prev => {
+                        const updated = {...prev};
+                        delete updated.contactPhone;
+                        return updated;
+                      });
+                    }
+                  }}
+                  label="Telefon"
+                  required={true}
+                  error={formErrors.contactPhone}
                 />
               </div>
               
@@ -735,7 +757,7 @@ function SchoolManagement(): JSX.Element {
                   name="password"
                   value={formVeri.password}
                   onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                   placeholder={seciliOkul ? "Güncellenmeyecekse boş bırakın" : "Boş bırakılırsa otomatik oluşturulur"}
                   minLength={6}
                 />
@@ -751,6 +773,35 @@ function SchoolManagement(): JSX.Element {
               </div>
               
               <div className="md:col-span-2">
+                <CustomSelect
+                  label="Dans Stilleri"
+                  options={[
+                    'Bale',
+                    'Modern Dans',
+                    'Hip Hop',
+                    'Jazz',
+                    'Latin Dansları',
+                    'Salsa',
+                    'Bachata',
+                    'Tango',
+                    'Zumba',
+                    'Çağdaş Dans',
+                    'Break Dans',
+                    'Halk Dansları'
+                  ]}
+                  value={formVeri.danceStyles}
+                  onChange={(value) => {
+                    setFormVeri(prev => ({
+                      ...prev,
+                      danceStyles: Array.isArray(value) ? value : [value]
+                    }));
+                  }}
+                  multiple={true}
+                  placeholder="Dans stilleri seçin"
+                />
+              </div>
+              
+              <div className="md:col-span-2">
                 <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
                   Açıklama
                 </label>
@@ -760,14 +811,11 @@ function SchoolManagement(): JSX.Element {
                   rows={3}
                   value={formVeri.description}
                   onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                 ></textarea>
               </div>
               
               <div className="md:col-span-2">
-                <label htmlFor="gorsel" className="block text-sm font-medium text-gray-700 mb-1">
-                  Okul Fotoğrafı
-                </label>
                 <ImageUploader
                   currentPhotoURL={formVeri.gorsel}
                   onImageChange={(base64Image: string | null) => {
@@ -790,21 +838,21 @@ function SchoolManagement(): JSX.Element {
             </div>
             
             <div className="flex justify-end gap-3">
-              <button
-                type="button"
+              <Button
                 onClick={() => setDuzenlemeModu(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                variant="secondary"
                 disabled={loading}
               >
                 İptal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                variant="primary"
                 disabled={loading}
+                loading={loading}
               >
-                {loading ? 'Kaydediliyor...' : (seciliOkul ? 'Güncelle' : 'Ekle')}
-              </button>
+                {seciliOkul ? 'Güncelle' : 'Ekle'}
+              </Button>
             </div>
           </form>
         </div>
@@ -816,7 +864,7 @@ function SchoolManagement(): JSX.Element {
               placeholder="Okul adı veya şehir ara..."
               value={aramaTerimi}
               onChange={(e) => setAramaTerimi(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-md"
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
           
@@ -869,7 +917,6 @@ function SchoolManagement(): JSX.Element {
                                   onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                                     const target = e.currentTarget;
                                     target.onerror = null;
-                                    // Hata durumunda baş harf avatarını göster
                                     target.src = generateInitialsAvatar(okul.name, 'school');
                                   }}
                                 />
@@ -911,16 +958,16 @@ function SchoolManagement(): JSX.Element {
                               : 'Belirsiz'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button 
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                          <button
                             onClick={() => okulDuzenle(okul)}
-                            className="text-indigo-600 hover:text-indigo-900 mr-3"
+                            className="text-indigo-600 hover:text-indigo-800"
                           >
                             Düzenle
                           </button>
-                          <button 
+                          <button
                             onClick={() => okulSil(okul.id)}
-                            className="text-red-600 hover:text-red-900"
+                            className="text-red-600 hover:text-red-800"
                           >
                             Sil
                           </button>
