@@ -7,7 +7,8 @@ import {
   StudentManagement,
   ContactRequests,
   SchoolRequests,
-  UserManagement
+  UserManagement,
+  CourseManagement
 } from '../components';
 import SeedUsersButton from '../../../scripts/SeedUsersButton';
 import MigrateSchoolsButton from '../../../scripts/MigrateSchoolsButton';
@@ -171,12 +172,7 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
           {activeTab === 'okullar' && <SchoolManagement />}
           {activeTab === 'egitmenler' && <InstructorManagement />}
           {activeTab === 'ogrenciler' && <StudentManagement />}
-          {activeTab === 'kurslar' && (
-            <div className="text-center py-4">
-              <h2 className="text-xl font-semibold">Kurs Yönetimi</h2>
-              <p className="text-gray-500 mt-2">Bu bölüm henüz yapım aşamasındadır.</p>
-            </div>
-          )}
+          {activeTab === 'kurslar' && <CourseManagement />}
           {activeTab === 'talepler' && (
             <div>
               <div className="mb-6">

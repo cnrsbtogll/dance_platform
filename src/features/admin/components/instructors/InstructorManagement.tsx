@@ -735,9 +735,14 @@ function InstructorManagement(): JSX.Element {
                   required={!seciliEgitmen}
                   value={formVeri.email}
                   onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className={`w-full p-2 border border-gray-300 rounded-md ${seciliEgitmen ? 'bg-gray-100' : ''}`}
+                  readOnly={seciliEgitmen !== null}
                 />
-                {!seciliEgitmen && (
+                {seciliEgitmen ? (
+                  <p className="mt-1 text-xs text-gray-500">
+                    E-posta adresi değiştirilemez.
+                  </p>
+                ) : (
                   <p className="mt-1 text-xs text-gray-500">
                     Eğitmen için otomatik olarak bir kullanıcı hesabı oluşturulacaktır.
                   </p>
