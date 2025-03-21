@@ -14,35 +14,19 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../../../../api/firebase/firebase';
+import { Instructor as InstructorType } from '../../../../types';
 
 interface InstructorRequest {
   id: string;
   fullName: string;
   experience: string;
-  danceStyles: string;
+  danceStyles: string | string[];
   contactNumber: string;
   bio: string;
   userId: string;
   userEmail: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: Timestamp;
-}
-
-interface Instructor {
-  id: string;
-  ad: string;
-  uzmanlık: string;
-  tecrube: string;
-  biyografi: string;
-  okul_id: number;
-  gorsel: string;
-  userId: string;
-  email: string;
-  displayName?: string;
-  phoneNumber?: string;
-  createdBy?: string;
-  createdAt?: any;
-  updatedAt?: any;
 }
 
 function InstructorRequests() {
@@ -109,17 +93,42 @@ function InstructorRequests() {
       const userDoc = await getDoc(userDocRef);
       
       if (!userDoc.exists()) {
-        throw new Error('Kullanıcı bulunamadı');
+        console.error('Kullanıcı bulunamadı. User ID:', userId);
+        console.error('Request Data:', requestData);
+        
+        // Kullanıcı yoksa, önce users koleksiyonunda yeni kullanıcı oluştur
+        try {
+          await setDoc(userDocRef, {
+            email: requestData.userEmail,
+            displayName: requestData.fullName,
+            phoneNumber: requestData.contactNumber,
+            role: ['instructor'],
+            isInstructor: true,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            status: 'active'
+          });
+          
+          console.log('Yeni kullanıcı oluşturuldu. User ID:', userId);
+        } catch (createError) {
+          console.error('Kullanıcı oluşturulurken hata:', createError);
+          throw new Error('Kullanıcı oluşturulamadı. Lütfen tekrar deneyin.');
+        }
       }
       
-      // 3. Update the user document to add the instructor role and additional instructor data
-      const userData = userDoc.data();
-      let roles = userData.role || [];
+      // 3. Get fresh user data after potential creation
+      const freshUserDoc = await getDoc(userDocRef);
+      const userData = freshUserDoc.data();
       
+      if (!userData) {
+        throw new Error('Kullanıcı verilerine erişilemedi');
+      }
+      
+      // Roles array'ini kontrol et ve güncelle
+      let roles = userData.role || [];
       if (!Array.isArray(roles)) {
         roles = [roles];
       }
-      
       if (!roles.includes('instructor')) {
         roles.push('instructor');
       }
@@ -136,38 +145,39 @@ function InstructorRequests() {
       });
       
       // 4. Add instructor to the instructors collection with more user data
-      const instructorData: Omit<Instructor, 'id'> = {
-        ad: requestData.fullName,
-        uzmanlık: requestData.danceStyles,
-        tecrube: requestData.experience,
-        biyografi: requestData.bio,
-        okul_id: 1, // Default okul_id (can be updated later)
-        gorsel: userData.photoURL || "/assets/images/dance/egitmen_default.jpg",
+      const instructorData: Partial<InstructorType> = {
         userId: userId,
-        email: userData.email || requestData.userEmail, // Prefer user's email from users table
-        displayName: userData.displayName || requestData.fullName,
+        displayName: requestData.fullName,
+        email: userData.email || requestData.userEmail,
+        photoURL: userData.photoURL || "/assets/images/dance/egitmen_default.jpg",
         phoneNumber: userData.phoneNumber || requestData.contactNumber,
-        createdBy: 'admin', // Record who created/approved this instructor
+        role: ['instructor'],
+        specialties: Array.isArray(requestData.danceStyles) 
+          ? requestData.danceStyles 
+          : typeof requestData.danceStyles === 'string'
+            ? requestData.danceStyles.split(',').map(s => s.trim())
+            : [],
+        experience: requestData.experience,
+        bio: requestData.bio,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
       
       const instructorsCollectionRef = collection(db, 'instructors');
-      await addDoc(instructorsCollectionRef, {
-        ...instructorData,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
+      const instructorDoc = await addDoc(instructorsCollectionRef, instructorData);
+      console.log('Eğitmen dokümanı oluşturuldu. ID:', instructorDoc.id);
       
       // 5. Update the request status
       await updateDoc(requestDocRef, {
         status: 'approved',
         updatedAt: serverTimestamp(),
-        approvedBy: 'admin' // Ideally, this would be the admin user ID
+        approvedBy: 'admin',
+        instructorDocId: instructorDoc.id // Oluşturulan eğitmen dokümanının referansını sakla
       });
       
       // 6. Update the local state
-      setRequests(prev => 
-        prev.filter(req => req.id !== requestId)
-      );
+      setRequests(prev => prev.filter(req => req.id !== requestId));
       
       alert('Eğitmen talebi başarıyla onaylandı. Eğitmen, eğitmenler listesine eklendi ve kullanıcı bilgileri güncellendi.');
       

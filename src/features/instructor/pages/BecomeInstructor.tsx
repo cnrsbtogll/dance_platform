@@ -11,7 +11,8 @@ import {
   getDoc,
   orderBy 
 } from 'firebase/firestore';
-import { db } from '../../../api/firebase/firebase';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { db, auth } from '../../../api/firebase/firebase';
 import { useAuth } from '../../../contexts/AuthContext';
 import CustomSelect from '../../../common/components/ui/CustomSelect';
 import { motion } from 'framer-motion';
@@ -266,15 +267,44 @@ function BecomeInstructor() {
     }
 
     try {
-      // Kullanıcı ID'si ve email
-      const userId = currentUser?.uid || 'guest-' + Date.now();
-      const userEmail = currentUser?.email || formData.email;
+      let userId = currentUser?.uid;
+      let userEmail = currentUser?.email;
+
+      // Eğer kullanıcı giriş yapmamışsa, yeni hesap oluştur
+      if (!currentUser && formData.email && formData.password) {
+        try {
+          const userCredential = await createUserWithEmailAndPassword(
+            auth,
+            formData.email,
+            formData.password
+          );
+
+          // Kullanıcı adını güncelle
+          await updateProfile(userCredential.user, {
+            displayName: formData.fullName
+          });
+
+          userId = userCredential.user.uid;
+          userEmail = userCredential.user.email;
+
+          console.log('Yeni kullanıcı oluşturuldu:', userId);
+        } catch (authError) {
+          console.error('Kullanıcı oluşturulurken hata:', authError);
+          setGeneralError('Hesap oluşturulurken bir hata oluştu. Lütfen farklı bir e-posta adresi deneyin.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+      
+      if (!userId || !userEmail) {
+        throw new Error('Kullanıcı bilgileri eksik');
+      }
       
       // Eğitmen isteği oluştur
       await addDoc(collection(db, 'instructorRequests'), {
         fullName: formData.fullName,
         experience: formData.experience,
-        danceStyles: formData.danceStyles, // Artık bir array olduğu için direkt kullanabiliyoruz
+        danceStyles: formData.danceStyles,
         contactNumber: formData.contactNumber,
         bio: formData.bio,
         userId: userId,

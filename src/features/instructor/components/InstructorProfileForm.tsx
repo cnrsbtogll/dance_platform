@@ -7,6 +7,7 @@ import { User } from '../../../types';
 import ImageUploader from '../../../common/components/ui/ImageUploader';
 import { toast } from 'react-hot-toast';
 import CustomSelect from '../../../common/components/ui/CustomSelect';
+import CustomPhoneInput from '../../../common/components/ui/CustomPhoneInput';
 import { useNavigate } from 'react-router-dom';
 import { updateProfile } from 'firebase/auth';
 
@@ -433,57 +434,14 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
         {/* İletişim Bilgileri */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Telefon
-            </label>
-            <div className="flex items-center">
-              <div className="bg-gray-100 p-2 border border-gray-300 border-r-0 rounded-l-md">
-                +90
-              </div>
-              <input
-                type="text"
-                {...register('phoneNumber')}
-                onChange={(e) => {
-                  // Sadece rakamları al
-                  const rawValue = e.target.value.replace(/\D/g, '');
-                  
-                  // Maksimum 10 rakam
-                  const trimmedValue = rawValue.slice(0, 10);
-                  
-                  // Format: 5XX XXX XXXX
-                  let formattedValue = trimmedValue;
-                  if (trimmedValue.length >= 3) {
-                    formattedValue = `${trimmedValue.slice(0, 3)} ${trimmedValue.slice(3)}`;
-                  }
-                  if (trimmedValue.length >= 6) {
-                    formattedValue = `${formattedValue.slice(0, 7)} ${formattedValue.slice(7)}`;
-                  }
-                  
-                  // Değeri güncelle
-                  setValue('phoneNumber', formattedValue);
-                  
-                  // İmleci doğru pozisyona getir
-                  const input = e.target;
-                  const cursorPosition = input.selectionStart || 0;
-                  
-                  // Boşlukları hesaba kat
-                  const spacesBeforeCursor = (formattedValue.slice(0, cursorPosition).match(/ /g) || []).length;
-                  const rawCursorPosition = cursorPosition - spacesBeforeCursor;
-                  
-                  // Yeni cursor pozisyonunu hesapla
-                  let newCursorPosition = rawCursorPosition;
-                  if (rawCursorPosition > 3) newCursorPosition++;
-                  if (rawCursorPosition > 6) newCursorPosition++;
-                  
-                  // Timeout ile cursor'ı pozisyonla (React'in state güncellemesini beklemek için)
-                  setTimeout(() => {
-                    input.setSelectionRange(newCursorPosition, newCursorPosition);
-                  }, 0);
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-r-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="5XX XXX XXXX"
-              />
-            </div>
+            <CustomPhoneInput
+              id="phoneNumber"
+              name="phoneNumber"
+              value={watch('phoneNumber') || ''}
+              onChange={(e) => setValue('phoneNumber', e.target.value)}
+              label="Telefon"
+              required
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
