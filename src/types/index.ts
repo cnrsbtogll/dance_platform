@@ -25,15 +25,20 @@ export interface UserWithProfile extends User {
   bio?: string;
 }
 
-export interface Instructor extends User {
-  bio?: string;
-  specialties?: string[];
-  experience?: string;
+export interface Instructor {
+  id: string;
+  userId: string;
+  displayName: string;
+  email: string;
+  photoURL?: string;
   phoneNumber?: string;
-  location?: string;
-  rating?: number;
-  reviewCount?: number;
-  status?: 'active' | 'inactive' | 'pending' | 'rejected';
+  role: string[];
+  specialties: string[];
+  experience: string;
+  bio: string;
+  status: 'active' | 'inactive';
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Badge {
@@ -152,4 +157,24 @@ export interface DanceSchool {
   status?: 'active' | 'pending' | 'inactive';
   features?: string[]; // Okuldaki imkanlar (ör: "Ücretsiz Park", "Duş", "Soyunma Odası")
   businessHours?: Record<string, { open: string; close: string; }>;
+}
+
+export interface Course {
+  id: string;
+  instructorId: string;
+  title: string;
+  description: string;
+  danceStyle: string;
+  level: 'beginner' | 'intermediate' | 'advanced' | 'professional';
+  capacity: number;
+  price: number;
+  schedule: {
+    dayOfWeek: number;
+    startTime: string;
+    endTime: string;
+  }[];
+  location: string;
+  createdAt: string;
+  updatedAt: string;
+  isActive: boolean;
 }
