@@ -2,7 +2,7 @@ import React, { useState, FormEvent } from 'react';
 import { User } from '../../../types';
 import { motion } from 'framer-motion';
 import InstructorProfileForm from '../components/InstructorProfileForm';
-import CourseManagement from '../components/CourseManagement';
+import CourseManagement from '../../../features/shared/components/courses/CourseManagement';
 
 interface InstructorPanelProps {
   user?: User | null;
@@ -10,17 +10,9 @@ interface InstructorPanelProps {
 
 function InstructorPanel({ user }: InstructorPanelProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'courses' | 'students' | 'schedule'>('profile');
-  const [showAddClassForm, setShowAddClassForm] = useState(false);
-  const [refreshCounter, setRefreshCounter] = useState(0);
 
   // Kullanıcı bilgilerini logla
   console.log('InstructorPanel - user:', user);
-
-  // Ders listesini yenilemek için kullanılacak fonksiyon
-  const refreshClassList = () => {
-    console.log('refreshClassList çağrıldı, yeni refreshCounter:', refreshCounter + 1);
-    setRefreshCounter((prev) => prev + 1);
-  };
 
   if (!user) {
     return <div>Yükleniyor...</div>;

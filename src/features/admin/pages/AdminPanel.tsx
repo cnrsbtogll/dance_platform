@@ -7,9 +7,9 @@ import {
   StudentManagement,
   ContactRequests,
   SchoolRequests,
-  UserManagement,
-  CourseManagement
+  UserManagement
 } from '../components';
+import CourseManagement from '../../shared/components/courses/CourseManagement';
 import SeedUsersButton from '../../../scripts/SeedUsersButton';
 import MigrateSchoolsButton from '../../../scripts/MigrateSchoolsButton';
 import SeedCoursesButton from '../../../scripts/SeedCoursesButton';
@@ -172,7 +172,7 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
           {activeTab === 'okullar' && <SchoolManagement />}
           {activeTab === 'egitmenler' && <InstructorManagement />}
           {activeTab === 'ogrenciler' && <StudentManagement />}
-          {activeTab === 'kurslar' && <CourseManagement />}
+          {activeTab === 'kurslar' && <CourseManagement isAdmin={true} />}
           {activeTab === 'talepler' && (
             <div>
               <div className="mb-6">
