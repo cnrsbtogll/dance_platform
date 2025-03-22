@@ -12,7 +12,8 @@ import {
   orderBy, 
   serverTimestamp,
   where,
-  setDoc 
+  setDoc,
+  Timestamp
 } from 'firebase/firestore';
 import { 
   createUserWithEmailAndPassword, 
@@ -429,6 +430,100 @@ function InstructorManagement(): JSX.Element {
     }
   };
 
+  // Davetiye e-postası gönderme fonksiyonu
+  const sendInvitationEmail = async (email: string, invitationData: {
+    displayName: string;
+    specialties?: string;
+    experience?: string;
+    bio?: string;
+    schoolId?: string;
+    schoolName?: string;
+    phoneNumber?: string;
+  }) => {
+    try {
+      // Benzersiz bir davet kodu oluştur
+      const invitationId = `inv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Remove undefined values from invitationData
+      const cleanedInvitationData = Object.fromEntries(
+        Object.entries({
+          email,
+          ...invitationData,
+          status: 'pending',
+          type: 'instructor',
+          createdAt: serverTimestamp(),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 gün geçerli
+        }).filter(([_, value]) => value !== undefined)
+      );
+
+      // Davet bilgilerini Firestore'a kaydet
+      await setDoc(doc(db, 'pendingUsers', invitationId), cleanedInvitationData);
+
+      // Eğitmeni instructors koleksiyonuna ekle
+      const instructorId = `instructor_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const now = Timestamp.now();
+      
+      const instructorData = {
+        id: instructorId,
+        ad: invitationData.displayName,
+        uzmanlık: invitationData.specialties || '',
+        tecrube: invitationData.experience || '',
+        biyografi: invitationData.bio || '',
+        okul_id: invitationData.schoolId || '',
+        gorsel: '',
+        email: email,
+        phoneNumber: invitationData.phoneNumber || '',
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now
+      };
+
+      await setDoc(doc(db, 'instructors', instructorId), {
+        ...instructorData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      // Kullanıcıyı users koleksiyonuna ekle
+      const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      const userData = {
+        id: userId,
+        email,
+        displayName: invitationData.displayName,
+        role: ['instructor'],
+        level: 'advanced',
+        photoURL: '',
+        phoneNumber: invitationData.phoneNumber || '',
+        schoolId: invitationData.schoolId || null,
+        schoolName: invitationData.schoolName || null,
+        createdAt: now,
+        updatedAt: now,
+        status: 'pending'
+      };
+
+      await setDoc(doc(db, 'users', userId), {
+        ...userData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      // Eğitmen listesini güncelle
+      setEgitmenler(prevEgitmenler => [
+        {
+          ...instructorData,
+          id: instructorId,
+        } as Egitmen,
+        ...prevEgitmenler
+      ]);
+
+      return true;
+    } catch (error) {
+      console.error('Davet gönderilirken hata oluştu:', error);
+      throw error;
+    }
+  };
+
   // Form gönderimi
   const formGonder = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
@@ -436,36 +531,20 @@ function InstructorManagement(): JSX.Element {
     setError(null);
     setSuccess(null);
     
-    // Görsel yoksa varsayılan avatar oluştur
-    let gorselData = formVeri.gorsel;
-    
-    if (!gorselData) {
-      gorselData = generateInitialsAvatar(formVeri.ad, 'instructor');
-    }
-    
-    // Form verisini güncelle
-    const formData = {
-      ...formVeri,
-      gorsel: gorselData
-    };
-    
-    // parseInt'a gerek yok çünkü okul_id artık string
-    const okul_id = formData.okul_id;
-    
     try {
       if (seciliEgitmen) {
-        // Mevcut eğitmeni güncelle - görsel zaten yüklenmiş olabilir
+        // Mevcut eğitmeni güncelle
         const egitmenRef = doc(db, 'instructors', seciliEgitmen.id);
         
         await updateDoc(egitmenRef, {
-          ad: formData.ad,
-          uzmanlık: formData.uzmanlık,
-          tecrube: formData.tecrube,
-          biyografi: formData.biyografi,
-          okul_id: okul_id,
-          gorsel: formData.gorsel,
-          email: formData.email,
-          phoneNumber: formData.phoneNumber,
+          ad: formVeri.ad,
+          uzmanlık: formVeri.uzmanlık,
+          tecrube: formVeri.tecrube,
+          biyografi: formVeri.biyografi,
+          okul_id: formVeri.okul_id,
+          gorsel: formVeri.gorsel,
+          email: formVeri.email,
+          phoneNumber: formVeri.phoneNumber,
           updatedAt: serverTimestamp()
         });
         
@@ -473,115 +552,62 @@ function InstructorManagement(): JSX.Element {
         const guncellenenEgitmenler = egitmenler.map(egitmen => 
           egitmen.id === seciliEgitmen.id ? { 
             ...egitmen, 
-            ad: formData.ad,
-            uzmanlık: formData.uzmanlık,
-            tecrube: formData.tecrube,
-            biyografi: formData.biyografi,
-            okul_id: okul_id,
-            gorsel: formData.gorsel,
-            email: formData.email,
-            phoneNumber: formData.phoneNumber
+            ad: formVeri.ad,
+            uzmanlık: formVeri.uzmanlık,
+            tecrube: formVeri.tecrube,
+            biyografi: formVeri.biyografi,
+            okul_id: formVeri.okul_id,
+            gorsel: formVeri.gorsel,
+            email: formVeri.email,
+            phoneNumber: formVeri.phoneNumber
           } : egitmen
         );
         setEgitmenler(guncellenenEgitmenler);
-        setSuccess('Eğitmen bilgileri başarıyla güncellendi. Fotoğraf daha önceden işlenmiş ve kaydedilmişti.');
-        
+        setSuccess('Eğitmen bilgileri başarıyla güncellendi.');
       } else {
-        // Kullanıcı hesabı oluşturma kısmı (her zaman yapılacak)
-        let userId = '';
-        let geciciSifre = '';
-        
-        if (!formData.email) {
-          throw new Error('Eğitmen hesabı oluşturmak için geçerli bir e-posta adresi gereklidir.');
+        // Yeni eğitmen ekleme
+        if (!formVeri.email || !formVeri.ad) {
+          throw new Error('E-posta ve ad alanları zorunludur.');
         }
         
-        // Email'in zaten kullanılıp kullanılmadığını kontrol et
-        const usersRef = collection(db, 'users');
-        const emailQuery = query(usersRef, where('email', '==', formData.email));
-        const emailQuerySnapshot = await getDocs(emailQuery);
+        // E-posta kontrolü
+        const emailQuery = query(
+          collection(db, 'users'), 
+          where('email', '==', formVeri.email)
+        );
+        const emailCheckSnapshot = await getDocs(emailQuery);
         
-        if (!emailQuerySnapshot.empty) {
+        if (!emailCheckSnapshot.empty) {
           throw new Error('Bu e-posta adresi zaten kullanılıyor.');
         }
-        
-        // Geçici şifre oluştur - eğitmen ismine göre basit bir şifre
-        geciciSifre = formData.password || `${formData.ad.replace(/\s+/g, '').toLowerCase()}${new Date().getFullYear()}`;
-        
-        // Firebase Auth ile yeni kullanıcı oluştur
-        const userCredential = await createUserWithEmailAndPassword(
-          auth, 
-          formData.email, 
-          geciciSifre
-        );
-        
-        userId = userCredential.user.uid;
-        
-        // Kullanıcı profilini güncelle
-        await updateProfile(userCredential.user, {
-          displayName: formData.ad
+
+        // Seçilen okul bilgilerini al
+        let schoolName = '';
+        if (formVeri.okul_id) {
+          const selectedSchool = dansOkullari.find(okul => okul.id === formVeri.okul_id);
+          schoolName = selectedSchool?.ad || '';
+        }
+
+        // Davet gönder
+        await sendInvitationEmail(formVeri.email, {
+          displayName: formVeri.ad,
+          specialties: formVeri.uzmanlık,
+          experience: formVeri.tecrube,
+          bio: formVeri.biyografi,
+          schoolId: formVeri.okul_id,
+          schoolName: schoolName,
+          phoneNumber: formVeri.phoneNumber
         });
         
-        // E-posta doğrulama gönder
-        await sendEmailVerification(userCredential.user);
-        
-        // Firestore'da users koleksiyonuna yeni kullanıcı ekle
-        await setDoc(doc(db, 'users', userId), {
-          id: userId,
-          email: formData.email,
-          displayName: formData.ad,
-          phoneNumber: formData.phoneNumber || '',
-          role: ['instructor'], // Eğitmen rolü ekle
-          level: 'advanced', // Eğitmenler için varsayılan seviye 
-          photoURL: formData.gorsel || '',
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          schoolId: okul_id // Eğitmenin bağlı olduğu okul
-        });
-        
-        // Yeni eğitmen ekle
-        const newInstructorData = {
-          ad: formData.ad,
-          uzmanlık: formData.uzmanlık,
-          tecrube: formData.tecrube,
-          biyografi: formData.biyografi,
-          okul_id: okul_id,
-          gorsel: formData.gorsel,
-          email: formData.email || '',
-          phoneNumber: formData.phoneNumber || '',
-          userId: userId || null, // Eğer kullanıcı oluşturulduysa, userId'yi kaydet
-          createdBy: auth.currentUser?.uid || null,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        };
-        
-        const docRef = await addDoc(collection(db, 'instructors'), newInstructorData);
-        
-        // State'i güncelle
-        const yeniEgitmen: Egitmen = {
-          id: docRef.id,
-          ...newInstructorData,
-          okul_id: okul_id // Tip hatası için açıkça string olarak belirtiyoruz
-        };
-        
-        setEgitmenler([yeniEgitmen, ...egitmenler]);
-        
-        // Başarı mesajı
-        setSuccess(
-          `Yeni eğitmen ve hesabı başarıyla oluşturuldu!\n\n` +
-          `Eğitmen Giriş Bilgileri:\n` +
-          `E-posta: ${formData.email}\n` +
-          `Geçici Şifre: ${geciciSifre}\n\n` +
-          `ÖNEMLİ: Lütfen bu şifreyi not alın, daha sonra görüntüleyemeyeceksiniz.`
-        );
+        setSuccess('Eğitmen başarıyla eklendi ve davet e-postası gönderildi.');
       }
       
-      // Formu kapat
       setDuzenlemeModu(false);
       setSeciliEgitmen(null);
       
     } catch (err: any) {
-      console.error('Eğitmen kaydedilirken hata oluştu:', err);
-      setError('Eğitmen kaydedilirken bir hata oluştu: ' + (err.message || 'Bilinmeyen hata'));
+      console.error('İşlem sırasında hata oluştu:', err);
+      setError('İşlem sırasında bir hata oluştu: ' + (err.message || 'Bilinmeyen hata'));
     } finally {
       setLoading(false);
     }
