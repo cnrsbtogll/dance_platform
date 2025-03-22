@@ -43,9 +43,9 @@ interface FormData {
   website: string;
   danceStyles: string[];
   establishedYear: string;
-  password?: string;
+  password: string;
   facilities: string[];
-  photoURL?: string;
+  photoURL: string;
 }
 
 interface BecomeSchoolProps {
@@ -647,12 +647,11 @@ function BecomeSchool({ onMount }: BecomeSchoolProps) {
                     label="Şifre"
                     name="password"
                     type="password"
-                    value={formData.password}
+                    value={formData.password || ''}
                     onChange={handleInputChange}
                     error={!!formErrors.password}
                     helperText={formErrors.password}
                     required
-                    minLength={6}
                   />
                 </div>
               )}
