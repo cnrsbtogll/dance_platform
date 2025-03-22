@@ -139,11 +139,13 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEnroll }) => {
   return (
     <Link
       to={`/courses/${course.id}`}
-      className="bg-white rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+      className="bg-white rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col h-full"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="relative">
-        {/* Resim Konteyner ve Overlay */}
-        <div className="relative h-56 overflow-hidden group">
+      {/* Resim Konteyner - Sabit yükseklik */}
+      <div className="relative h-48">
+        <div className="absolute inset-0">
           <img 
             src={course.imageUrl || `https://via.placeholder.com/400x250?text=${encodeURIComponent(getDanceStyleName(course.danceStyle))}`} 
             alt={course.name} 
@@ -151,27 +153,28 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEnroll }) => {
             style={{ objectPosition: 'center center' }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80"></div>
-          
-          {/* Seviye rozeti */}
-          <div className={`absolute top-4 right-4 ${getLevelColor(course.level)} text-white px-3 py-1 text-sm font-medium rounded-full shadow-lg`}>
-            {getLevelName(course.level)}
-          </div>
-          
-          {/* Zamanlama rozeti */}
-          <div className="absolute bottom-4 left-4 bg-white/80 backdrop-blur-sm text-gray-800 px-3 py-1 text-sm font-medium rounded-full flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {formatSchedule()}
-          </div>
+        </div>
+        
+        {/* Seviye rozeti */}
+        <div className={`absolute top-4 right-4 ${getLevelColor(course.level)} text-white px-3 py-1 text-sm font-medium rounded-full shadow-lg`}>
+          {getLevelName(course.level)}
+        </div>
+        
+        {/* Zamanlama rozeti */}
+        <div className="absolute bottom-4 left-4 bg-white/80 backdrop-blur-sm text-gray-800 px-3 py-1 text-sm font-medium rounded-full flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {formatSchedule()}
         </div>
       </div>
 
-      {/* Kurs Bilgileri */}
-      <div className="p-5">
-        <div className="flex justify-between items-start">
-          <div>
-            <div className="flex space-x-2 mb-2">
+      {/* Kurs Bilgileri - flex-grow ile kalan alanı doldur */}
+      <div className="p-5 flex flex-col flex-grow">
+        {/* Üst Kısım */}
+        <div className="flex-grow">
+          <div className="flex justify-between items-start mb-3">
+            <div className="flex space-x-2">
               <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getDanceStyleColor(course.danceStyle)} text-white`}>
                 {getDanceStyleName(course.danceStyle)}
               </span>
@@ -181,68 +184,77 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEnroll }) => {
                 </span>
               )}
             </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-1">{course.name}</h3>
-            <p className="text-sm text-gray-500 mb-3">
-              {course.instructorName} 
-              {course.schoolName && ` • ${course.schoolName}`}
-            </p>
-          </div>
-          <div className="text-lg font-bold text-indigo-600">
-            {formatPrice()}
-          </div>
-        </div>
-        
-        <p className="text-sm text-gray-600 line-clamp-2 mb-4">
-          {course.description}
-        </p>
-        
-        {/* Katılımcı durumu */}
-        <div className="mb-4">
-          <div className="flex items-center mb-1">
-            <div className="h-2 w-full bg-gray-200 rounded-full">
-              <div 
-                className={`h-2 rounded-full ${
-                  course.currentParticipants / course.maxParticipants > 0.8
-                    ? 'bg-red-500'
-                    : course.currentParticipants / course.maxParticipants > 0.5
-                    ? 'bg-yellow-500'
-                    : 'bg-green-500'
-                }`}
-                style={{ width: `${(course.currentParticipants / course.maxParticipants) * 100}%` }}
-              ></div>
+            <div className="text-lg font-bold text-indigo-600">
+              {formatPrice()}
             </div>
-            <span className="ml-2 text-xs text-gray-700">
-              {course.currentParticipants} / {course.maxParticipants}
-            </span>
           </div>
-          <p className="text-xs text-gray-500">
-            {course.currentParticipants === course.maxParticipants 
-              ? 'Kontenjan dolu' 
-              : `${course.maxParticipants - course.currentParticipants} kişilik kontenjan kaldı`}
+
+          <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2">{course.name}</h3>
+          
+          <p className="text-sm text-gray-500 mb-3">
+            {course.instructorName} 
+            {course.schoolName && ` • ${course.schoolName}`}
+          </p>
+          
+          <p className="text-sm text-gray-600 line-clamp-2 mb-4">
+            {course.description}
           </p>
         </div>
-        
-        {/* Butonlar */}
-        <div className="flex space-x-2">
-          <Link 
-            to={`/courses/${course.id}`} 
-            className="flex-1 py-2 px-4 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 text-center"
-          >
-            Detaylar
-          </Link>
-          {onEnroll && (
-            <button
-              onClick={() => onEnroll(course.id)}
-              disabled={course.currentParticipants >= course.maxParticipants}
-              className={`flex-1 py-2 px-4 text-sm font-medium rounded-md ${
-                course.currentParticipants >= course.maxParticipants
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'
-              }`}
+
+        {/* Alt Kısım - Katılımcı Durumu ve Butonlar */}
+        <div>
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex-1 mr-3">
+                <div className="h-2 w-full bg-gray-200 rounded-full">
+                  <div 
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      course.currentParticipants / course.maxParticipants > 0.8
+                        ? 'bg-red-500'
+                        : course.currentParticipants / course.maxParticipants > 0.5
+                        ? 'bg-yellow-500'
+                        : 'bg-green-500'
+                    }`}
+                    style={{ width: `${(course.currentParticipants / course.maxParticipants) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+              <div className="flex items-center justify-center min-w-[60px] text-sm font-medium text-gray-700 tabular-nums">
+                {course.currentParticipants}/{course.maxParticipants}
+              </div>
+            </div>
+            <p className="text-xs text-gray-500">
+              {course.currentParticipants === course.maxParticipants 
+                ? 'Kontenjan dolu' 
+                : `${course.maxParticipants - course.currentParticipants} kişilik kontenjan kaldı`}
+            </p>
+          </div>
+          
+          {/* Butonlar */}
+          <div className="flex space-x-2">
+            <Link 
+              to={`/courses/${course.id}`} 
+              className="flex-1 py-2 px-4 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 text-center"
             >
-              Katıl
-            </button>
-          )}
+              Detaylar
+            </Link>
+            {onEnroll && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  onEnroll(course.id);
+                }}
+                disabled={course.currentParticipants >= course.maxParticipants}
+                className={`flex-1 py-2 px-4 text-sm font-medium rounded-md ${
+                  course.currentParticipants >= course.maxParticipants
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'
+                }`}
+              >
+                Katıl
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </Link>
