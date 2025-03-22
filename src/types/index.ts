@@ -97,7 +97,7 @@ export interface DanceClass {
     longitude: number;
   };
   price: number;
-  currency: 'TRY' | 'USD' | 'EUR'; // Standart para birimi kodları
+  currency: 'TRY' | 'USD' | 'EUR';
   duration: number; // Minutes
   maxParticipants: number;
   currentParticipants: number;
@@ -111,6 +111,9 @@ export interface DanceClass {
   status?: 'active' | 'cancelled' | 'completed' | 'draft';
   tags?: string[]; // Ek etiketler
   highlights?: string[]; // Öne çıkan bilgiler
+  // İletişim bilgileri
+  phoneNumber?: string;
+  email?: string;
 }
 
 export interface DanceSchool {
