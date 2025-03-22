@@ -3,6 +3,8 @@ import { Box, Typography, CircularProgress, IconButton, Button } from '@mui/mate
 import { AddAPhoto, Edit, DeleteOutline, Check, Close } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 
+type UserType = 'school' | 'instructor' | 'student';
+
 interface ImageUploaderProps {
   currentPhotoURL?: string;
   onImageChange: (base64Image: string | null) => void;
@@ -14,6 +16,8 @@ interface ImageUploaderProps {
   width?: number;
   height?: number;
   resetState?: boolean;
+  displayName?: string;
+  userType?: UserType;
 }
 
 const ImageUploader: React.FC<ImageUploaderProps> = ({
@@ -27,7 +31,55 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   width = 200,
   height = 200,
   resetState = false,
+  displayName = '?',
+  userType = 'student'
 }) => {
+  // Generate initials avatar function
+  const generateInitialsAvatar = (name: string, type: UserType = 'student'): string => {
+    // İsmin baş harfini al
+    const initial = name ? name.charAt(0).toUpperCase() : '?';
+    
+    // Tip bazlı renk belirleme
+    let backgroundColor;
+    let textColor = '#FFFFFF'; // Beyaz metin
+    
+    switch(type) {
+      case 'school':
+        backgroundColor = '#8B5CF6'; // Mor - okullar için
+        break;
+      case 'instructor':
+        backgroundColor = '#3B82F6'; // Mavi - eğitmenler için
+        break;
+      case 'student':
+        backgroundColor = '#10B981'; // Yeşil - öğrenciler için
+        break;
+      default:
+        backgroundColor = '#6B7280'; // Gri - varsayılan
+    }
+    
+    // SVG avatar oluştur
+    const svgContent = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+        <rect width="200" height="200" fill="${backgroundColor}"/>
+        <text 
+          x="50%" 
+          y="50%" 
+          dy=".1em" 
+          font-family="Arial, sans-serif" 
+          font-size="100" 
+          fill="${textColor}" 
+          text-anchor="middle" 
+          dominant-baseline="middle"
+        >
+          ${initial}
+        </text>
+      </svg>
+    `;
+    
+    // SVG'yi base64 formatına dönüştür
+    return `data:image/svg+xml;base64,${btoa(svgContent)}`;
+  };
+
   const [previewURL, setPreviewURL] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -221,6 +273,13 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     }
   };
 
+  // Update image display logic to use generateInitialsAvatar
+  const getDisplayImage = () => {
+    if (previewURL) return previewURL;
+    if (currentPhotoURL) return currentPhotoURL;
+    return generateInitialsAvatar(displayName, userType);
+  };
+
   return (
     <Box sx={{ width: '100%', mb: 2 }}>
       <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
@@ -260,34 +319,16 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           }}
         >
           {/* Görsel veya yükleme alanı gösterimi */}
-          {(previewURL || currentPhotoURL) ? (
-            <Box
-              sx={{
-                width: '100%',
-                height: '100%',
-                backgroundColor: '#e0e7ff',
-                backgroundImage: previewURL || currentPhotoURL ? `url(${previewURL || currentPhotoURL})` : 'none',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-              }}
-            />
-          ) : (
-            <Box sx={{
+          <Box
+            sx={{
               width: '100%',
               height: '100%',
               backgroundColor: '#e0e7ff',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 2
-            }}>
-              <AddAPhoto sx={{ fontSize: 40, color: '#8B5CF6', mb: 2 }} />
-              <Typography variant="body1" align="center" sx={{ color: '#4F46E5', fontWeight: 500 }}>
-                {title} Yükle
-              </Typography>
-            </Box>
-          )}
+              backgroundImage: `url(${getDisplayImage()})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
+          />
           
           {/* Success overlay */}
           {uploadSuccess && (

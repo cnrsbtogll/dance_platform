@@ -28,6 +28,9 @@ import { useAuth } from '../../../../contexts/AuthContext';
 import { resizeImageFromBase64 } from '../../../../api/services/userService';
 import { generateInitialsAvatar } from '../../../../common/utils/imageUtils';
 import ImageUploader from '../../../../common/components/ui/ImageUploader';
+import CustomInput from '../../../../common/components/ui/CustomInput';
+import CustomSelect from '../../../../common/components/ui/CustomSelect';
+import CustomPhoneInput from '../../../../common/components/ui/CustomPhoneInput';
 import { Button, Card, CardContent, Dialog, DialogActions, DialogContent, DialogTitle, Grid, IconButton, TextField } from '@mui/material';
 
 // Default placeholder image for students
@@ -345,7 +348,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
     instructorId: '',
     schoolId: '',
     password: '',
-    createAccount: true
+    createAccount: false
   });
 
   // Check if current user is super admin
@@ -524,29 +527,32 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
       email: '',
       phoneNumber: '',
       level: 'beginner',
-      photoURL: '/assets/placeholders/default-student.jpg',
+      photoURL: generateInitialsAvatar('?', 'student'),
       instructorId: '',
       schoolId: '',
       password: '',
-      createAccount: true
+      createAccount: false
     });
     setEditMode(true);
   };
 
-  // Handle input change
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>): void => {
-    const { name, value, type } = e.target;
-    
-    if (type === 'checkbox') {
-      const checkbox = e.target as HTMLInputElement;
+  // Update handleInputChange function
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { name: string; value: string; type?: string; checked?: boolean } } | string,
+    fieldName?: string
+  ): void => {
+    if (typeof e === 'string' && fieldName) {
+      // Handle direct value changes (from CustomSelect)
       setFormData(prev => ({
         ...prev,
-        [name]: checkbox.checked
+        [fieldName]: e
       }));
-    } else {
+    } else if (typeof e === 'object' && 'target' in e) {
+      // Handle event-based changes
+      const target = e.target as { name: string; value: string; type?: string; checked?: boolean };
       setFormData(prev => ({
         ...prev,
-        [name]: value
+        [target.name]: target.type === 'checkbox' ? !!target.checked : target.value
       }));
     }
   };
@@ -948,180 +954,121 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-1">
-                  Ad Soyad*
-                </label>
-                <input
-                  type="text"
-                  id="displayName"
+                <CustomInput
                   name="displayName"
+                  label="Ad Soyad"
+                  type="text"
                   required
                   value={formData.displayName}
                   onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  fullWidth
                 />
               </div>
               
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                  E-posta*
-                </label>
-                <input
+                <CustomInput
                   type="email"
-                  id="email"
                   name="email"
+                  label="E-posta"
                   required
                   value={formData.email}
                   onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                  disabled={!!selectedStudent} // Cannot change email for existing students
+                  disabled={!!selectedStudent}
+                  fullWidth
+                  helperText={selectedStudent ? "Mevcut öğrencilerin e-posta adresleri değiştirilemez." : ""}
                 />
-                {selectedStudent && (
-                  <p className="text-xs text-gray-500 mt-1">Mevcut öğrencilerin e-posta adresleri değiştirilemez.</p>
-                )}
               </div>
               
               <div>
-                <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
-                  Telefon
-                </label>
-                <input
-                  type="text"
-                  id="phoneNumber"
+                <CustomPhoneInput
                   name="phoneNumber"
+                  label="Telefon"
                   value={formData.phoneNumber}
                   onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  fullWidth
                 />
               </div>
               
               <div>
-                <label htmlFor="level" className="block text-sm font-medium text-gray-700 mb-1">
-                  Dans Seviyesi*
-                </label>
-                <select
-                  id="level"
+                <CustomSelect
                   name="level"
-                  required
+                  label="Dans Seviyesi"
                   value={formData.level}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="beginner">Başlangıç</option>
-                  <option value="intermediate">Orta</option>
-                  <option value="advanced">İleri</option>
-                  <option value="professional">Profesyonel</option>
-                </select>
-              </div>
-              
-              <div>
-                <StudentPhotoUploader 
-                  currentPhotoURL={formData.photoURL || DEFAULT_STUDENT_IMAGE}
-                  onImageChange={handlePhotoChange}
+                  onChange={(value) => handleInputChange(value, 'level')}
+                  options={[
+                    { value: 'beginner', label: 'Başlangıç' },
+                    { value: 'intermediate', label: 'Orta' },
+                    { value: 'advanced', label: 'İleri' },
+                    { value: 'professional', label: 'Profesyonel' }
+                  ]}
+                  fullWidth
                 />
               </div>
               
               <div>
-                <label htmlFor="instructorId" className="block text-sm font-medium text-gray-700 mb-1">
-                  Eğitmen
-                </label>
-                <select
-                  id="instructorId"
-                  name="instructorId"
-                  value={formData.instructorId}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="">Eğitmen Seç...</option>
-                  {instructors.map(instructor => (
-                    <option key={instructor.id} value={instructor.id}>
-                      {instructor.displayName}
-                    </option>
-                  ))}
-                </select>
+                <ImageUploader 
+                  currentPhotoURL={formData.photoURL}
+                  onImageChange={handlePhotoChange}
+                  displayName={formData.displayName || '?'}
+                  userType="student"
+                  shape="circle"
+                  width={96}
+                  height={96}
+                />
               </div>
               
               <div>
-                <label htmlFor="schoolId" className="block text-sm font-medium text-gray-700 mb-1">
-                  Okul
-                </label>
-                <select
-                  id="schoolId"
-                  name="schoolId"
-                  value={formData.schoolId}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="">Okul Seç...</option>
-                  {schools.map(school => (
-                    <option key={school.id} value={school.id}>
-                      {school.displayName}
-                    </option>
-                  ))}
-                </select>
+                <CustomSelect
+                  name="instructorId"
+                  label="Eğitmen"
+                  value={formData.instructorId}
+                  onChange={(value) => handleInputChange(value, 'instructorId')}
+                  options={[
+                    { value: '', label: 'Eğitmen Seç...' },
+                    ...instructors.map(instructor => ({
+                      value: instructor.id,
+                      label: instructor.displayName
+                    }))
+                  ]}
+                  fullWidth
+                />
               </div>
               
-              {!selectedStudent && (
-                <>
-                  <div className="md:col-span-2">
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id="createAccount"
-                        name="createAccount"
-                        checked={formData.createAccount}
-                        onChange={handleInputChange}
-                        className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
-                      />
-                      <label htmlFor="createAccount" className="ml-2 block text-sm text-gray-700">
-                        Giriş yapabilen kullanıcı hesabı oluştur
-                      </label>
-                    </div>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Bu seçeneği işaretlerseniz, öğrenci için giriş yapabileceği bir hesap oluşturulacak ve e-posta doğrulama gönderilecektir.
-                    </p>
-                  </div>
-                  
-                  {formData.createAccount && (
-                    <div className="md:col-span-2">
-                      <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                        Şifre*
-                      </label>
-                      <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        required={formData.createAccount}
-                        value={formData.password}
-                        onChange={handleInputChange}
-                        className="w-full p-2 border border-gray-300 rounded-md"
-                        minLength={6}
-                      />
-                      <p className="mt-1 text-xs text-gray-500">
-                        Şifre en az 6 karakter uzunluğunda olmalıdır.
-                      </p>
-                    </div>
-                  )}
-                </>
-              )}
+              <div>
+                <CustomSelect
+                  name="schoolId"
+                  label="Okul"
+                  value={formData.schoolId}
+                  onChange={(value) => handleInputChange(value, 'schoolId')}
+                  options={[
+                    { value: '', label: 'Okul Seç...' },
+                    ...schools.map(school => ({
+                      value: school.id,
+                      label: school.displayName
+                    }))
+                  ]}
+                  fullWidth
+                />
+              </div>
             </div>
             
             <div className="flex justify-end space-x-3">
-              <button
-                type="button"
+              <Button
+                variant="outlined"
+                color="secondary"
                 onClick={() => setEditMode(false)}
-                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
                 disabled={loading}
               >
                 İptal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+                variant="contained"
+                color="primary"
                 disabled={loading}
               >
                 {loading ? 'Kaydediliyor...' : (selectedStudent ? 'Güncelle' : 'Ekle')}
-              </button>
+              </Button>
             </div>
           </form>
         </div>

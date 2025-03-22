@@ -28,6 +28,9 @@ import { useAuth } from '../../../../contexts/AuthContext';
 import CustomSelect from '../../../../common/components/ui/CustomSelect';
 import CustomPhoneInput from '../../../../common/components/ui/CustomPhoneInput';
 import { generateInitialsAvatar } from '../../../../common/utils/imageUtils';
+import ImageUploader from '../../../../common/components/ui/ImageUploader';
+import CustomInput from '../../../../common/components/ui/CustomInput';
+import { Button } from '@mui/material';
 
 // Student interface with instructor and school
 interface Student {
@@ -312,20 +315,33 @@ export const UserManagement: React.FC = () => {
     }
   };
 
-  // Handle input change
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>): void => {
-    const { name, value, type } = e.target;
-    
-    if (type === 'checkbox') {
-      const checkbox = e.target as HTMLInputElement;
+  // Update handleInputChange function
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { name: string; value: string; type?: string; checked?: boolean } } | string,
+    fieldName?: string
+  ): void => {
+    if (typeof e === 'string' && fieldName) {
+      // Handle direct value changes (from CustomSelect)
       setFormData(prev => ({
         ...prev,
-        [name]: checkbox.checked
+        [fieldName]: e
       }));
-    } else {
+    } else if (typeof e === 'object' && 'target' in e) {
+      // Handle event-based changes
+      const target = e.target as { name: string; value: string; type?: string; checked?: boolean };
       setFormData(prev => ({
         ...prev,
-        [name]: value
+        [target.name]: target.type === 'checkbox' ? !!target.checked : target.value
+      }));
+    }
+  };
+
+  // Handle photo change
+  const handlePhotoChange = (base64Image: string | null) => {
+    if (base64Image) {
+      setFormData(prev => ({
+        ...prev,
+        photoURL: base64Image
       }));
     }
   };
@@ -741,110 +757,121 @@ export const UserManagement: React.FC = () => {
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-1">
-                  Ad Soyad*
-                </label>
-                <input
-                  type="text"
-                  id="displayName"
+                <CustomInput
                   name="displayName"
+                  label="Ad Soyad"
+                  type="text"
                   required
                   value={formData.displayName}
                   onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  fullWidth
                 />
               </div>
               
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                  E-posta*
-                </label>
-                <input
+                <CustomInput
                   type="email"
-                  id="email"
                   name="email"
+                  label="E-posta"
                   required
                   value={formData.email}
                   onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                  disabled={!!selectedStudent} // Cannot change email for existing students
+                  disabled={!!selectedStudent}
+                  fullWidth
+                  helperText={selectedStudent ? "Mevcut kullanıcıların e-posta adresleri değiştirilemez." : ""}
                 />
-                {selectedStudent && (
-                  <p className="text-xs text-gray-500 mt-1">Mevcut öğrencilerin e-posta adresleri değiştirilemez.</p>
-                )}
               </div>
               
               <div>
-                <CustomSelect
-                  label="Okul"
-                  value={formData.schoolId}
-                  onChange={handleSelectChange('schoolId')}
-                  options={schools.map(school => ({
-                    value: school.id,
-                    label: school.name
-                  }))}
-                  placeholder="Okul Seç..."
+                <CustomPhoneInput
+                  name="phoneNumber"
+                  label="Telefon"
+                  value={formData.phoneNumber}
+                  onChange={handleInputChange}
+                  fullWidth
                 />
               </div>
               
               <div>
                 <CustomSelect
-                  label="Eğitmen"
-                  value={formData.instructorId}
-                  onChange={handleSelectChange('instructorId')}
-                  options={instructors.map(instructor => ({
-                    value: instructor.id,
-                    label: instructor.displayName
-                  }))}
-                  placeholder="Eğitmen Seç..."
-                />
-              </div>
-              
-              <div>
-                <CustomSelect
+                  name="level"
                   label="Dans Seviyesi"
                   value={formData.level}
-                  onChange={handleSelectChange('level')}
+                  onChange={(value) => handleInputChange(value, 'level')}
                   options={[
                     { value: 'beginner', label: 'Başlangıç' },
                     { value: 'intermediate', label: 'Orta' },
                     { value: 'advanced', label: 'İleri' },
                     { value: 'professional', label: 'Profesyonel' }
                   ]}
-                  placeholder="Seviye Seçin"
+                  fullWidth
+                />
+              </div>
+              
+              <div className="md:col-span-2">
+                <ImageUploader
+                  currentPhotoURL={formData.photoURL}
+                  onImageChange={handlePhotoChange}
+                  displayName={formData.displayName || '?'}
+                  userType={getAvatarType(selectedStudent?.role || 'student')}
+                  shape="circle"
+                  width={96}
+                  height={96}
+                />
+              </div>
+
+              <div>
+                <CustomSelect
+                  name="instructorId"
+                  label="Eğitmen"
+                  value={formData.instructorId}
+                  onChange={(value) => handleInputChange(value, 'instructorId')}
+                  options={[
+                    { value: '', label: 'Eğitmen Seç...' },
+                    ...instructors.map(instructor => ({
+                      value: instructor.id,
+                      label: instructor.displayName
+                    }))
+                  ]}
+                  fullWidth
                 />
               </div>
               
               <div>
-                <CustomPhoneInput
-                  id="phoneNumber"
-                  name="phoneNumber"
-                  value={formData.phoneNumber}
-                  onChange={handleInputChange}
-                  onValidation={handlePhoneValidation}
-                  error={formErrors.phoneNumber}
-                  label="Telefon"
-                  required
+                <CustomSelect
+                  name="schoolId"
+                  label="Okul"
+                  value={formData.schoolId}
+                  onChange={(value) => handleInputChange(value, 'schoolId')}
+                  options={[
+                    { value: '', label: 'Okul Seç...' },
+                    ...schools.map(school => ({
+                      value: school.id,
+                      label: school.name
+                    }))
+                  ]}
+                  fullWidth
                 />
               </div>
             </div>
             
             <div className="flex justify-end space-x-3">
-              <button
-                type="button"
+              <Button
+                variant="outlined"
+                color="secondary"
                 onClick={() => setEditMode(false)}
-                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
                 disabled={loading}
               >
                 İptal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+                variant="contained"
+                color="primary"
                 disabled={loading}
               >
                 {loading ? 'Kaydediliyor...' : (selectedStudent ? 'Güncelle' : 'Ekle')}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
