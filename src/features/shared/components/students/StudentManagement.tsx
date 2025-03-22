@@ -378,83 +378,69 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
     setError(null);
     
     try {
-      // Get all users from Firestore
+      // Get students
       const usersRef = collection(db, 'users');
-      let q;
+      let studentsQuery;
       
       if (isAdmin) {
-        // Admin sees all students
-        q = query(usersRef, orderBy('createdAt', 'desc'));
+        console.log('Admin mode: fetching all students');
+        studentsQuery = query(
+          usersRef, 
+          where('role', 'array-contains', 'student'),
+          orderBy('createdAt', 'desc')
+        );
       } else {
-        // Instructors only see their students
-        q = query(
+        console.log('Instructor mode: fetching students for instructor', currentUser?.uid);
+        studentsQuery = query(
           usersRef, 
           where('instructorId', '==', currentUser?.uid),
           orderBy('createdAt', 'desc')
         );
       }
       
-      const querySnapshot = await getDocs(q);
-      
-      const studentsData: FirebaseUser[] = [];
-      const instructorsData: Instructor[] = [];
-      const schoolsData: School[] = [];
-      
-      querySnapshot.forEach((doc) => {
+      const studentsSnapshot = await getDocs(studentsQuery);
+      const studentsData: FirebaseUser[] = studentsSnapshot.docs.map(doc => {
         const data = doc.data();
-        const id = doc.id;
-        
-        // Role değerini kontrol et - string veya array olabilir
-        let role = data.role;
-        
-        // Test için her rolü 
-        if (Array.isArray(role)) {
-          // Role bir array ise her role türüne göre işlem yap
-          if (role.includes('student')) {
-            studentsData.push({ id, ...data } as FirebaseUser);
-          }
-          if (role.includes('instructor')) {
-            instructorsData.push({
-              id,
-              displayName: data.displayName || 'İsimsiz Eğitmen',
-              email: data.email || ''
-            });
-          }
-          if (role.includes('school')) {
-            schoolsData.push({
-              id,
-              displayName: data.displayName || 'İsimsiz Okul',
-              email: data.email || ''
-            });
-          }
-        } else {
-          // Role bir string ise
-          if (role === 'student') {
-            studentsData.push({ id, ...data } as FirebaseUser);
-          } else if (role === 'instructor') {
-            instructorsData.push({
-              id,
-              displayName: data.displayName || 'İsimsiz Eğitmen',
-              email: data.email || ''
-            });
-          } else if (role === 'school') {
-            schoolsData.push({
-              id,
-              displayName: data.displayName || 'İsimsiz Okul',
-              email: data.email || ''
-            });
-          }
+        // Verify if the document has role field and it includes 'student'
+        const roles = Array.isArray(data.role) ? data.role : [data.role];
+        if (!roles.includes('student')) {
+          return null;
         }
-      });
+        console.log('Student data:', { id: doc.id, ...data });
+        return {
+          id: doc.id,
+          ...data
+        } as FirebaseUser;
+      }).filter(Boolean) as FirebaseUser[]; // Remove null values
+
+      // Get instructors
+      const instructorsQuery = query(
+        usersRef,
+        where('role', 'array-contains', 'instructor'),
+        orderBy('displayName', 'asc')
+      );
+      const instructorsSnapshot = await getDocs(instructorsQuery);
+      const instructorsData: Instructor[] = instructorsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        displayName: doc.data().displayName || 'İsimsiz Eğitmen',
+        email: doc.data().email || ''
+      }));
+
+      // Get schools
+      const schoolsQuery = query(
+        usersRef,
+        where('role', 'array-contains', 'school'),
+        orderBy('displayName', 'asc')
+      );
+      const schoolsSnapshot = await getDocs(schoolsQuery);
+      const schoolsData: School[] = schoolsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        displayName: doc.data().displayName || 'İsimsiz Okul',
+        email: doc.data().email || ''
+      }));
       
-      console.log(`${studentsData.length} öğrenci bulundu`);
-      if (!isAdmin) {
-        console.log('Instructor ID:', currentUser?.uid);
-        console.log('Found students:', studentsData.map(s => ({
-          name: s.displayName,
-          instructorId: s.instructorId
-        })));
-      }
+      console.log(`Found: ${studentsData.length} students, ${instructorsData.length} instructors, ${schoolsData.length} schools`);
+      console.log('Students:', studentsData.map(s => ({ id: s.id, name: s.displayName, instructorId: s.instructorId })));
       
       setStudents(studentsData);
       setFilteredStudents(studentsData);
@@ -470,8 +456,11 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
 
   // Fetch students, instructors and schools on initial load
   useEffect(() => {
-    fetchAllUsers();
-  }, []);
+    if (currentUser?.uid) {
+      console.log('Fetching users with currentUser:', currentUser.uid);
+      fetchAllUsers();
+    }
+  }, [currentUser]);
 
   // Update filtered students when search term changes
   useEffect(() => {
@@ -518,7 +507,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
       phone: '',
       level: 'beginner',
       photoURL: generateInitialsAvatar('?', 'student'),
-      instructorId: '',
+      instructorId: isAdmin ? '' : currentUser?.uid || '',
       schoolId: ''
     });
     setEditMode(true);
@@ -921,13 +910,13 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
       )}
       
       {/* Üst Başlık ve Arama Bölümü */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
         <div>
           <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">Öğrenci Yönetimi</h2>
           <p className="text-sm text-gray-600 mt-1">Öğrencilerinizi ekleyin, düzenleyin ve yönetin</p>
         </div>
-        <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-grow sm:max-w-[200px]">
+        <div className="flex flex-col gap-2 w-full sm:w-64">
+          <div className="relative w-full">
             <input
               type="text"
               placeholder="Ad veya e-posta ile ara..."
@@ -944,13 +933,13 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
           {!editMode && (
             <button 
               onClick={addNewStudent}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+              className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
               disabled={loading}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
-              {loading ? 'Yükleniyor...' : 'Yeni Öğrenci Ekle'}
+              {loading ? 'Yükleniyor...' : 'Yeni Öğrenci'}
             </button>
           )}
         </div>
@@ -975,6 +964,20 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
           
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              {/* Profil Fotoğrafı */}
+              <div className="md:col-span-2">
+                <ImageUploader 
+                  currentPhotoURL={formData.photoURL}
+                  onImageChange={handlePhotoChange}
+                  displayName={formData.displayName || '?'}
+                  userType="student"
+                  shape="circle"
+                  width={96}
+                  height={96}
+                  maxSizeKB={5120}
+                />
+              </div>
+              
               <div>
                 <CustomInput
                   name="displayName"
@@ -998,6 +1001,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                   error={false}
                   fullWidth
                   helperText={selectedStudent ? "Mevcut öğrencilerin e-posta adresleri değiştirilemez." : ""}
+                  disabled={!!selectedStudent}
                 />
               </div>
               
@@ -1035,40 +1039,29 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                 />
               </div>
               
-              <div>
-                <ImageUploader 
-                  currentPhotoURL={formData.photoURL}
-                  onImageChange={handlePhotoChange}
-                  displayName={formData.displayName || '?'}
-                  userType="student"
-                  shape="circle"
-                  width={96}
-                  height={96}
-                  maxSizeKB={5120}
-                />
-              </div>
-              
-              <div>
-                <CustomSelect
-                  name="instructorId"
-                  label="Eğitmen"
-                  value={formData.instructorId}
-                  onChange={(value: string | string[]) => {
-                    if (typeof value === 'string') {
-                      handleSelectChange(value, 'instructorId');
-                    }
-                  }}
-                  options={[
-                    { value: '', label: 'Eğitmen Seç...' },
-                    ...instructors.map(instructor => ({
-                      value: instructor.id,
-                      label: instructor.displayName
-                    }))
-                  ]}
-                  fullWidth
-                  required
-                />
-              </div>
+              {isAdmin && (
+                <div>
+                  <CustomSelect
+                    name="instructorId"
+                    label="Eğitmen"
+                    value={formData.instructorId}
+                    onChange={(value: string | string[]) => {
+                      if (typeof value === 'string') {
+                        handleSelectChange(value, 'instructorId');
+                      }
+                    }}
+                    options={[
+                      { value: '', label: 'Eğitmen Seç...' },
+                      ...instructors.map(instructor => ({
+                        value: instructor.id,
+                        label: instructor.displayName
+                      }))
+                    ]}
+                    fullWidth
+                    required
+                  />
+                </div>
+              )}
               
               <div>
                 <CustomSelect
@@ -1081,7 +1074,6 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                     }
                   }}
                   options={[
-                    { value: '', label: 'Okul Seç...' },
                     ...schools.map(school => ({
                       value: school.id,
                       label: school.displayName

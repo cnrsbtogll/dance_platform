@@ -68,6 +68,7 @@ export interface CustomInputProps {
   placeholder?: string;
   className?: string;
   required?: boolean;
+  disabled?: boolean;
 }
 
 export const CustomInput: React.FC<CustomInputProps> = ({
@@ -84,6 +85,7 @@ export const CustomInput: React.FC<CustomInputProps> = ({
   placeholder,
   className,
   required = false,
+  disabled = false,
 }) => {
   return (
     <StyledTextField
@@ -102,6 +104,7 @@ export const CustomInput: React.FC<CustomInputProps> = ({
       size="small"
       className={className}
       required={required}
+      disabled={disabled}
       margin="none"
     />
   );
