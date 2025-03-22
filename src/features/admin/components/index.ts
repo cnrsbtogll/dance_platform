@@ -4,9 +4,6 @@ export * from './schools';
 // Instructors
 export * from './instructors';
 
-// Students
-export * from './students';
-
 // Users
 export * from './users';
 

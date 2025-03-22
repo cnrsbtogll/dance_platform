@@ -4,12 +4,12 @@ import {
   InstructorManagement, 
   InstructorRequests, 
   DanceStyleManagement, 
-  StudentManagement,
   ContactRequests,
   SchoolRequests,
   UserManagement
 } from '../components';
 import CourseManagement from '../../shared/components/courses/CourseManagement';
+import { StudentManagement } from '../../shared/components/students/StudentManagement';
 import SeedUsersButton from '../../../scripts/SeedUsersButton';
 import MigrateSchoolsButton from '../../../scripts/MigrateSchoolsButton';
 import SeedCoursesButton from '../../../scripts/SeedCoursesButton';
@@ -171,7 +171,7 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
           {activeTab === 'kullanicilar' && <UserManagement />}
           {activeTab === 'okullar' && <SchoolManagement />}
           {activeTab === 'egitmenler' && <InstructorManagement />}
-          {activeTab === 'ogrenciler' && <StudentManagement />}
+          {activeTab === 'ogrenciler' && <StudentManagement isAdmin={true} />}
           {activeTab === 'kurslar' && <CourseManagement isAdmin={true} />}
           {activeTab === 'talepler' && (
             <div>
