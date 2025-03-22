@@ -96,15 +96,14 @@ interface Course {
   level: string;
   maxParticipants: number;
   currentParticipants: number;
-  schedule: Schedule[];
   duration: number;
-  date: any;
   price: number;
   currency: string;
   status: 'active' | 'inactive';
-  createdAt?: any;
-  updatedAt?: any;
   recurring: boolean;
+  schedule: Schedule[];
+  date: any;
+  time: string;
   location: Location;
   imageUrl: string;
   highlights: string[];
@@ -112,6 +111,8 @@ interface Course {
   instructorPhone: string;
   schoolPhone: string;
   schoolAddress: string;
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 interface FormData {
@@ -125,13 +126,14 @@ interface FormData {
   level: string;
   maxParticipants: number;
   currentParticipants: number;
-  schedule: Schedule[];
   duration: number;
-  date: any;
   price: number;
   currency: string;
   status: 'active' | 'inactive';
   recurring: boolean;
+  schedule: Schedule[];
+  date: any;
+  time: string;
   location: Location;
   imageUrl: string;
   highlights: string[];
@@ -217,6 +219,28 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose, course }) 
   );
 };
 
+// Timestamp'i tarihe çeviren yardımcı fonksiyon ekle
+const timestampToDate = (timestamp: any): string => {
+  if (!timestamp) return '';
+  
+  try {
+    // Firebase timestamp kontrolü
+    if (timestamp?.seconds) {
+      return new Date(timestamp.seconds * 1000).toISOString().split('T')[0];
+    }
+    
+    // Normal Date objesi kontrolü
+    if (timestamp instanceof Date) {
+      return timestamp.toISOString().split('T')[0];
+    }
+    
+    return '';
+  } catch (error) {
+    console.error('Tarih dönüştürme hatası:', error);
+    return '';
+  }
+};
+
 function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseManagementProps): JSX.Element {
   const [courses, setCourses] = useState<Course[]>([]);
   const [editMode, setEditMode] = useState<boolean>(false);
@@ -235,13 +259,14 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
     level: 'beginner',
     maxParticipants: 10,
     currentParticipants: 0,
-    schedule: [],
     duration: 90,
     date: null,
+    time: '18:00',
     price: 0,
     currency: 'TRY',
     status: 'active',
     recurring: true,
+    schedule: [],
     location: {
       address: '',
       city: '',
@@ -250,7 +275,7 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
       latitude: 0,
       longitude: 0
     },
-    imageUrl: '',
+    imageUrl: '/placeholders/default-course-image.png',
     highlights: [],
     tags: []
   });
@@ -308,16 +333,13 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
         level: 'beginner',
         maxParticipants: 15,
         currentParticipants: 0,
-        schedule: [
-          { day: 'Pazartesi', time: '19:00' },
-          { day: 'Çarşamba', time: '19:00' }
-        ],
         duration: 90,
         date: serverTimestamp(),
         price: 350,
         currency: 'TRY',
         status: 'active',
         recurring: true,
+        schedule: [{ day: 'Pazartesi', time: '19:00' }],
         location: {
           address: '',
           city: 'İstanbul',
@@ -593,27 +615,10 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
   const editCourse = (course: Course) => {
     setSelectedCourse(course);
     setFormData({
-      name: course.name,
-      description: course.description,
-      instructorId: course.instructorId,
-      instructorName: course.instructorName,
-      schoolId: course.schoolId,
-      schoolName: course.schoolName,
-      danceStyle: course.danceStyle,
-      level: course.level,
-      maxParticipants: course.maxParticipants,
-      currentParticipants: course.currentParticipants,
-      schedule: course.schedule,
-      duration: course.duration,
+      ...course,
+      schedule: course.schedule || [],
       date: course.date,
-      price: course.price,
-      currency: course.currency,
-      status: course.status,
-      recurring: course.recurring,
-      location: course.location,
-      imageUrl: course.imageUrl,
-      highlights: course.highlights,
-      tags: course.tags
+      time: course.time || '18:00'
     });
     setEditMode(true);
   };
@@ -632,13 +637,14 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
       level: 'beginner',
       maxParticipants: 10,
       currentParticipants: 0,
-      schedule: [],
       duration: 90,
       date: null,
+      time: '18:00',
       price: 0,
       currency: 'TRY',
       status: 'active',
       recurring: true,
+      schedule: [],
       location: {
         address: '',
         city: '',
@@ -703,13 +709,14 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
       level: courseData.level || 'beginner',
       maxParticipants: courseData.maxParticipants || 0,
       currentParticipants: courseData.currentParticipants || 0,
-      schedule: courseData.schedule || [],
       duration: courseData.duration || 90,
       date: courseData.date,
+      time: courseData.time || '18:00',
       price: courseData.price || 0,
       currency: courseData.currency || 'TRY',
       status: courseData.status || 'inactive',
       recurring: courseData.recurring || false,
+      schedule: courseData.schedule || [],
       location: courseData.location || {
         address: '',
         city: '',
@@ -734,59 +741,31 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
     setSuccess(null);
 
     try {
-      // Seçilen eğitmen ve okul bilgilerini al
-      const selectedInstructor = instructors.find(i => i.value === (instructorId || formData.instructorId));
-      const selectedSchool = schools.find(s => s.value === (schoolId || formData.schoolId));
-
-      // Eğitmen ve okul detaylarını getir
-      let instructorPhone = '';
-      let schoolPhone = '';
-      let schoolAddress = '';
-
-      if (selectedInstructor) {
-        const instructorDoc = await getDoc(doc(db, 'instructors', selectedInstructor.value));
-        if (instructorDoc.exists()) {
-          instructorPhone = instructorDoc.data().phoneNumber || '';
-        }
-      }
-
-      if (selectedSchool) {
-        const schoolDoc = await getDoc(doc(db, 'schools', selectedSchool.value));
-        if (schoolDoc.exists()) {
-          const schoolData = schoolDoc.data();
-          schoolPhone = schoolData.phoneNumber || '';
-          schoolAddress = schoolData.address || '';
-        }
-      }
-
-      const courseData = {
+      const courseDataToSave = {
         ...formData,
-        instructorId: instructorId || formData.instructorId,
-        instructorName: selectedInstructor?.label || formData.instructorName,
-        instructorPhone: instructorPhone,
-        schoolId: schoolId || formData.schoolId,
-        schoolName: selectedSchool?.label || formData.schoolName,
-        schoolPhone: schoolPhone,
-        schoolAddress: schoolAddress,
-        recurring: formData.recurring || false,
-        currentParticipants: formData.currentParticipants || 0,
-        status: formData.status || 'active'
+        recurring: formData.recurring,
+        schedule: formData.recurring ? formData.schedule : [],
+        date: formData.recurring ? null : formData.date,
+        time: formData.time,
+        instructorPhone: '',
+        schoolPhone: '',
+        schoolAddress: '',
+        updatedAt: serverTimestamp()
       };
-
-      // Firebase için veriyi temizle
-      const cleanedData = cleanDataForFirebase(courseData);
 
       if (selectedCourse) {
         // Mevcut kursu güncelle
         const courseRef = doc(db, 'courses', selectedCourse.id);
-        await updateDoc(courseRef, {
-          ...cleanedData,
-          updatedAt: serverTimestamp()
-        });
+        await updateDoc(courseRef, courseDataToSave);
+        
+        const updatedCourse: Course = {
+          ...selectedCourse,
+          ...courseDataToSave,
+        };
         
         setCourses(prev => prev.map(course => 
           course.id === selectedCourse.id 
-            ? { ...course, ...courseData }
+            ? updatedCourse
             : course
         ));
         
@@ -794,16 +773,14 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
       } else {
         // Yeni kurs ekle
         const docRef = await addDoc(collection(db, 'courses'), {
-          ...cleanedData,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
+          ...courseDataToSave,
+          createdAt: serverTimestamp()
         });
         
         const newCourse: Course = {
+          ...courseDataToSave,
           id: docRef.id,
-          ...courseData,
           createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
         };
         
         setCourses(prev => [newCourse, ...prev]);
@@ -975,7 +952,7 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
 
               {/* Durum ve Tekrar */}
               <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-900">Durum ve Tekrar</h3>
+                <h3 className="text-lg font-medium text-gray-900">Durum</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <CustomSelect
@@ -990,23 +967,6 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
                       placeholder="Durum Seçin"
                       required
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tekrarlı Kurs</label>
-                    <div className="mt-2">
-                      <label className="inline-flex items-center">
-                        <input
-                          type="checkbox"
-                          name="recurring"
-                          checked={formData.recurring}
-                          onChange={(e) => setFormData({ ...formData, recurring: e.target.checked })}
-                          className="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                        />
-                        <span className="ml-2 text-sm text-gray-600">
-                          Bu kurs düzenli olarak tekrar eder
-                        </span>
-                      </label>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -1061,62 +1021,128 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
               {/* Program Seçimi */}
               <div className="md:col-span-2 space-y-4">
                 <h3 className="text-lg font-medium text-gray-900">Program</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {formData.schedule.map((scheduleItem, index) => (
-                    <div key={index} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                      <div className="flex-grow">
-                        <CustomSelect
-                          name={`schedule-day-${index}`}
-                          label="Gün"
-                          options={dayOptions}
-                          value={scheduleItem.day}
-                          onChange={(value) => {
-                            const newSchedule = [...formData.schedule];
-                            newSchedule[index].day = value as string;
-                            setFormData({ ...formData, schedule: newSchedule });
-                          }}
-                          placeholder="Gün Seçin"
-                        />
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Kurs Tipi</label>
+                    <div className="mt-2">
+                      <label className="inline-flex items-center mr-4">
                         <input
-                          type="time"
-                          value={scheduleItem.time}
-                          onChange={(e) => {
-                            const newSchedule = [...formData.schedule];
-                            newSchedule[index].time = e.target.value;
-                            setFormData({ ...formData, schedule: newSchedule });
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                          type="radio"
+                          name="recurring"
+                          checked={formData.recurring}
+                          onChange={(e) => setFormData({ ...formData, recurring: true })}
+                          className="form-radio h-4 w-4 text-indigo-600"
                         />
-                      </div>
+                        <span className="ml-2">Periyodik Kurs</span>
+                      </label>
+                      <label className="inline-flex items-center">
+                        <input
+                          type="radio"
+                          name="recurring"
+                          checked={!formData.recurring}
+                          onChange={(e) => setFormData({ ...formData, recurring: false })}
+                          className="form-radio h-4 w-4 text-indigo-600"
+                        />
+                        <span className="ml-2">Tek Seferlik Kurs</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {formData.recurring ? (
+                    <div className="space-y-4">
+                      {formData.schedule.map((scheduleItem, index) => (
+                        <div key={index} className="flex items-center gap-4">
+                          <div className="flex-1">
+                            <CustomSelect
+                              name={`schedule-day-${index}`}
+                              label="Gün"
+                              options={dayOptions}
+                              value={scheduleItem.day}
+                              onChange={(value) => {
+                                const newSchedule = [...formData.schedule];
+                                newSchedule[index].day = value as string;
+                                setFormData({ ...formData, schedule: newSchedule });
+                              }}
+                              placeholder="Gün Seçin"
+                              required
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Saat</label>
+                            <input
+                              type="time"
+                              value={scheduleItem.time}
+                              onChange={(e) => {
+                                const newSchedule = [...formData.schedule];
+                                newSchedule[index].time = e.target.value;
+                                setFormData({ ...formData, schedule: newSchedule });
+                              }}
+                              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                              required
+                            />
+                          </div>
+                          <div className="flex items-end pb-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newSchedule = formData.schedule.filter((_, i) => i !== index);
+                                setFormData({ ...formData, schedule: newSchedule });
+                              }}
+                              className="p-2 text-red-600 hover:text-red-800"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      
                       <button
                         type="button"
                         onClick={() => {
-                          const newSchedule = formData.schedule.filter((_, i) => i !== index);
-                          setFormData({ ...formData, schedule: newSchedule });
+                          setFormData({
+                            ...formData,
+                            schedule: [...formData.schedule, { day: 'Pazartesi', time: '18:00' }]
+                          });
                         }}
-                        className="p-2 text-red-600 hover:text-red-800"
+                        className="flex items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-500 hover:text-indigo-500 w-full"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                         </svg>
+                        Program Ekle
                       </button>
                     </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData({
-                        ...formData,
-                        schedule: [...formData.schedule, { day: 'Pazartesi', time: '09:00' }]
-                      });
-                    }}
-                    className="flex items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-500 hover:text-indigo-500"
-                  >
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    Program Ekle
-                  </button>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Kurs Tarihi</label>
+                        <input
+                          type="date"
+                          name="date"
+                          value={timestampToDate(formData.date)}
+                          onChange={(e) => {
+                            const selectedDate = e.target.value ? new Date(e.target.value) : null;
+                            setFormData({ ...formData, date: selectedDate });
+                          }}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Kurs Saati</label>
+                        <input
+                          type="time"
+                          name="time"
+                          value={formData.time}
+                          onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1170,9 +1196,17 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
                   </td>
                   <td className="hidden sm:table-cell px-4 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      {course.schedule.map((s, index) => (
-                        <div key={index}>{s.day} {s.time}</div>
-                      ))}
+                      {course.recurring ? (
+                        <div className="space-y-1">
+                          {course.schedule.map((s, index) => (
+                            <div key={index}>{s.day} {s.time}</div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div>
+                          {timestampToDate(course.date)} {course.time}
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td className="hidden md:table-cell px-4 py-4 whitespace-nowrap text-sm text-gray-500">

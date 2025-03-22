@@ -95,25 +95,36 @@ export interface PartnerMatch {
 export interface DanceClass {
   id: string;
   name: string;
-  description?: string;
-  instructorId: string;
-  instructorName: string;
-  schoolId?: string;
-  schoolName?: string;
   danceStyle: string;
-  level: string;
-  schedule: {
-    day: string;
-    time: string;
-  }[];
+  level: 'beginner' | 'intermediate' | 'advanced' | 'professional';
   price: number;
-  capacity: number;
-  enrolledStudents: number;
-  status: 'active' | 'inactive';
-  photoURL?: string;
+  currency: 'TRY' | 'USD' | 'EUR';
+  imageUrl?: string;
+  instructorName: string;
+  instructorId: string;
+  schoolName?: string;
+  schoolId?: string;
+  description?: string;
+  currentParticipants: number;
+  maxParticipants: number;
+  recurring: boolean;
+  daysOfWeek?: string[];
+  date?: Date;
+  time?: string;
+  duration: number;
+  status: 'active' | 'inactive' | 'cancelled';
+  location?: {
+    address?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    latitude?: number;
+    longitude?: number;
+  };
+  highlights?: string[];
+  tags?: string[];
   phoneNumber?: string;
   email?: string;
-  address?: string;
   createdAt: Date;
   updatedAt: Date;
 }
