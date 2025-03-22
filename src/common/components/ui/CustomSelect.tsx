@@ -1,61 +1,66 @@
 import React from 'react';
-import { FormControl, InputLabel, Select, MenuItem, FormHelperText, SelectChangeEvent } from '@mui/material';
+import { FormControl, InputLabel, Select, MenuItem, FormHelperText } from '@mui/material';
 
-interface SelectOption {
+interface Option {
   value: string;
   label: string;
 }
 
-export interface CustomSelectProps {
+interface CustomSelectProps {
+  label: string;
   name: string;
-  label: string;
-  value: string;
-  options: SelectOption[];
+  value: string | string[];
+  options: Option[];
+  onChange: (value: string | string[]) => void;
+  error?: string;
+  multiple?: boolean;
   required?: boolean;
-  disabled?: boolean;
+  placeholder?: string;
   fullWidth?: boolean;
-  helperText?: string;
-  onChange: (value: string) => void;
 }
 
-export const CustomSelect: React.FC<CustomSelectProps> = ({
-  name,
+const CustomSelect: React.FC<CustomSelectProps> = ({
   label,
+  name,
   value,
   options,
-  required = false,
-  disabled = false,
-  fullWidth = false,
-  helperText,
   onChange,
+  error,
+  multiple = false,
+  required = false,
+  placeholder,
+  fullWidth = true,
 }) => {
-  const handleChange = (event: SelectChangeEvent<string>) => {
-    onChange(event.target.value);
+  const handleChange = (event: any) => {
+    const selectedValue = event.target.value;
+    onChange(selectedValue);
   };
 
   return (
-    <FormControl
-      variant="outlined"
-      required={required}
-      disabled={disabled}
-      fullWidth={fullWidth}
-    >
-      <InputLabel>{label}</InputLabel>
+    <FormControl fullWidth={fullWidth} error={!!error} required={required}>
+      <InputLabel id={`${name}-label`}>{label}</InputLabel>
       <Select
+        labelId={`${name}-label`}
+        id={name}
         name={name}
         value={value}
         label={label}
         onChange={handleChange}
+        multiple={multiple}
+        displayEmpty={!!placeholder}
       >
+        {placeholder && (
+          <MenuItem value="" disabled>
+            {placeholder}
+          </MenuItem>
+        )}
         {options.map((option) => (
           <MenuItem key={option.value} value={option.value}>
             {option.label}
           </MenuItem>
         ))}
       </Select>
-      {helperText && (
-        <FormHelperText>{helperText}</FormHelperText>
-      )}
+      {error && <FormHelperText>{error}</FormHelperText>}
     </FormControl>
   );
 };

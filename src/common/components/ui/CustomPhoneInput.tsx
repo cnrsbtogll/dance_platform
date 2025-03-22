@@ -1,61 +1,113 @@
-import React from 'react';
+import React, { ChangeEvent } from 'react';
 import { TextField } from '@mui/material';
+import { IMaskInput } from 'react-imask';
+
+interface CustomMaskProps {
+  onChange: (event: { target: { name: string; value: string } }) => void;
+  name: string;
+}
+
+const CountryCodeMask = React.forwardRef<HTMLInputElement, CustomMaskProps>(
+  function CountryCodeMask(props, ref) {
+    const { onChange, ...other } = props;
+    return (
+      <IMaskInput
+        {...other}
+        mask={"+00[0][0]"}
+        definitions={{
+          '0': /[0-9]/
+        }}
+        inputRef={ref}
+        onAccept={(value: any) => onChange({ target: { name: props.name, value } })}
+      />
+    );
+  }
+);
+
+const PhoneNumberMask = React.forwardRef<HTMLInputElement, CustomMaskProps>(
+  function PhoneNumberMask(props, ref) {
+    const { onChange, ...other } = props;
+    return (
+      <IMaskInput
+        {...other}
+        mask={"000 000 0000"}
+        definitions={{
+          '0': /[0-9]/
+        }}
+        inputRef={ref}
+        onAccept={(value: any) => onChange({ target: { name: props.name, value } })}
+      />
+    );
+  }
+);
 
 export interface CustomPhoneInputProps {
   name: string;
   label: string;
-  value: string;
-  required?: boolean;
-  disabled?: boolean;
-  fullWidth?: boolean;
+  countryCode: string;
+  phoneNumber: string;
+  onCountryCodeChange: (value: string) => void;
+  onPhoneNumberChange: (value: string) => void;
+  error?: boolean;
   helperText?: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  fullWidth?: boolean;
+  disabled?: boolean;
+  required?: boolean;
 }
 
 export const CustomPhoneInput: React.FC<CustomPhoneInputProps> = ({
   name,
   label,
-  value,
-  required = false,
-  disabled = false,
-  fullWidth = false,
+  countryCode,
+  phoneNumber,
+  onCountryCodeChange,
+  onPhoneNumberChange,
+  error = false,
   helperText,
-  onChange,
+  fullWidth = true,
+  disabled = false,
+  required = false,
 }) => {
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    // Only allow digits, spaces, parentheses, and hyphens
-    const sanitizedValue = e.target.value.replace(/[^\d\s()-]/g, '');
-    
-    // Update the input with the sanitized value
-    const event = {
-      ...e,
-      target: {
-        ...e.target,
-        name,
-        value: sanitizedValue,
-      },
-    };
-    
-    onChange(event);
-  };
-
   return (
-    <TextField
-      type="tel"
-      name={name}
-      label={label}
-      value={value}
-      required={required}
-      disabled={disabled}
-      fullWidth={fullWidth}
-      helperText={helperText}
-      onChange={handleChange}
-      variant="outlined"
-      inputProps={{
-        pattern: '[0-9\\s()-]*',
-        maxLength: 15,
-      }}
-    />
+    <div className="flex gap-2 items-start">
+      <TextField
+        name={`${name}-country-code`}
+        label="Ülke Kodu"
+        value={countryCode}
+        onChange={(e) => onCountryCodeChange(e.target.value)}
+        error={error}
+        required={required}
+        disabled={disabled}
+        variant="outlined"
+        size="small"
+        sx={{ width: '120px' }}
+        InputProps={{
+          inputComponent: CountryCodeMask as any,
+          inputProps: {
+            placeholder: '+XX'
+          }
+        }}
+      />
+      <TextField
+        name={`${name}-phone-number`}
+        label={label}
+        value={phoneNumber}
+        onChange={(e) => onPhoneNumberChange(e.target.value)}
+        error={error}
+        helperText={helperText || "Örnek: 532 123 4567"}
+        fullWidth={fullWidth}
+        required={required}
+        disabled={disabled}
+        variant="outlined"
+        size="small"
+        InputProps={{
+          inputComponent: PhoneNumberMask as any,
+          inputProps: {
+            placeholder: 'XXX XXX XXXX'
+          }
+        }}
+      />
+    </div>
   );
 };
 

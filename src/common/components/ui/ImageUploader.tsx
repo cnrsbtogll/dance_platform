@@ -1,97 +1,45 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Box, Typography, CircularProgress, IconButton, Button } from '@mui/material';
+import React, { useState, useRef } from 'react';
+import { Box, IconButton, Button, Typography } from '@mui/material';
 import { AddAPhoto, Edit, DeleteOutline, Check, Close } from '@mui/icons-material';
 import { motion } from 'framer-motion';
+import { generateInitialsAvatar } from '../../utils/imageUtils';
 
 type UserType = 'school' | 'instructor' | 'student';
 
 interface ImageUploaderProps {
   currentPhotoURL?: string;
   onImageChange: (base64Image: string | null) => void;
+  displayName?: string;
+  userType?: UserType;
   maxSizeKB?: number;
   maxWidth?: number;
   maxHeight?: number;
-  title?: string;
   shape?: 'circle' | 'square';
   width?: number;
   height?: number;
-  resetState?: boolean;
-  displayName?: string;
-  userType?: UserType;
 }
 
 const ImageUploader: React.FC<ImageUploaderProps> = ({
   currentPhotoURL,
   onImageChange,
+  displayName = '?',
+  userType = 'student',
   maxSizeKB = 10240,
   maxWidth = 3840,
   maxHeight = 2160,
-  title = 'Fotoğraf',
   shape = 'circle',
-  width = 200,
-  height = 200,
-  resetState = false,
-  displayName = '?',
-  userType = 'student'
+  width = 150,
+  height = 150
 }) => {
-  // Generate initials avatar function
-  const generateInitialsAvatar = (name: string, type: UserType = 'student'): string => {
-    // İsmin baş harfini al
-    const initial = name ? name.charAt(0).toUpperCase() : '?';
-    
-    // Tip bazlı renk belirleme
-    let backgroundColor;
-    let textColor = '#FFFFFF'; // Beyaz metin
-    
-    switch(type) {
-      case 'school':
-        backgroundColor = '#8B5CF6'; // Mor - okullar için
-        break;
-      case 'instructor':
-        backgroundColor = '#3B82F6'; // Mavi - eğitmenler için
-        break;
-      case 'student':
-        backgroundColor = '#10B981'; // Yeşil - öğrenciler için
-        break;
-      default:
-        backgroundColor = '#6B7280'; // Gri - varsayılan
-    }
-    
-    // SVG avatar oluştur
-    const svgContent = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
-        <rect width="200" height="200" fill="${backgroundColor}"/>
-        <text 
-          x="50%" 
-          y="50%" 
-          dy=".1em" 
-          font-family="Arial, sans-serif" 
-          font-size="100" 
-          fill="${textColor}" 
-          text-anchor="middle" 
-          dominant-baseline="middle"
-        >
-          ${initial}
-        </text>
-      </svg>
-    `;
-    
-    // SVG'yi base64 formatına dönüştür
-    return `data:image/svg+xml;base64,${btoa(svgContent)}`;
-  };
-
   const [previewURL, setPreviewURL] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [dragActive, setDragActive] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [resetState, setResetState] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const MAX_FILE_SIZE_MB = 20; // Maximum file size in MB
-  const MAX_DIMENSIONS = 4096; // Maximum width/height in pixels
-
-  // Reset state when resetState prop changes
-  useEffect(() => {
+  // Reset state when component unmounts or when reset is triggered
+  React.useEffect(() => {
     if (resetState) {
       if (previewURL && previewURL.startsWith('blob:')) {
         URL.revokeObjectURL(previewURL);
@@ -99,14 +47,12 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       setPreviewURL(null);
       setError(null);
       setUploadSuccess(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      setResetState(false);
     }
-  }, [resetState]);
+  }, [resetState, previewURL]);
 
-  // Clean up any blob URLs when component unmounts
-  useEffect(() => {
+  // Cleanup URLs on unmount
+  React.useEffect(() => {
     return () => {
       if (previewURL && previewURL.startsWith('blob:')) {
         URL.revokeObjectURL(previewURL);
@@ -117,59 +63,23 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   const validateImage = (file: File): { valid: boolean; error?: string } => {
     // Check file size
     if (file.size > maxSizeKB * 1024) {
-      return { valid: false, error: `Dosya boyutu çok büyük. Lütfen ${maxSizeKB/1024}MB'dan küçük bir görsel seçin.` };
-    }
-
-    // Check file type
-    if (!file.type.startsWith('image/')) {
-      return { valid: false, error: 'Lütfen geçerli bir görsel dosyası seçin (JPEG, PNG, GIF, vs.)' };
+      return {
+        valid: false,
+        error: `Dosya boyutu ${maxSizeKB}KB'dan küçük olmalıdır.`
+      };
     }
 
     return { valid: true };
   };
 
   const validateAndSetImage = (file: File) => {
-    // Check file size
-    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-      setError(`Dosya boyutu çok büyük. Lütfen ${MAX_FILE_SIZE_MB}MB'dan küçük bir görsel seçin.`);
-      return;
-    }
-
-    // Check file type
-    if (!file.type.startsWith('image/')) {
-      setError('Lütfen geçerli bir görsel dosyası seçin (JPEG, PNG, GIF, vs.)');
-      return;
-    }
-
-    // Check image dimensions
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-    
-    img.onload = () => {
-      if (img.width > MAX_DIMENSIONS || img.height > MAX_DIMENSIONS) {
-        URL.revokeObjectURL(objectUrl);
-        setError(`Görsel boyutları çok büyük. Lütfen maksimum ${MAX_DIMENSIONS}x${MAX_DIMENSIONS} piksel boyutunda bir görsel seçin.`);
-        return;
-      }
-      
-      // Convert to base64
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        setPreviewURL(result);
-        setError(null);
-      };
-      reader.readAsDataURL(file);
-      
-      URL.revokeObjectURL(objectUrl);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setPreviewURL(result);
+      setError(null);
     };
-    
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      setError('Görsel yüklenirken bir hata oluştu. Lütfen başka bir görsel deneyin.');
-    };
-    
-    img.src = objectUrl;
+    reader.readAsDataURL(file);
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -196,28 +106,25 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     }
   };
 
-  const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    setDragActive(false);
     
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       validateAndSetImage(e.dataTransfer.files[0]);
     }
   };
 
-  const confirmUpload = (e: React.MouseEvent) => {
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const triggerFileSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleConfirmUpload = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -225,10 +132,11 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       onImageChange(previewURL);
       setUploadSuccess(true);
       
-      // Sadece başarı durumunu sıfırla, preview'ı temizleme
+      // Reset after successful upload
       setTimeout(() => {
         setUploadSuccess(false);
-      }, 1500);
+        setResetState(true);
+      }, 2000);
     }
   };
 
@@ -243,17 +151,6 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     setError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
-    }
-  };
-
-  const triggerFileSelect = (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
     }
   };
 
@@ -273,7 +170,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     }
   };
 
-  // Update image display logic to use generateInitialsAvatar
+  // Get the current display image
   const getDisplayImage = () => {
     if (previewURL) return previewURL;
     if (currentPhotoURL) return currentPhotoURL;
@@ -281,11 +178,14 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   };
 
   return (
-    <Box sx={{ width: '100%', mb: 2 }}>
-      <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
-        {title}
-      </Typography>
-      
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 2
+      }}
+    >
       <input
         type="file"
         hidden
@@ -296,225 +196,143 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       
       <Box
         component={motion.div}
-        whileHover={{ scale: 1.03 }}
-        sx={{ position: 'relative', mb: 3 }}
+        whileHover={{ scale: 1.05 }}
+        onClick={handleImageClick}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        sx={{
+          position: 'relative',
+          width: width,
+          height: height,
+          borderRadius: shape === 'circle' ? '50%' : '8px',
+          overflow: 'hidden',
+          cursor: 'pointer',
+          '&:hover': {
+            '& .overlay': {
+              opacity: 1
+            }
+          }
+        }}
       >
-        {/* Image preview with overlay */}
+        {/* Background image */}
         <Box
-          onDragEnter={handleDrag}
-          onClick={handleImageClick}
           sx={{
-            position: 'relative',
-            width: width,
-            height: height,
-            borderRadius: shape === 'circle' ? '50%' : '8px',
-            overflow: 'hidden',
-            boxShadow: '0 8px 24px rgba(149, 157, 165, 0.2)',
-            cursor: 'pointer',
-            border: uploadSuccess ? '3px solid #22C55E' : (dragActive ? '3px dashed #8B5CF6' : '3px solid #8B5CF6'),
-            transition: 'all 0.3s ease',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: '#e0e7ff',
+            backgroundImage: `url(${getDisplayImage()})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            transition: 'transform 0.3s ease-in-out',
             '&:hover': {
-              boxShadow: '0 12px 28px rgba(149, 157, 165, 0.3)',
+              transform: 'scale(1.1)'
             }
           }}
-        >
-          {/* Görsel veya yükleme alanı gösterimi */}
+        />
+        
+        {/* Gradient overlay on hover */}
+        {!previewURL && currentPhotoURL && !uploadSuccess && (
           <Box
-            sx={{
-              width: '100%',
-              height: '100%',
-              backgroundColor: '#e0e7ff',
-              backgroundImage: `url(${getDisplayImage()})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-            }}
-          />
-          
-          {/* Success overlay */}
-          {uploadSuccess && (
-            <Box
-              component={motion.div}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.6) 0%, rgba(21, 128, 61, 0.6) 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                zIndex: 2
-              }}
-            >
-              <Check sx={{ fontSize: 48 }} />
-            </Box>
-          )}
-          
-          {/* Gradient overlay on hover */}
-          {!previewURL && currentPhotoURL && !uploadSuccess && (
-            <Box
-              component={motion.div}
-              initial={{ opacity: 0 }}
-              whileHover={{ opacity: 1 }}
-              sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.6) 0%, rgba(139, 92, 246, 0.6) 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                zIndex: 1
-              }}
-            >
-              <AddAPhoto fontSize="large" />
-            </Box>
-          )}
-        </Box>
-
-        {/* Düzenleme butonu */}
-        {!previewURL && currentPhotoURL && (
-          <IconButton 
-            size="small"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              triggerFileSelect();
-            }}
-            component={motion.button}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            component={motion.div}
+            className="overlay"
+            initial={{ opacity: 0 }}
             sx={{
               position: 'absolute',
-              right: -5,
-              bottom: 10,
-              backgroundColor: '#8B5CF6',
-              color: 'white',
-              boxShadow: '0 4px 12px rgba(139, 92, 246, 0.4)',
-              border: '2px solid white',
-              '&:hover': {
-                backgroundColor: '#7C3AED',
-              },
-              zIndex: 10
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.7))',
+              opacity: 0,
+              transition: 'opacity 0.3s ease-in-out',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
           >
-            <Edit fontSize="small" />
-          </IconButton>
+            <Edit sx={{ color: 'white', fontSize: 24 }} />
+          </Box>
         )}
 
-        {/* Silme butonu */}
-        {!previewURL && currentPhotoURL && (
-          <IconButton 
-            size="small"
-            onClick={handleRemoveCurrentPhoto}
-            component={motion.button}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+        {/* Upload success animation */}
+        {uploadSuccess && (
+          <Box
+            component={motion.div}
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
             sx={{
               position: 'absolute',
-              right: -5,
-              top: 10,
-              backgroundColor: '#EF4444',
-              color: 'white',
-              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)',
-              border: '2px solid white',
-              '&:hover': {
-                backgroundColor: '#DC2626',
-              },
-              zIndex: 10
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
           >
-            <DeleteOutline fontSize="small" />
-          </IconButton>
+            <Check sx={{ color: 'white', fontSize: 40 }} />
+          </Box>
         )}
       </Box>
-      
-      {/* Preview controls and user guidance */}
+
+      {/* Action buttons */}
       {previewURL && (
         <Box 
           sx={{ 
             display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center', 
-            gap: 2,
-            mt: 2 
+            gap: 1,
+            mt: 1
           }}
         >
-          <Typography variant="body2" color="text.secondary" align="center">
-            Seçilen fotoğrafı kaydetmek için onaylayın veya farklı bir fotoğraf seçin.
-          </Typography>
-          
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button
-              variant="contained"
-              color={uploadSuccess ? "success" : "primary"}
-              startIcon={uploadSuccess ? <Check /> : null}
-              onClick={confirmUpload}
-              disabled={isUploading || uploadSuccess}
-              sx={{
-                backgroundColor: uploadSuccess ? '#22C55E' : '#8B5CF6',
-                '&:hover': {
-                  backgroundColor: uploadSuccess ? '#15803D' : '#7C3AED',
-                },
-                transition: 'all 0.3s ease',
-                position: 'relative',
-                minWidth: 140
-              }}
-            >
-              {uploadSuccess ? 'Kaydedildi!' : 'Fotoğrafı Onayla'}
-              {isUploading && (
-                <CircularProgress
-                  size={24}
-                  sx={{
-                    color: 'white',
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    marginTop: '-12px',
-                    marginLeft: '-12px',
-                  }}
-                />
-              )}
-            </Button>
-            
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<Close />}
-              onClick={cancelUpload}
-              disabled={isUploading || uploadSuccess}
-            >
-              İptal
-            </Button>
-          </Box>
+          <IconButton 
+            size="small"
+            onClick={handleConfirmUpload}
+            component={motion.button}
+            whileHover={{ scale: 1.1 }}
+            sx={{
+              backgroundColor: 'success.main',
+              color: 'white',
+              '&:hover': {
+                backgroundColor: 'success.dark'
+              }
+            }}
+          >
+            <Check />
+          </IconButton>
+          <IconButton 
+            size="small"
+            onClick={cancelUpload}
+            component={motion.button}
+            whileHover={{ scale: 1.1 }}
+            sx={{
+              backgroundColor: 'error.main',
+              color: 'white',
+              '&:hover': {
+                backgroundColor: 'error.dark'
+              }
+            }}
+          >
+            <Close />
+          </IconButton>
         </Box>
       )}
       
       {/* Error message */}
       {error && (
-        <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+        <Typography variant="caption" color="error" sx={{ mt: 1 }}>
           {error}
         </Typography>
-      )}
-      
-      {/* Loading indicator */}
-      {isUploading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-          <CircularProgress size={24} sx={{ color: '#8B5CF6' }} />
-        </Box>
       )}
       
       {/* User guidance message */}
       {!previewURL && !currentPhotoURL && (
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          {title} yüklemek için yukarıdaki alana tıklayın veya bir dosyayı sürükleyip bırakın.
+          Fotoğraf yüklemek için tıklayın veya sürükleyip bırakın
         </Typography>
       )}
     </Box>
