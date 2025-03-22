@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   collection, 
   getDocs, 
@@ -334,7 +334,7 @@ export const UserManagement: React.FC = () => {
   };
 
   // Handle phone validation
-  const handlePhoneValidation = (isValid: boolean, errorMessage?: string) => {
+  const handlePhoneValidation = useCallback((isValid: boolean, errorMessage?: string) => {
     if (!isValid && errorMessage) {
       setFormErrors(prev => ({
         ...prev,
@@ -346,7 +346,7 @@ export const UserManagement: React.FC = () => {
         return rest;
       });
     }
-  };
+  }, []);
 
   // Reset form
   const resetForm = () => {
