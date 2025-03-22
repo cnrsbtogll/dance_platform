@@ -586,6 +586,76 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
     }
   };
 
+  // Davetiye e-postası gönderme fonksiyonu
+  const sendInvitationEmail = async (email: string, invitationData: {
+    displayName: string;
+    level?: DanceLevel;
+    phoneNumber?: string;
+    instructorId?: string;
+    instructorName?: string;
+    schoolId?: string;
+    schoolName?: string;
+    photoURL?: string;
+  }) => {
+    try {
+      // Benzersiz bir davet kodu oluştur
+      const invitationId = `inv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Remove undefined values from invitationData
+      const cleanedInvitationData = Object.fromEntries(
+        Object.entries({
+          email,
+          ...invitationData,
+          status: 'pending',
+          type: 'student',
+          createdAt: serverTimestamp(),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 gün geçerli
+        }).filter(([_, value]) => value !== undefined)
+      );
+
+      // Davet bilgilerini Firestore'a kaydet
+      await setDoc(doc(db, 'pendingUsers', invitationId), cleanedInvitationData);
+
+      // Kullanıcıyı users koleksiyonuna ekle
+      const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const now = Timestamp.now();
+      
+      const userData = {
+        id: userId,
+        email,
+        displayName: invitationData.displayName,
+        role: 'student',
+        level: invitationData.level || 'beginner',
+        photoURL: invitationData.photoURL || DEFAULT_STUDENT_IMAGE,
+        phoneNumber: invitationData.phoneNumber || '',
+        instructorId: invitationData.instructorId || null,
+        instructorName: invitationData.instructorName || null,
+        schoolId: invitationData.schoolId || null,
+        schoolName: invitationData.schoolName || null,
+        createdAt: now,
+        updatedAt: now,
+        status: 'pending'
+      };
+
+      await setDoc(doc(db, 'users', userId), {
+        ...userData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      // Öğrenci listesini güncelle
+      setStudents(prevStudents => [
+        userData as FirebaseUser,
+        ...prevStudents
+      ]);
+
+      return true;
+    } catch (error) {
+      console.error('Davet gönderilirken hata oluştu:', error);
+      throw error;
+    }
+  };
+
   // Form submission
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
@@ -670,37 +740,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
         if (!emailCheckSnapshot.empty) {
           throw new Error('Bu e-posta adresi zaten kullanılıyor.');
         }
-        
-        let userId = '';
-        
-        // Create user in Firebase Auth if requested
-        if (formData.createAccount) {
-          if (!formData.password) {
-            throw new Error('Kullanıcı hesabı oluşturmak için şifre gereklidir.');
-          }
-          
-          // Create the user in Firebase Auth
-          const userCredential = await createUserWithEmailAndPassword(
-            auth,
-            formData.email,
-            formData.password
-          );
-          
-          userId = userCredential.user.uid;
-          
-          // Update user profile
-          await updateProfile(userCredential.user, {
-            displayName: formData.displayName,
-            photoURL: formData.photoURL || DEFAULT_STUDENT_IMAGE
-          });
-          
-          // Send email verification
-          await sendEmailVerification(userCredential.user);
-        } else {
-          // Generate a random ID if not creating auth account
-          userId = 'user_' + Date.now() + Math.random().toString(36).substr(2, 9);
-        }
-        
+
         // Get instructor name if an instructor is selected
         let instructorName = '';
         if (formData.instructorId) {
@@ -714,48 +754,20 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
           const selectedSchool = schools.find(s => s.id === formData.schoolId);
           schoolName = selectedSchool?.displayName || '';
         }
-        
-        // Create user document in Firestore
-        const newStudentData = {
-          id: userId,
+
+        // Davet gönder
+        await sendInvitationEmail(formData.email, {
           displayName: formData.displayName,
-          email: formData.email,
-          phoneNumber: formData.phoneNumber || '',
-          role: 'student' as UserRole,
           level: formData.level,
-          instructorId: formData.instructorId || null,
-          instructorName: instructorName || null,
-          schoolId: formData.schoolId || null,
-          schoolName: schoolName || null,
-          photoURL: formData.photoURL || DEFAULT_STUDENT_IMAGE,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        };
+          phoneNumber: formData.phoneNumber,
+          instructorId: formData.instructorId,
+          instructorName: instructorName,
+          schoolId: formData.schoolId,
+          schoolName: schoolName,
+          photoURL: formData.photoURL
+        });
         
-        try {
-          await setDoc(doc(db, 'users', userId), newStudentData);
-          console.log('Yeni öğrenci kaydedildi:', userId);
-          
-          // Add to students array
-          const newStudent: FirebaseUser = {
-            ...newStudentData,
-            role: 'student' as UserRole,
-            level: formData.level,
-            instructorId: formData.instructorId || null,
-            instructorName: instructorName || null,
-            schoolId: formData.schoolId || null,
-            schoolName: schoolName || null,
-            createdAt: serverTimestamp() as Timestamp,
-            updatedAt: serverTimestamp() as Timestamp
-          };
-          
-          setStudents([newStudent, ...students]);
-          setSuccess('Yeni öğrenci başarıyla oluşturuldu.');
-        } catch (docError) {
-          console.error('Firestore dökümanı oluşturulurken hata:', docError);
-          throw new Error('Öğrenci bilgileri kaydedilirken bir hata oluştu: ' + 
-            (docError instanceof Error ? docError.message : 'Bilinmeyen hata'));
-        }
+        setSuccess('Öğrenci başarıyla eklendi ve davet e-postası gönderildi.');
       }
       
       // Close the form
@@ -763,8 +775,8 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
       setSelectedStudent(null);
       
     } catch (err: any) {
-      console.error('Öğrenci kaydedilirken hata oluştu:', err);
-      setError('Öğrenci kaydedilirken bir hata oluştu: ' + (err.message || 'Bilinmeyen hata'));
+      console.error('İşlem sırasında hata oluştu:', err);
+      setError('İşlem sırasında bir hata oluştu: ' + (err.message || 'Bilinmeyen hata'));
     } finally {
       setLoading(false);
     }
