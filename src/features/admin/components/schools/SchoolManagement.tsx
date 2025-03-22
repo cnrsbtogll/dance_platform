@@ -13,7 +13,8 @@ import {
   QueryDocumentSnapshot, 
   Timestamp,
   setDoc,
-  getDoc
+  getDoc,
+  where
 } from 'firebase/firestore';
 import {
   createUserWithEmailAndPassword,
@@ -372,203 +373,204 @@ function SchoolManagement(): JSX.Element {
     }
   };
 
-  // Form gönderimi
+  // Davetiye e-postası gönderme fonksiyonu
+  const sendInvitationEmail = async (email: string, invitationData: {
+    name: string;
+    description?: string;
+    address?: string;
+    city?: string;
+    country?: string;
+    zipCode?: string;
+    contactPerson?: string;
+    contactPhone?: string;
+    website?: string;
+    establishedYear?: string;
+    danceStyles?: string[];
+  }) => {
+    try {
+      // Benzersiz bir davet kodu oluştur
+      const invitationId = `inv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Remove undefined values from invitationData
+      const cleanedInvitationData = Object.fromEntries(
+        Object.entries({
+          email,
+          ...invitationData,
+          status: 'pending',
+          type: 'school',
+          createdAt: serverTimestamp(),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 gün geçerli
+        }).filter(([_, value]) => value !== undefined)
+      );
+
+      // Davet bilgilerini Firestore'a kaydet
+      await setDoc(doc(db, 'pendingUsers', invitationId), cleanedInvitationData);
+
+      // Okulu schools koleksiyonuna ekle
+      const schoolId = `school_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const now = Timestamp.now();
+      
+      const schoolData = {
+        id: schoolId,
+        name: invitationData.name,
+        description: invitationData.description || '',
+        address: invitationData.address || '',
+        city: invitationData.city || '',
+        country: invitationData.country || '',
+        zipCode: invitationData.zipCode || '',
+        contactEmail: email,
+        contactPerson: invitationData.contactPerson || '',
+        contactPhone: invitationData.contactPhone || '',
+        website: invitationData.website || '',
+        establishedYear: invitationData.establishedYear || '',
+        danceStyles: invitationData.danceStyles || [],
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now
+      };
+
+      await setDoc(doc(db, 'schools', schoolId), {
+        ...schoolData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      // Kullanıcıyı users koleksiyonuna ekle
+      const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      const userData = {
+        id: userId,
+        email,
+        displayName: invitationData.name,
+        role: ['school'],
+        photoURL: '',
+        phoneNumber: invitationData.contactPhone || '',
+        schoolId: schoolId,
+        createdAt: now,
+        updatedAt: now,
+        status: 'pending'
+      };
+
+      await setDoc(doc(db, 'users', userId), {
+        ...userData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      // Okul listesini güncelle
+      setOkullar(prevOkullar => [
+        {
+          ...schoolData,
+          id: schoolId,
+        } as Okul,
+        ...prevOkullar
+      ]);
+
+      return true;
+    } catch (error) {
+      console.error('Davet gönderilirken hata oluştu:', error);
+      throw error;
+    }
+  };
+
+  // Form submission
   const formGonder = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
-    e.stopPropagation();
+    
+    if (Object.keys(formErrors).length > 0) {
+      setError('Lütfen form hatalarını düzeltin.');
+      return;
+    }
     
     setLoading(true);
     setError(null);
     setSuccess(null);
     
-    // Görsel yoksa varsayılan avatar oluştur
-    let gorselData = formVeri.gorsel;
-    
-    if (!gorselData || gorselData === '/assets/images/dance/okul_default.jpg') {
-      gorselData = generateInitialsAvatar(formVeri.name, 'school');
-    }
-    
-    // Form verisini güncelle
-    const formData = {
-      ...formVeri,
-      gorsel: gorselData
-    };
-    
-    // Görsel tipini kontrol etmemiz için log
-    console.log('Görsel veri tipi:', typeof gorselData);
-    console.log('Görsel veri uzunluğu:', gorselData ? gorselData.length : 0);
-    console.log('Görsel veri başlangıç:', gorselData ? gorselData.substring(0, 30) + '...' : 'boş');
-    
     try {
       if (seciliOkul) {
-        // Mevcut okulu güncelle - görsel zaten yüklenmiş olabilir
+        // Mevcut okul güncelleme
         const okulRef = doc(db, 'schools', seciliOkul.id);
         
-        // Tüm form verilerini güncelle, zaten yüklenen görsel varsa o korunacak
         await updateDoc(okulRef, {
-          ...formData,
+          name: formVeri.name,
+          description: formVeri.description,
+          address: formVeri.address,
+          city: formVeri.city,
+          country: formVeri.country,
+          zipCode: formVeri.zipCode,
+          contactEmail: formVeri.contactEmail,
+          contactPerson: formVeri.contactPerson,
+          contactPhone: formVeri.contactPhone,
+          website: formVeri.website,
+          establishedYear: formVeri.establishedYear,
+          danceStyles: formVeri.danceStyles,
           updatedAt: serverTimestamp()
         });
         
-        // Şifre değişikliği varsa kullanıcıyı güncelle
-        if (formData.password && formData.password.length >= 6) {
-          // Okula ait kullanıcı ID'sini al
-          const okulDoc = await getDoc(okulRef);
-          if (okulDoc.exists() && okulDoc.data().userId) {
-            const userId = okulDoc.data().userId;
-            
-            try {
-              // Kullanıcı belgesini Firestore'dan al
-              const userDoc = await getDoc(doc(db, 'users', userId));
-              if (userDoc.exists()) {
-                const userData = userDoc.data();
-                
-                // Şifre sıfırlama e-postası gönder
-                await sendPasswordResetEmail(auth, userData.email);
-                
-                setSuccess('Okul başarıyla güncellendi. Şifre değişikliği için şifre sıfırlama e-postası gönderildi. Lütfen e-posta kutusunu kontrol edin.');
-              } else {
-                setSuccess('Okul başarıyla güncellendi, ancak kullanıcı bilgileri bulunamadığı için şifre sıfırlama e-postası gönderilemedi.');
-              }
-            } catch (passwordError) {
-              console.error('Şifre sıfırlama e-postası gönderilirken hata oluştu:', passwordError);
-              setSuccess('Okul başarıyla güncellendi, ancak şifre sıfırlama e-postası gönderilemedi.');
-            }
-          } else {
-            setSuccess('Okul başarıyla güncellendi. Okula ait kullanıcı bulunamadığı için şifre değişikliği yapılamadı.');
-          }
-        } else {
-          setSuccess('Okul bilgileri başarıyla güncellendi. Fotoğraf daha önceden kaydedilmişti.');
-        }
+        const updatedOkullar = okullar.map(okul => 
+          okul.id === seciliOkul.id 
+            ? { 
+                ...okul, 
+                name: formVeri.name,
+                description: formVeri.description,
+                address: formVeri.address,
+                city: formVeri.city,
+                country: formVeri.country,
+                zipCode: formVeri.zipCode,
+                contactEmail: formVeri.contactEmail,
+                contactPerson: formVeri.contactPerson,
+                contactPhone: formVeri.contactPhone,
+                website: formVeri.website,
+                establishedYear: formVeri.establishedYear,
+                danceStyles: formVeri.danceStyles,
+                updatedAt: serverTimestamp() as Timestamp
+              } 
+            : okul
+        );
+        
+        setOkullar(updatedOkullar);
+        setSuccess('Dans okulu bilgileri başarıyla güncellendi.');
       } else {
-        // Yeni okul ekle
-        const yeniOkulRef = await addDoc(collection(db, 'schools'), {
-          ...formData,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
+        // Yeni okul ekleme
+        if (!formVeri.contactEmail || !formVeri.name) {
+          throw new Error('E-posta ve okul adı alanları zorunludur.');
+        }
+        
+        // E-posta kontrolü
+        const emailQuery = query(
+          collection(db, 'users'), 
+          where('email', '==', formVeri.contactEmail)
+        );
+        const emailCheckSnapshot = await getDocs(emailQuery);
+        
+        if (!emailCheckSnapshot.empty) {
+          throw new Error('Bu e-posta adresi zaten kullanılıyor.');
+        }
+
+        // Davet gönder
+        await sendInvitationEmail(formVeri.contactEmail, {
+          name: formVeri.name,
+          description: formVeri.description,
+          address: formVeri.address,
+          city: formVeri.city,
+          country: formVeri.country,
+          zipCode: formVeri.zipCode,
+          contactPerson: formVeri.contactPerson,
+          contactPhone: formVeri.contactPhone,
+          website: formVeri.website,
+          establishedYear: formVeri.establishedYear,
+          danceStyles: formVeri.danceStyles
         });
         
-        // Okul için kullanıcı hesabı oluştur
-        // E-posta adresini okul iletişim adresinden al
-        const okulEmail = formData.contactEmail;
-        
-        // E-posta formatını kontrol et
-        if (!okulEmail || !okulEmail.includes('@')) {
-          throw new Error('Okul için geçerli bir e-posta adresi gereklidir');
-        }
-        
-        try {
-          // Şifre belirle - kullanıcı tarafından girilmiş veya otomatik oluştur
-          let kullaniciSifresi = formData.password;
-          
-          // Şifre girilmemişse otomatik oluştur
-          if (!kullaniciSifresi || kullaniciSifresi.length < 6) {
-            kullaniciSifresi = `${formData.name.replace(/\s+/g, '').toLowerCase()}${new Date().getFullYear()}`;
-            console.log("Otomatik oluşturulan şifre:", kullaniciSifresi);
-          }
-          
-          // Firebase Auth'da kullanıcı oluşturma denemeleri
-          console.log("Kullanıcı oluşturma denemesi başlıyor - email:", okulEmail);
-          
-          try {
-            // Firebase Auth'da kullanıcı oluştur
-            const userCredential = await createUserWithEmailAndPassword(
-              auth,
-              okulEmail,
-              kullaniciSifresi
-            );
-            
-            console.log("Firebase Auth kullanıcısı oluşturuldu, UID:", userCredential.user.uid);
-            
-            // Kullanıcı profil bilgilerini güncelleyelim
-            await updateProfile(userCredential.user, {
-              displayName: formData.name
-            });
-            
-            console.log("Kullanıcı profili güncellendi");
-            
-            // Firestore'da kullanıcı belgesini oluştur
-            await setDoc(doc(db, 'users', userCredential.user.uid), {
-              id: userCredential.user.uid,
-              displayName: formData.name,
-              email: okulEmail,
-              phoneNumber: formData.contactPhone || '',
-              role: ['school'],  // Okul rolü
-              photoURL: formData.gorsel || '',
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-              schoolId: yeniOkulRef.id // Okulun ID'si
-            });
-            
-            console.log("Firestore'da kullanıcı belgesi oluşturuldu");
-            
-            // Okul belgesine kullanıcı ID'sini ekle
-            await updateDoc(doc(db, 'schools', yeniOkulRef.id), {
-              userId: userCredential.user.uid
-            });
-            
-            console.log("Okul belgesi kullanıcı ID'si ile güncellendi");
-            
-            setSuccess(
-              `Yeni okul ve okul hesabı başarıyla oluşturuldu!\n\n` +
-              `Okul Giriş Bilgileri:\n` +
-              `E-posta: ${okulEmail}\n` + 
-              (formData.password 
-                ? 'Belirttiğiniz şifre ile giriş yapabilirsiniz.\n\n' 
-                : `Geçici Şifre: ${kullaniciSifresi}\n\n` +
-                  'ÖNEMLİ: Lütfen bu şifreyi not alın, daha sonra görüntüleyemeyeceksiniz.'
-              )
-            );
-          } catch (authError: any) {
-            // Auth hatalarını daha ayrıntılı işle
-            console.error('Firebase Auth kullanıcı oluşturma hatası:', authError);
-            
-            // Hata mesajını analiz et
-            let hataDetayi = '';
-            if (authError.code) {
-              switch(authError.code) {
-                case 'auth/email-already-in-use':
-                  hataDetayi = 'Bu e-posta adresi zaten kullanımda.';
-                  break;
-                case 'auth/invalid-email':
-                  hataDetayi = 'Geçersiz e-posta formatı.';
-                  break;
-                case 'auth/operation-not-allowed':
-                  hataDetayi = 'E-posta/şifre girişi Firebase projesinde etkin değil.';
-                  break;
-                case 'auth/weak-password':
-                  hataDetayi = 'Şifre yeterince güçlü değil. En az 6 karakter olmalıdır.';
-                  break;
-                default:
-                  hataDetayi = authError.message || 'Bilinmeyen hata';
-              }
-            }
-            
-            // Okul bilgisini korumak için devam et
-            setSuccess(
-              `Yeni okul eklendi ancak kullanıcı hesabı oluşturulamadı. Hata: ${hataDetayi}\n\n` +
-              `Okul Bilgileri:\n` +
-              `- ID: ${yeniOkulRef.id}\n` +
-              `- Ad: ${formData.name}\n` +
-              `- E-posta: ${okulEmail}\n\n` + 
-              `Lütfen yönetici panelinden manuel olarak bir kullanıcı hesabı oluşturun.`
-            );
-          }
-        } catch (err) {
-          console.error('Okul kullanıcısı oluşturma sürecinde genel hata:', err);
-          setSuccess('Yeni okul eklendi ancak kullanıcı hesabı oluşturulamadı. Lütfen manuel olarak oluşturun.');
-        }
+        setSuccess('Dans okulu başarıyla eklendi ve davet e-postası gönderildi.');
       }
       
-      // Okul listesini yenile
-      fetchOkullar();
-      
-      // Formu kapat
       setDuzenlemeModu(false);
       setSeciliOkul(null);
-    } catch (err) {
-      console.error('Okul kaydederken hata oluştu:', err);
-      setError('Okul kaydedilirken bir hata oluştu: ' + (err instanceof Error ? err.message : 'Bilinmeyen hata'));
+      
+    } catch (err: any) {
+      console.error('İşlem sırasında hata oluştu:', err);
+      setError('İşlem sırasında bir hata oluştu: ' + (err.message || 'Bilinmeyen hata'));
     } finally {
       setLoading(false);
     }
