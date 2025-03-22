@@ -315,7 +315,11 @@ const StudentPhotoUploader: React.FC<StudentPhotoUploaderProps> = ({
   );
 };
 
-export const StudentManagement: React.FC = () => {
+interface StudentManagementProps {
+  isAdmin?: boolean;
+}
+
+export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = false }) => {
   const { currentUser } = useAuth();
   const [students, setStudents] = useState<FirebaseUser[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<FirebaseUser[]>([]);
@@ -379,7 +383,20 @@ export const StudentManagement: React.FC = () => {
     try {
       // Get all users from Firestore
       const usersRef = collection(db, 'users');
-      const q = query(usersRef, orderBy('createdAt', 'desc'));
+      let q;
+      
+      if (isAdmin) {
+        // Admin sees all students
+        q = query(usersRef, orderBy('createdAt', 'desc'));
+      } else {
+        // Instructors only see their students
+        q = query(
+          usersRef, 
+          where('instructorId', '==', currentUser?.uid),
+          orderBy('createdAt', 'desc')
+        );
+      }
+      
       const querySnapshot = await getDocs(q);
       
       const studentsData: FirebaseUser[] = [];
@@ -434,8 +451,13 @@ export const StudentManagement: React.FC = () => {
       });
       
       console.log(`${studentsData.length} öğrenci bulundu`);
-      console.log(`${instructorsData.length} eğitmen bulundu:`, instructorsData.map(i => i.displayName));
-      console.log(`${schoolsData.length} okul bulundu:`, schoolsData.map(s => s.displayName));
+      if (!isAdmin) {
+        console.log('Instructor ID:', currentUser?.uid);
+        console.log('Found students:', studentsData.map(s => ({
+          name: s.displayName,
+          instructorId: s.instructorId
+        })));
+      }
       
       setStudents(studentsData);
       setFilteredStudents(studentsData);
