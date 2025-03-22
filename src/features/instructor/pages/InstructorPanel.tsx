@@ -4,10 +4,9 @@ import { motion } from 'framer-motion';
 import InstructorProfileForm from '../components/InstructorProfileForm';
 import CourseManagement from '../../../features/shared/components/courses/CourseManagement';
 import { query, where, orderBy, collection, getDocs } from 'firebase/firestore';
-import { usersRef } from '../../../firebase/firebaseConfig';
-import { currentUser } from '../../../firebase/firebaseConfig';
 import { StudentManagement } from '../../../features/shared/components/students/StudentManagement';
 import { db } from '../../../api/firebase/firebase';
+import { ChatList } from '../../../features/chat/components/ChatList';
 
 interface InstructorPanelProps {
   user: any; // TODO: Add proper type
@@ -23,7 +22,7 @@ interface Course {
 }
 
 function InstructorPanel({ user }: InstructorPanelProps) {
-  const [activeTab, setActiveTab] = useState<'profile' | 'courses' | 'students' | 'schedule'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'courses' | 'students' | 'schedule' | 'messages'>('profile');
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -128,6 +127,16 @@ function InstructorPanel({ user }: InstructorPanelProps) {
             >
               Ders Programım
             </button>
+            <button
+              onClick={() => setActiveTab('messages')}
+              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 ${
+                activeTab === 'messages'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Mesajlarım
+            </button>
           </nav>
         </div>
 
@@ -142,6 +151,10 @@ function InstructorPanel({ user }: InstructorPanelProps) {
 
           {activeTab === 'students' && (
             <StudentManagement isAdmin={false} />
+          )}
+
+          {activeTab === 'messages' && (
+            <ChatList />
           )}
 
           {activeTab === 'schedule' && (
@@ -203,6 +216,7 @@ function InstructorPanel({ user }: InstructorPanelProps) {
           <li>• Öğrencilerinizin ilerleme durumlarını takip ederek kişiselleştirilmiş geri bildirimler verin.</li>
           <li>• Ders programınızı önceden planlayarak öğrencilerinize duyurun.</li>
           <li>• Dans videolarınızı paylaşarak öğrencilerinizin ders dışında da çalışmalarını sağlayın.</li>
+          <li>• Öğrencilerinizle düzenli iletişim kurarak motivasyonlarını yüksek tutun.</li>
         </ul>
       </div>
     </div>

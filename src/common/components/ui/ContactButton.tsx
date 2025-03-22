@@ -1,6 +1,6 @@
 import React, { useState, Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { DanceClass } from '../../types';
+import { DanceClass } from '../../../types';
 
 interface ContactButtonProps {
   course: DanceClass;

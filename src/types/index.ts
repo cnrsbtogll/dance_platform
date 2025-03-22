@@ -89,39 +89,27 @@ export interface PartnerMatch {
 export interface DanceClass {
   id: string;
   name: string;
-  description: string;
-  danceStyle: DanceStyle;
-  level: DanceLevel;
+  description?: string;
   instructorId: string;
   instructorName: string;
   schoolId?: string;
   schoolName?: string;
-  location: {
-    address: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    latitude: number;
-    longitude: number;
-  };
+  danceStyle: string;
+  level: string;
+  schedule: {
+    day: string;
+    time: string;
+  }[];
   price: number;
-  currency: 'TRY' | 'USD' | 'EUR';
-  duration: number; // Minutes
-  maxParticipants: number;
-  currentParticipants: number;
-  date: Date | any; // FireStore Timestamp için esneklik
-  time: string;
-  recurring: boolean;
-  daysOfWeek?: string[];
-  imageUrl?: string;
-  createdAt?: any; // Firestore Timestamp
-  updatedAt?: any; // Firestore Timestamp
-  status?: 'active' | 'cancelled' | 'completed' | 'draft';
-  tags?: string[]; // Ek etiketler
-  highlights?: string[]; // Öne çıkan bilgiler
-  // İletişim bilgileri
+  capacity: number;
+  enrolledStudents: number;
+  status: 'active' | 'inactive';
+  photoURL?: string;
   phoneNumber?: string;
   email?: string;
+  address?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface DanceSchool {

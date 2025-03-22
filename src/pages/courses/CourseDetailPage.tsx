@@ -4,7 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../api/firebase/firebase';
 import { DanceClass } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import ContactButton from '../../components/common/ContactButton';
+import ContactButton from '../../common/components/ui/ContactButton';
 
 const CourseDetailPage: React.FC = () => {
   const { id } = useParams<Record<string, string | undefined>>();
