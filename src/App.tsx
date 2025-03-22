@@ -44,6 +44,11 @@ function App(): JSX.Element {
   const InstructorRedirect: React.FC = () => {
     const location = useLocation();
     
+    // /become-school sayfasına gidildiğinde yönlendirme yapma
+    if (location.pathname === '/become-school') {
+      return null;
+    }
+    
     if (user?.role?.includes('instructor') && location.pathname !== '/instructor') {
       return <Navigate to="/instructor" replace />;
     }
@@ -318,7 +323,21 @@ function App(): JSX.Element {
                 />
                 <Route
                   path="/become-school"
-                  element={<BecomeSchool />}
+                  element={
+                    <BecomeSchool 
+                      onMount={() => {
+                        console.log('🎯 /become-school route render:', {
+                          isAuthenticated,
+                          user: {
+                            id: user?.id,
+                            email: user?.email,
+                            role: user?.role
+                          },
+                          timestamp: new Date().toISOString()
+                        });
+                      }}
+                    />
+                  }
                 />
                 <Route 
                   path="/profile" 

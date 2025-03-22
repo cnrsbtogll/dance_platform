@@ -23,13 +23,43 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Kullanıcı rollerini kontrol et
-  const hasInstructorRole = user?.role?.includes('instructor');
-  const hasSchoolAdminRole = user?.role?.includes('school_admin');
-  const hasSchoolRole = user?.role?.includes('school');
-  const hasSuperAdminRole = user?.role?.includes('admin');
-  const hasStudentRole = user?.role?.includes('student') || 
-                       (!hasInstructorRole && !hasSchoolAdminRole && !hasSchoolRole && !hasSuperAdminRole && isAuthenticated);
+  // Kullanıcı rollerini kontrol et ve logla
+  useEffect(() => {
+    console.log('🔍 Kullanıcı rol bilgileri:', {
+      rawRole: user?.role,
+      isArray: Array.isArray(user?.role),
+      user: user
+    });
+  }, [user]);
+
+  const hasInstructorRole = Array.isArray(user?.role) 
+    ? user?.role?.includes('instructor')
+    : user?.role === 'instructor';
+  const hasSchoolAdminRole = Array.isArray(user?.role)
+    ? user?.role?.includes('school_admin')
+    : user?.role === 'school_admin';
+  const hasSchoolRole = Array.isArray(user?.role)
+    ? user?.role?.includes('school')
+    : user?.role === 'school';
+  const hasSuperAdminRole = Array.isArray(user?.role)
+    ? user?.role?.includes('admin')
+    : user?.role === 'admin';
+  const hasStudentRole = (Array.isArray(user?.role) 
+    ? user?.role?.includes('student')
+    : user?.role === 'student') || 
+    (!hasInstructorRole && !hasSchoolAdminRole && !hasSchoolRole && !hasSuperAdminRole && isAuthenticated);
+
+  // Rol durumlarını logla
+  useEffect(() => {
+    console.log('👥 Kullanıcı rol durumları:', {
+      hasInstructorRole,
+      hasSchoolAdminRole,
+      hasSchoolRole,
+      hasSuperAdminRole,
+      hasStudentRole,
+      isAuthenticated
+    });
+  }, [hasInstructorRole, hasSchoolAdminRole, hasSchoolRole, hasSuperAdminRole, hasStudentRole, isAuthenticated]);
 
   // Profil fotoğrafını Firestore'dan getir
   useEffect(() => {
@@ -225,10 +255,25 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                   </Link>
                 )}
                 
-                {/* 'Dans Okulu Aç' butonunu okul sahibi olmayanlar görür (eğitmenler dahil) */}
-                {!hasSchoolRole && (
+                {/* 'Dans Okulu Aç' butonunu sadece eğitmenler görür */}
+                {!hasSchoolRole && hasInstructorRole && (
                   <Link
                     to="/become-school"
+                    onClick={() => {
+                      console.log('🎯 Dans Okulu Aç butonuna tıklandı:', {
+                        userId: user?.id,
+                        userEmail: user?.email,
+                        userRole: user?.role,
+                        roleChecks: {
+                          hasInstructorRole,
+                          hasSchoolRole,
+                          hasSchoolAdminRole,
+                          hasSuperAdminRole
+                        },
+                        timestamp: new Date().toISOString(),
+                        currentPath: location.pathname
+                      });
+                    }}
                     className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -400,11 +445,27 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                   </Link>
                 )}
                 
-                {!hasSchoolRole && (
+                {/* 'Dans Okulu Aç' butonunu sadece eğitmenler görür */}
+                {!hasSchoolRole && hasInstructorRole && (
                   <Link 
                     to="/become-school"
+                    onClick={() => {
+                      console.log('🎯 Dans Okulu Aç butonuna tıklandı (Mobil):', {
+                        userId: user?.id,
+                        userEmail: user?.email,
+                        userRole: user?.role,
+                        roleChecks: {
+                          hasInstructorRole,
+                          hasSchoolRole,
+                          hasSchoolAdminRole,
+                          hasSuperAdminRole
+                        },
+                        timestamp: new Date().toISOString(),
+                        currentPath: location.pathname
+                      });
+                      setIsMenuOpen(false);
+                    }}
                     className="block w-full px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:ring-offset-1 shadow-sm transition-all duration-200"
-                    onClick={() => setIsMenuOpen(false)}
                   >
                     <div className="flex items-center justify-center">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
