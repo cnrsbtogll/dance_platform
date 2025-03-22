@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { InstructorFormData, FormErrors } from '../types';
 import CustomInput from '../../../../../common/components/ui/CustomInput';
 import CustomSelect from '../../../../../common/components/ui/CustomSelect';
 import CustomPhoneInput from '../../../../../common/components/ui/CustomPhoneInput';
 import ImageUploader from '../../../../../common/components/ui/ImageUploader';
 import { DanceLevel } from '../../../../../types';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { db } from '../../../../../api/firebase/firebase';
 
 interface InstructorFormProps {
   formData: InstructorFormData;
@@ -23,6 +25,43 @@ export const InstructorForm: React.FC<InstructorFormProps> = ({
   onInputChange,
   onPhotoChange
 }) => {
+  const [danceStyles, setDanceStyles] = useState<Array<{ value: string; label: string }>>([]);
+  const [loadingStyles, setLoadingStyles] = useState(true);
+
+  // Dans stillerini Firebase'den getir
+  useEffect(() => {
+    const fetchDanceStyles = async () => {
+      try {
+        const stylesRef = collection(db, 'danceStyles');
+        const q = query(stylesRef, orderBy('label'));
+        const querySnapshot = await getDocs(q);
+        
+        const styles = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            label: data.label || data.name || '',
+            value: data.value || doc.id
+          };
+        });
+        
+        setDanceStyles(styles);
+      } catch (error) {
+        console.error('Dans stilleri yüklenirken hata:', error);
+        // Hata durumunda varsayılan stiller
+        setDanceStyles([
+          { value: 'salsa', label: 'Salsa' },
+          { value: 'bachata', label: 'Bachata' },
+          { value: 'kizomba', label: 'Kizomba' },
+          { value: 'zouk', label: 'Zouk' }
+        ]);
+      } finally {
+        setLoadingStyles(false);
+      }
+    };
+
+    fetchDanceStyles();
+  }, []);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
       <div>
@@ -30,7 +69,6 @@ export const InstructorForm: React.FC<InstructorFormProps> = ({
           name="displayName"
           label="Ad Soyad"
           type="text"
-          required
           value={formData.displayName}
           onChange={onInputChange}
           helperText={formErrors.displayName}
@@ -43,10 +81,9 @@ export const InstructorForm: React.FC<InstructorFormProps> = ({
           type="email"
           name="email"
           label="E-posta"
-          required
           value={formData.email}
           onChange={onInputChange}
-          disabled={isEdit}
+          readOnly={isEdit}
           helperText={isEdit ? "Mevcut kullanıcıların e-posta adresleri değiştirilemez." : formErrors.email}
           fullWidth
         />
@@ -56,7 +93,7 @@ export const InstructorForm: React.FC<InstructorFormProps> = ({
         <CustomPhoneInput
           name="phoneNumber"
           label="Telefon"
-          value={formData.phoneNumber}
+          initialValue={formData.phoneNumber}
           onChange={onInputChange}
           helperText={formErrors.phoneNumber}
           fullWidth
@@ -83,7 +120,7 @@ export const InstructorForm: React.FC<InstructorFormProps> = ({
         <CustomInput
           name="experience"
           label="Deneyim (Yıl)"
-          type="number"
+          type="text"
           value={formData.experience.toString()}
           onChange={onInputChange}
           fullWidth
@@ -91,23 +128,25 @@ export const InstructorForm: React.FC<InstructorFormProps> = ({
       </div>
 
       <div>
-        <CustomSelect
-          name="specialties"
-          label="Uzmanlık Alanları"
-          value={formData.specialties}
-          onChange={(value) => {
-            const selectedSpecialties = Array.isArray(value) ? value : [value];
-            onInputChange({ target: { name: 'specialties', value: selectedSpecialties } });
-          }}
-          options={[
-            { value: 'salsa', label: 'Salsa' },
-            { value: 'bachata', label: 'Bachata' },
-            { value: 'kizomba', label: 'Kizomba' },
-            { value: 'zouk', label: 'Zouk' }
-          ]}
-          multiple
-          fullWidth
-        />
+        {loadingStyles ? (
+          <div className="flex items-center space-x-2">
+            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500"></div>
+            <span className="text-sm text-gray-500">Dans stilleri yükleniyor...</span>
+          </div>
+        ) : (
+          <CustomSelect
+            name="specialties"
+            label="Uzmanlık Alanları"
+            value={formData.specialties}
+            onChange={(value) => {
+              const selectedSpecialties = Array.isArray(value) ? value : [value];
+              onInputChange({ target: { name: 'specialties', value: selectedSpecialties } });
+            }}
+            options={danceStyles}
+            multiple
+            fullWidth
+          />
+        )}
       </div>
       
       <div className="md:col-span-2">

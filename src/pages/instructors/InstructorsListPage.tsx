@@ -30,10 +30,20 @@ const InstructorsListPage: React.FC = () => {
     try {
       const fetchedInstructors = await fetchAllInstructors();
       
-      console.log('Fetched Instructors:', fetchedInstructors.map(instructor => ({
+      console.log('Raw Fetched Instructors Data:', JSON.stringify(fetchedInstructors, null, 2));
+      
+      console.log('Instructor Details:', fetchedInstructors.map(instructor => ({
         id: instructor.id,
-        name: instructor.user.displayName,
-        specialties: instructor.specialties
+        name: instructor.user?.displayName || 'İsimsiz',
+        email: instructor.user?.email,
+        specialties: instructor.specialties || [],
+        experience: instructor.experience,
+        level: instructor.level,
+        schoolId: instructor.schoolId,
+        schoolName: instructor.schoolName,
+        userId: instructor.userId,
+        photoURL: instructor.user?.photoURL,
+        availability: instructor.availability
       })));
       
       // Eğitmenleri tecrübeye göre sıralayalım (yüksekten düşüğe)
@@ -111,7 +121,9 @@ const InstructorsListPage: React.FC = () => {
 
     // Dans stiline göre filtreleme
     const matchesStyle = selectedStyle === '' || 
-      (instructor.specialties && instructor.specialties.includes(selectedStyle));
+      (instructor.specialties && instructor.specialties.some(specialty => 
+        specialty.toLowerCase() === selectedStyle.toLowerCase()
+      ));
 
     // Log filtreleme detayları
     if (selectedStyle) {
@@ -120,8 +132,7 @@ const InstructorsListPage: React.FC = () => {
         name: instructor.user.displayName,
         specialties: instructor.specialties,
         selectedStyle,
-        matchesStyle,
-        rawData: instructor // Log the entire instructor object for debugging
+        matchesStyle
       });
     }
     

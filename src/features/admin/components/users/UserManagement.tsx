@@ -640,19 +640,45 @@ export const UserManagement: React.FC = () => {
           }
           case 'instructor': {
             const instructorData = formData as InstructorFormData;
-            const instructorRef = doc(db, 'instructors', selectedStudent.id);
-            const updateData = {
+            
+            // First update the user document
+            const userUpdateData = {
               ...commonFields,
               level: instructorData.level,
-              specialties: instructorData.specialties,
+              specialties: instructorData.specialties || [],
               experience: instructorData.experience,
-              bio: instructorData.bio,
+              bio: instructorData.bio || '',
               schoolId: instructorData.schoolId || null,
               schoolName: schools.find(s => s.id === instructorData.schoolId)?.displayName || null,
-              availability: instructorData.availability
+              availability: instructorData.availability || { days: [], hours: [] }
             };
-            batch.update(userRef, updateData);
-            batch.update(instructorRef, updateData);
+            
+            batch.update(userRef, userUpdateData);
+            
+            try {
+              // Query for instructor document using userId
+              const instructorsRef = collection(db, 'instructors');
+              const q = query(instructorsRef, where('userId', '==', selectedStudent.id));
+              const querySnapshot = await getDocs(q);
+              
+              if (querySnapshot.empty) {
+                // If no instructor document exists, create one
+                const newInstructorRef = doc(collection(db, 'instructors'));
+                batch.set(newInstructorRef, {
+                  ...userUpdateData,
+                  userId: selectedStudent.id,
+                  createdAt: serverTimestamp(),
+                });
+              } else {
+                // Update existing instructor document
+                const instructorRef = doc(db, 'instructors', querySnapshot.docs[0].id);
+                batch.update(instructorRef, userUpdateData);
+              }
+            } catch (err) {
+              console.error('Eğitmen belgesi güncellenirken hata:', err);
+              throw new Error('Eğitmen bilgileri güncellenirken hata oluştu. Lütfen tekrar deneyin.');
+            }
+            
             break;
           }
           case 'school': {

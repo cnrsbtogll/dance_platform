@@ -160,26 +160,34 @@ export const fetchAllInstructors = async (): Promise<Array<Instructor & { user: 
     
     for (const instructorDoc of instructorsSnapshot.docs) {
       const rawData = instructorDoc.data();
+      console.log('Raw instructor data from Firestore:', rawData);
       
       // Convert Turkish field names to English and handle data type conversions
       const instructorData: Instructor = {
         id: instructorDoc.id,
         userId: rawData.userId,
-        displayName: rawData.ad || rawData.displayName || '',
+        displayName: rawData.displayName || '',
         email: rawData.email || '',
-        photoURL: rawData.gorsel || rawData.photoURL,
+        photoURL: rawData.photoURL,
         phoneNumber: rawData.phoneNumber || '',
         role: ['instructor'],
-        // Convert single string uzmanlık to array of specialties
-        specialties: rawData.uzmanlık ? [rawData.uzmanlık] : [],
-        experience: rawData.tecrube || rawData.experience || '0',
-        bio: rawData.biyografi || rawData.bio || '',
+        // Handle specialties array correctly
+        specialties: Array.isArray(rawData.specialties) ? rawData.specialties : 
+                    rawData.uzmanlık ? [rawData.uzmanlık] : [],
+        // Convert experience to number
+        experience: typeof rawData.experience === 'number' ? rawData.experience :
+                   typeof rawData.experience === 'string' ? parseInt(rawData.experience) :
+                   typeof rawData.tecrube === 'number' ? rawData.tecrube :
+                   typeof rawData.tecrube === 'string' ? parseInt(rawData.tecrube) : 0,
+        level: rawData.level || 'professional',
+        schoolId: rawData.schoolId || null,
+        schoolName: rawData.schoolName || null,
+        availability: rawData.availability || { days: [], hours: [] },
         status: rawData.status || 'active',
         createdAt: rawData.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
         updatedAt: rawData.updatedAt?.toDate?.()?.toISOString() || new Date().toISOString()
       };
       
-      // Log the converted data
       console.log('Converted instructor data:', instructorData);
       
       try {

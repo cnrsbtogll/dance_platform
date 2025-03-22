@@ -34,8 +34,16 @@ export interface Instructor {
   phoneNumber?: string;
   role: string[];
   specialties: string[];
-  experience: string;
-  bio: string;
+  experience: number;
+  level: DanceLevel;
+  schoolId?: string;
+  schoolName?: string;
+  availability?: {
+    days: string[];
+    hours: string[];
+  };
+  rating?: number;
+  reviewCount?: number;
   status: 'active' | 'inactive';
   createdAt: string;
   updatedAt: string;

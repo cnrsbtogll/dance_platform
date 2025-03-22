@@ -45,13 +45,11 @@ const InstructorCard: React.FC<InstructorCardProps> = ({
           <span className="text-gray-400 text-sm ml-1">({instructor.reviewCount || 0} değerlendirme)</span>
         </div>
         <div className="text-sm text-gray-500">
-          <p><span className="font-medium">Tecrübe:</span> {instructor.experience || instructor.tecrube || 0} yıl</p>
+          <p><span className="font-medium">Tecrübe:</span> {instructor.experience || 0} yıl</p>
           <p><span className="font-medium">Uzmanlık:</span> {
-            Array.isArray(instructor.uzmanlık) ? instructor.uzmanlık.join(', ') : 
-            Array.isArray(instructor.specialties) ? instructor.specialties.join(', ') : 
-            instructor.uzmanlık ? String(instructor.uzmanlık) :
-            instructor.specialties ? String(instructor.specialties) :
-            "Çeşitli Dans Stilleri"
+            instructor.specialties && instructor.specialties.length > 0 
+              ? instructor.specialties.join(', ') 
+              : "Çeşitli Dans Stilleri"
           }</p>
         </div>
       </div>
