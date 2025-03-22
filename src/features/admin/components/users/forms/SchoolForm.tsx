@@ -45,8 +45,8 @@ export const SchoolForm: React.FC<SchoolFormProps> = ({
           name="displayName"
           value={formData.displayName}
           onChange={onInputChange}
-          error={formErrors.displayName}
-          required
+          helperText={formErrors.displayName}
+          error={!!formErrors.displayName}
         />
       </div>
 
@@ -57,16 +57,21 @@ export const SchoolForm: React.FC<SchoolFormProps> = ({
           type="email"
           value={formData.email}
           onChange={onInputChange}
-          error={formErrors.email}
-          required
+          helperText={formErrors.email}
+          error={!!formErrors.email}
         />
       </div>
 
       <div className="col-span-2">
         <CustomPhoneInput
-          value={formData.phoneNumber}
-          onChange={(value) => onInputChange({ target: { name: 'phoneNumber', value } })}
-          error={formErrors.phoneNumber}
+          name="phoneNumber"
+          label="Telefon"
+          countryCode="+90"
+          phoneNumber={formData.phoneNumber || ''}
+          onCountryCodeChange={() => {}}
+          onPhoneNumberChange={(value) => onInputChange({ target: { name: 'phoneNumber', value } })}
+          error={!!formErrors.phoneNumber}
+          helperText={formErrors.phoneNumber}
         />
       </div>
 
@@ -77,7 +82,8 @@ export const SchoolForm: React.FC<SchoolFormProps> = ({
           type="text"
           value={formData.website || ''}
           onChange={onInputChange}
-          error={formErrors.website}
+          helperText={formErrors.website}
+          error={!!formErrors.website}
         />
       </div>
 
@@ -87,7 +93,8 @@ export const SchoolForm: React.FC<SchoolFormProps> = ({
           name="contactPerson"
           value={formData.contactPerson || ''}
           onChange={onInputChange}
-          error={formErrors.contactPerson}
+          helperText={formErrors.contactPerson}
+          error={!!formErrors.contactPerson}
         />
       </div>
 
@@ -97,7 +104,8 @@ export const SchoolForm: React.FC<SchoolFormProps> = ({
           name="city"
           value={formData.city || ''}
           onChange={onInputChange}
-          error={formErrors.city}
+          helperText={formErrors.city}
+          error={!!formErrors.city}
         />
       </div>
 
@@ -107,7 +115,8 @@ export const SchoolForm: React.FC<SchoolFormProps> = ({
           name="district"
           value={formData.district || ''}
           onChange={onInputChange}
-          error={formErrors.district}
+          helperText={formErrors.district}
+          error={!!formErrors.district}
         />
       </div>
 
@@ -117,7 +126,8 @@ export const SchoolForm: React.FC<SchoolFormProps> = ({
           name="address"
           value={formData.address || ''}
           onChange={onInputChange}
-          error={formErrors.address}
+          helperText={formErrors.address}
+          error={!!formErrors.address}
           multiline
           rows={3}
         />
@@ -129,7 +139,8 @@ export const SchoolForm: React.FC<SchoolFormProps> = ({
           name="description"
           value={formData.description || ''}
           onChange={onInputChange}
-          error={formErrors.description}
+          helperText={formErrors.description}
+          error={!!formErrors.description}
           multiline
           rows={3}
         />
