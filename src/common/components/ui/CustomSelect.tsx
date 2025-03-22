@@ -17,6 +17,7 @@ interface CustomSelectProps {
   required?: boolean;
   placeholder?: string;
   fullWidth?: boolean;
+  allowEmpty?: boolean;
 }
 
 const CustomSelect: React.FC<CustomSelectProps> = ({
@@ -30,6 +31,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
   required = false,
   placeholder,
   fullWidth = true,
+  allowEmpty = true,
 }) => {
   const handleChange = (event: any) => {
     const selectedValue = event.target.value;
@@ -77,9 +79,11 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
           }
         }}
       >
-        <MenuItem value="" disabled>
-          <span className="text-gray-500">{placeholder || label}</span>
-        </MenuItem>
+        {allowEmpty && (
+          <MenuItem value="">
+            <span className="text-gray-500">{placeholder || 'Seçiniz'}</span>
+          </MenuItem>
+        )}
         {options.map((option) => (
           <MenuItem key={option.value} value={option.value}>
             {option.label}
