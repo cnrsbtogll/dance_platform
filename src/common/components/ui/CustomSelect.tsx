@@ -37,8 +37,20 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
   };
 
   return (
-    <FormControl fullWidth={fullWidth} error={!!error} required={required}>
-      <InputLabel id={`${name}-label`}>{label}</InputLabel>
+    <FormControl fullWidth={fullWidth} error={!!error} required={required} sx={{ minWidth: 120, marginTop: 1 }}>
+      <InputLabel 
+        id={`${name}-label`} 
+        sx={{ 
+          backgroundColor: 'white', 
+          px: 1,
+          '&.MuiInputLabel-shrink': {
+            backgroundColor: 'white',
+          }
+        }}
+        shrink={true}
+      >
+        {label}
+      </InputLabel>
       <Select
         labelId={`${name}-label`}
         id={name}
@@ -47,13 +59,27 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
         label={label}
         onChange={handleChange}
         multiple={multiple}
-        displayEmpty={!!placeholder}
+        displayEmpty={true}
+        sx={{
+          '& .MuiSelect-select': {
+            padding: '14px',
+          },
+          backgroundColor: 'white',
+          borderRadius: '0.75rem',
+          '& .MuiOutlinedInput-notchedOutline': {
+            borderColor: '#E5E7EB',
+          },
+          '&:hover .MuiOutlinedInput-notchedOutline': {
+            borderColor: '#A5B4FC',
+          },
+          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+            borderColor: '#6366F1',
+          }
+        }}
       >
-        {placeholder && (
-          <MenuItem value="" disabled>
-            {placeholder}
-          </MenuItem>
-        )}
+        <MenuItem value="" disabled>
+          <span className="text-gray-500">{placeholder || label}</span>
+        </MenuItem>
         {options.map((option) => (
           <MenuItem key={option.value} value={option.value}>
             {option.label}
