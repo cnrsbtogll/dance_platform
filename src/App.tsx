@@ -284,8 +284,7 @@ function App(): JSX.Element {
             )}
             
             <Navbar isAuthenticated={isAuthenticated} user={user} />
-            
-            <main className={`pt-20 pb-10 ${(isOffline || (error && !isOffline)) ? 'mt-8' : ''}`}>
+            <div className="pt-16">
               <Routes>
                 <Route path="/" element={<HomePage isAuthenticated={isAuthenticated} user={user} />} />
                 <Route path="/courses/:id" element={<CourseDetailPage />} />
@@ -349,7 +348,7 @@ function App(): JSX.Element {
                 <Route path="/signup" element={isAuthenticated ? <Navigate to="/" /> : <SignUp />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>
-            </main>
+            </div>
             
             <footer className="bg-gray-800 text-white py-8">
               <div className="container mx-auto px-4">

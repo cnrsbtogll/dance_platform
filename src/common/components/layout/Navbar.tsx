@@ -179,7 +179,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
       <nav className="bg-white shadow-md fixed w-full z-50 backdrop-blur-sm bg-white/90">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
-            <div className="flex">
+            <div className="flex items-center">
               <div className="flex-shrink-0 flex items-center">
                 <Link to="/" className="flex items-center group transition-all duration-300 ease-in-out">
                   {/* Modern gradient logo with dance icon */}
@@ -206,7 +206,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                   <span className="ml-3 text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 tracking-tight group-hover:tracking-wide transition-all duration-300">Dans Platformu</span>
                 </Link>
               </div>
-              <div className="hidden sm:ml-8 sm:flex sm:space-x-8">
+              <div className="hidden sm:ml-8 sm:flex sm:space-x-4">
                 {(!user?.role || (Array.isArray(user.role) ? 
                   !user.role.includes('school') && !user.role.includes('instructor') : 
                   user.role !== 'school' && user.role !== 'instructor')) && (
@@ -239,9 +239,9 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                 )}
               </div>
             </div>
-            <div className="hidden sm:ml-6 sm:flex sm:items-center">
+            <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-2">
               {/* Kullanıcının rolüne göre butonları göster */}
-              <div className="flex space-x-3 mr-3">
+              <div className="flex space-x-2">
                 {/* 'Eğitmen Ol' butonunu eğitmen olmayanlar ve okul sahibi olmayanlar görür */}
                 {!hasInstructorRole && !hasSchoolRole && (
                   <Link
@@ -255,8 +255,8 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                   </Link>
                 )}
                 
-                {/* 'Dans Okulu Aç' butonunu sadece eğitmenler görür */}
-                {!hasSchoolRole && hasInstructorRole && (
+                {/* 'Dans Okulu Aç' butonunu herkes görebilir */}
+                {!hasSchoolRole && (
                   <Link
                     to="/become-school"
                     onClick={() => {
@@ -426,10 +426,10 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
 
         {/* Mobil için hamburger menüsü */}
         {isMenuOpen && (
-          <div className="sm:hidden animate-fadeIn fixed top-16 left-0 right-0 z-40 bg-white shadow-lg">
-            <div className="pt-1 pb-1 border-t border-gray-200 bg-gray-50/80 backdrop-blur-sm">
+          <div className="sm:hidden animate-fadeIn fixed top-16 left-0 right-0 z-40 bg-white shadow-lg max-h-[calc(100vh-4rem)] overflow-y-auto">
+            <div className="pt-2 pb-3 border-t border-gray-200 bg-gray-50/80 backdrop-blur-sm">
               {/* Her durumda gösterilecek butonlar */}
-              <div className="px-2 py-1 space-y-1">
+              <div className="px-4 space-y-2">
                 {!hasInstructorRole && !hasSchoolRole && (
                   <Link 
                     to="/become-instructor"
@@ -445,8 +445,8 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                   </Link>
                 )}
                 
-                {/* 'Dans Okulu Aç' butonunu sadece eğitmenler görür */}
-                {!hasSchoolRole && hasInstructorRole && (
+                {/* Dans Okulu Aç butonu - Mobil */}
+                {!hasSchoolRole && (
                   <Link 
                     to="/become-school"
                     onClick={() => {
@@ -479,10 +479,10 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
 
               {isAuthenticated ? (
                 <>
-                  <div className="flex items-center px-3">
+                  <div className="flex items-center px-4 py-2">
                     <div className="flex-shrink-0">
                       <img
-                        className="h-6 w-6 rounded-full object-cover shadow-sm"
+                        className="h-8 w-8 rounded-full object-cover shadow-sm"
                         src={profilePhotoURL}
                         alt={user?.displayName || 'Profil'}
                         onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
@@ -493,12 +493,12 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                         }}
                       />
                     </div>
-                    <div className="ml-2">
+                    <div className="ml-3">
                       <div className="text-sm font-medium leading-none text-gray-800">{user?.displayName || 'Kullanıcı'}</div>
-                      <div className="text-xs font-medium leading-none text-gray-500 mt-0.5">{user?.email || ''}</div>
+                      <div className="text-xs font-medium leading-none text-gray-500 mt-1">{user?.email || ''}</div>
                     </div>
                   </div>
-                  <div className="mt-1 space-y-0 px-2">
+                  <div className="mt-3 space-y-1 px-4">
                     {(!user?.role || (Array.isArray(user.role) ? 
                       !user.role.includes('school') && !user.role.includes('instructor') : 
                       user.role !== 'school' && user.role !== 'instructor')) && (
