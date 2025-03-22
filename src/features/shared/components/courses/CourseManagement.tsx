@@ -13,7 +13,8 @@ import {
   QueryDocumentSnapshot,
   QuerySnapshot,
   limit,
-  where
+  where,
+  getDoc
 } from 'firebase/firestore';
 import { db } from '../../../../api/firebase/firebase';
 import { auth } from '../../../../api/firebase/firebase';
@@ -107,6 +108,9 @@ interface Course {
   imageUrl: string;
   highlights: string[];
   tags: string[];
+  instructorPhone: string;
+  schoolPhone: string;
+  schoolAddress: string;
 }
 
 interface FormData {
@@ -138,6 +142,79 @@ interface CourseManagementProps {
   schoolId?: string;
   isAdmin?: boolean;
 }
+
+// İletişim Modal bileşeni
+interface ContactModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  course: Course;
+}
+
+const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose, course }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold">İletişim Bilgileri</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Eğitmen Bilgileri */}
+        <div className="mb-6">
+          <h4 className="text-md font-medium text-gray-900 mb-2">Eğitmen</h4>
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <p className="text-sm text-gray-600 mb-1">
+              <span className="font-medium">İsim:</span> {course.instructorName}
+            </p>
+            {course.instructorPhone && (
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Telefon:</span>{' '}
+                <a href={`tel:${course.instructorPhone}`} className="text-blue-600 hover:underline">
+                  {course.instructorPhone}
+                </a>
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Okul Bilgileri */}
+        <div className="mb-6">
+          <h4 className="text-md font-medium text-gray-900 mb-2">Dans Okulu</h4>
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <p className="text-sm text-gray-600 mb-1">
+              <span className="font-medium">İsim:</span> {course.schoolName}
+            </p>
+            {course.schoolPhone && (
+              <p className="text-sm text-gray-600 mb-1">
+                <span className="font-medium">Telefon:</span>{' '}
+                <a href={`tel:${course.schoolPhone}`} className="text-blue-600 hover:underline">
+                  {course.schoolPhone}
+                </a>
+              </p>
+            )}
+            {course.schoolAddress && (
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Adres:</span> {course.schoolAddress}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <Button onClick={onClose} variant="secondary">
+            Kapat
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseManagementProps): JSX.Element {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -179,6 +256,11 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [instructors, setInstructors] = useState<Array<{ label: string; value: string }>>([]);
+  const [schools, setSchools] = useState<Array<{ label: string; value: string }>>([]);
+  const [loadingInstructors, setLoadingInstructors] = useState<boolean>(true);
+  const [loadingSchools, setLoadingSchools] = useState<boolean>(true);
+  const [selectedContactCourse, setSelectedContactCourse] = useState<Course | null>(null);
 
   // Dans stillerini getir
   const fetchDanceStyles = async () => {
@@ -375,6 +457,141 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
     }
   };
 
+  // Eğitmenleri getir
+  const fetchInstructors = async () => {
+    if (!isAdmin) return;
+    
+    try {
+      console.log('Eğitmenler getiriliyor...');
+      const instructorsRef = collection(db, 'instructors');
+      console.log('Instructors koleksiyonu referansı:', instructorsRef);
+
+      // Önce tüm eğitmenleri getir, filtrelemeyi client-side yap
+      const q = query(instructorsRef);
+      console.log('Oluşturulan query:', q);
+
+      const querySnapshot = await getDocs(q);
+      console.log('Query sonuçları:', {
+        empty: querySnapshot.empty,
+        size: querySnapshot.size,
+        docs: querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          data: doc.data()
+        }))
+      });
+      
+      const instructorsList = querySnapshot.docs
+        .map(doc => {
+          const data = doc.data();
+          console.log('Eğitmen verisi işleniyor:', {
+            id: doc.id,
+            data: data,
+            displayName: data.displayName,
+            status: data.status,
+            userId: data.userId,
+            email: data.email
+          });
+
+          // Sadece aktif eğitmenleri al
+          if (data.status === 'active') {
+            return {
+              label: data.displayName || data.email || 'İsimsiz Eğitmen',
+              value: doc.id
+            };
+          }
+          return null;
+        })
+        .filter(Boolean) // null değerleri filtrele
+        .sort((a, b) => a.label.localeCompare(b.label)); // displayName'e göre sırala
+      
+      console.log('İşlenmiş eğitmen listesi:', instructorsList);
+      setInstructors(instructorsList);
+    } catch (error) {
+      console.error('Eğitmenler yüklenirken hata detayı:', {
+        error,
+        message: error instanceof Error ? error.message : 'Bilinmeyen hata',
+        code: error instanceof Error ? (error as any).code : undefined,
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
+      // Varsayılan eğitmen listesi
+      setInstructors([
+        { label: 'Test Eğitmen 1', value: 'test-instructor-1' },
+        { label: 'Test Eğitmen 2', value: 'test-instructor-2' }
+      ]);
+    } finally {
+      setLoadingInstructors(false);
+    }
+  };
+
+  // Okulları getir
+  const fetchSchools = async () => {
+    if (!isAdmin) return;
+    
+    try {
+      console.log('Okullar getiriliyor...');
+      const schoolsRef = collection(db, 'schools');
+      console.log('Schools koleksiyonu referansı:', schoolsRef);
+
+      const q = query(schoolsRef);
+      console.log('Oluşturulan query:', q);
+
+      const querySnapshot = await getDocs(q);
+      console.log('Query sonuçları:', {
+        empty: querySnapshot.empty,
+        size: querySnapshot.size,
+        docs: querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          data: doc.data()
+        }))
+      });
+      
+      const schoolsList = querySnapshot.docs
+        .map(doc => {
+          const data = doc.data();
+          console.log('Okul verisi işleniyor:', {
+            id: doc.id,
+            data: data,
+            displayName: data.displayName,
+            name: data.name,
+            ad: data.ad,
+            status: data.status,
+            userId: data.userId,
+            email: data.email
+          });
+
+          // Sadece aktif okulları al
+          if (data.status === 'active') {
+            return {
+              label: data.displayName || data.name || data.ad || data.email || 'İsimsiz Okul',
+              value: doc.id
+            };
+          }
+          return null;
+        })
+        .filter((school): school is { label: string; value: string } => school !== null)
+        .sort((a, b) => a.label.localeCompare(b.label));
+      
+      console.log('İşlenmiş okul listesi:', schoolsList);
+      setSchools(schoolsList);
+    } catch (error) {
+      console.error('Okullar yüklenirken hata detayı:', {
+        error,
+        message: error instanceof Error ? error.message : 'Bilinmeyen hata',
+        code: error instanceof Error ? (error as any).code : undefined,
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
+      // Varsayılan okul listesi
+      setSchools([
+        { label: 'Test Okul 1', value: 'test-school-1' },
+        { label: 'Test Okul 2', value: 'test-school-2' }
+      ]);
+    } finally {
+      setLoadingSchools(false);
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -382,7 +599,9 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
       try {
         await Promise.all([
           fetchCourses(),
-          fetchDanceStyles()
+          fetchDanceStyles(),
+          isAdmin && fetchInstructors(),
+          isAdmin && fetchSchools()
         ]);
       } catch (err) {
         if (isMounted) {
@@ -397,7 +616,7 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isAdmin]);
 
   // Kurs düzenleme
   const editCourse = (course: Course) => {
@@ -495,6 +714,47 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
     return restData;
   };
 
+  // Veri işleme fonksiyonunu güncelle
+  const processQueryData = (doc: QueryDocumentSnapshot<DocumentData>): Course => {
+    const courseData = doc.data();
+    return {
+      id: doc.id,
+      name: courseData.name || '',
+      description: courseData.description || '',
+      instructorId: courseData.instructorId || '',
+      instructorName: courseData.instructorName || 'Bilinmeyen Eğitmen',
+      instructorPhone: courseData.instructorPhone || '',
+      schoolId: courseData.schoolId || '',
+      schoolName: courseData.schoolName || 'Bilinmeyen Okul',
+      schoolPhone: courseData.schoolPhone || '',
+      schoolAddress: courseData.schoolAddress || '',
+      danceStyle: courseData.danceStyle || '',
+      level: courseData.level || 'beginner',
+      maxParticipants: courseData.maxParticipants || 0,
+      currentParticipants: courseData.currentParticipants || 0,
+      schedule: courseData.schedule || [],
+      duration: courseData.duration || 90,
+      date: courseData.date,
+      price: courseData.price || 0,
+      currency: courseData.currency || 'TRY',
+      status: courseData.status || 'inactive',
+      recurring: courseData.recurring || false,
+      location: courseData.location || {
+        address: '',
+        city: '',
+        state: '',
+        zipCode: '',
+        latitude: 0,
+        longitude: 0
+      },
+      imageUrl: courseData.imageUrl || '/placeholders/default-course-image.png',
+      highlights: courseData.highlights || [],
+      tags: courseData.tags || [],
+      createdAt: courseData.createdAt,
+      updatedAt: courseData.updatedAt
+    };
+  };
+
   // Form gönderimi
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -503,13 +763,43 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
     setSuccess(null);
 
     try {
+      // Seçilen eğitmen ve okul bilgilerini al
+      const selectedInstructor = instructors.find(i => i.value === (instructorId || formData.instructorId));
+      const selectedSchool = schools.find(s => s.value === (schoolId || formData.schoolId));
+
+      // Eğitmen ve okul detaylarını getir
+      let instructorPhone = '';
+      let schoolPhone = '';
+      let schoolAddress = '';
+
+      if (selectedInstructor) {
+        const instructorDoc = await getDoc(doc(db, 'instructors', selectedInstructor.value));
+        if (instructorDoc.exists()) {
+          instructorPhone = instructorDoc.data().phoneNumber || '';
+        }
+      }
+
+      if (selectedSchool) {
+        const schoolDoc = await getDoc(doc(db, 'schools', selectedSchool.value));
+        if (schoolDoc.exists()) {
+          const schoolData = schoolDoc.data();
+          schoolPhone = schoolData.phoneNumber || '';
+          schoolAddress = schoolData.address || '';
+        }
+      }
+
       const courseData = {
         ...formData,
         instructorId: instructorId || formData.instructorId,
+        instructorName: selectedInstructor?.label || formData.instructorName,
+        instructorPhone: instructorPhone,
         schoolId: schoolId || formData.schoolId,
-        recurring: formData.recurring || false, // Varsayılan olarak false
-        currentParticipants: formData.currentParticipants || 0, // Varsayılan olarak 0
-        status: formData.status || 'active' // Varsayılan olarak active
+        schoolName: selectedSchool?.label || formData.schoolName,
+        schoolPhone: schoolPhone,
+        schoolAddress: schoolAddress,
+        recurring: formData.recurring || false,
+        currentParticipants: formData.currentParticipants || 0,
+        status: formData.status || 'active'
       };
 
       // Firebase için veriyi temizle
@@ -583,44 +873,6 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
     course.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Veri işleme fonksiyonunu güncelle
-  const processQueryData = (doc: QueryDocumentSnapshot<DocumentData>): Course => {
-    const courseData = doc.data();
-    return {
-      id: doc.id,
-      name: courseData.name || '',
-      description: courseData.description || '',
-      instructorId: courseData.instructorId || '',
-      instructorName: courseData.instructorName || 'Bilinmeyen Eğitmen',
-      schoolId: courseData.schoolId || '',
-      schoolName: courseData.schoolName || 'Bilinmeyen Okul',
-      danceStyle: courseData.danceStyle || '',
-      level: courseData.level || 'beginner',
-      maxParticipants: courseData.maxParticipants || 0,
-      currentParticipants: courseData.currentParticipants || 0,
-      schedule: courseData.schedule || [],
-      duration: courseData.duration || 90,
-      date: courseData.date,
-      price: courseData.price || 0,
-      currency: courseData.currency || 'TRY',
-      status: courseData.status || 'inactive',
-      recurring: courseData.recurring || false,
-      location: courseData.location || {
-        address: '',
-        city: '',
-        state: '',
-        zipCode: '',
-        latitude: 0,
-        longitude: 0
-      },
-      imageUrl: courseData.imageUrl || '/placeholders/default-course-image.png',
-      highlights: courseData.highlights || [],
-      tags: courseData.tags || [],
-      createdAt: courseData.createdAt,
-      updatedAt: courseData.updatedAt
-    };
-  };
-
   return (
     <div>
       {/* Başlık ve Yeni Ekle butonu */}
@@ -686,6 +938,7 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
                       </div>
                     ) : (
                       <CustomSelect
+                        name="danceStyle"
                         label="Dans Stili*"
                         value={formData.danceStyle}
                         onChange={(value) => setFormData(prev => ({ ...prev, danceStyle: value as string }))}
@@ -697,6 +950,7 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
 
                   <div>
                     <CustomSelect
+                      name="level"
                       label="Seviye*"
                       value={formData.level}
                       onChange={(value) => setFormData(prev => ({ ...prev, level: value as string }))}
@@ -707,6 +961,7 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
 
                   <div>
                     <CustomSelect
+                      name="status"
                       label="Durum"
                       value={formData.status}
                       onChange={(value) => setFormData(prev => ({ ...prev, status: value as 'active' | 'inactive' }))}
@@ -714,6 +969,60 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
                       placeholder="Durum Seçin"
                     />
                   </div>
+
+                  {isAdmin && (
+                    <>
+                      <div>
+                        {loadingInstructors ? (
+                          <div className="p-2 flex items-center">
+                            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500 mr-2"></div>
+                            <span className="text-sm text-gray-600">Eğitmenler yükleniyor...</span>
+                          </div>
+                        ) : (
+                          <CustomSelect
+                            name="instructorId"
+                            label="Eğitmen*"
+                            value={formData.instructorId}
+                            onChange={(value) => {
+                              const selectedInstructor = instructors.find(i => i.value === value);
+                              setFormData(prev => ({
+                                ...prev,
+                                instructorId: value as string,
+                                instructorName: selectedInstructor?.label || ''
+                              }));
+                            }}
+                            options={instructors}
+                            placeholder="Eğitmen Seçin"
+                          />
+                        )}
+                      </div>
+
+                      <div>
+                        {loadingSchools ? (
+                          <div className="p-2 flex items-center">
+                            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500 mr-2"></div>
+                            <span className="text-sm text-gray-600">Okullar yükleniyor...</span>
+                          </div>
+                        ) : (
+                          <CustomSelect
+                            name="schoolId"
+                            label="Dans Okulu"
+                            value={formData.schoolId}
+                            onChange={(value) => {
+                              const selectedSchool = schools.find(s => s.value === value);
+                              setFormData(prev => ({
+                                ...prev,
+                                schoolId: value as string,
+                                schoolName: selectedSchool?.label || ''
+                              }));
+                            }}
+                            options={schools}
+                            placeholder="Dans Okulu Seçin"
+                          />
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -726,6 +1035,7 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
                     <div key={index} className="flex items-center gap-4 p-3 bg-gray-50 rounded-md">
                       <div className="flex-1">
                         <CustomSelect
+                          name="day"
                           label="Gün"
                           value={item.day}
                           onChange={(value) => {
@@ -840,6 +1150,7 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
                         className="flex-1 p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                       />
                       <CustomSelect
+                        name="currency"
                         label=""
                         value={formData.currency}
                         onChange={(value) => setFormData(prev => ({ ...prev, currency: value as string }))}
@@ -1008,6 +1319,12 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                         <button
+                          onClick={() => setSelectedContactCourse(course)}
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          İletişim
+                        </button>
+                        <button
                           onClick={() => editCourse(course)}
                           className="text-indigo-600 hover:text-indigo-800"
                         >
@@ -1034,6 +1351,13 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
           </div>
         </>
       )}
+
+      {/* İletişim Modal */}
+      <ContactModal
+        isOpen={!!selectedContactCourse}
+        onClose={() => setSelectedContactCourse(null)}
+        course={selectedContactCourse!}
+      />
     </div>
   );
 }
