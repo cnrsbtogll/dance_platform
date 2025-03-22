@@ -643,10 +643,10 @@ export const UserManagement: React.FC = () => {
             <div className="flex-shrink-0 h-10 w-10">
               <img
                 className="h-10 w-10 rounded-full object-cover"
-                src={student.photoURL || 'https://via.placeholder.com/40?text=User'}
+                src={student.photoURL || '/assets/default-avatar.svg'}
                 alt={student.displayName}
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = "https://via.placeholder.com/40?text=User";
+                  (e.target as HTMLImageElement).src = "/assets/default-avatar.svg";
                 }}
               />
             </div>
