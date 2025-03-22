@@ -54,16 +54,13 @@ interface Student {
 
 // Form data interface
 interface FormData {
-  id: string;
   displayName: string;
   email: string;
-  phoneNumber: string;
+  phone: string;
   level: DanceLevel;
   photoURL: string;
   instructorId: string;
   schoolId: string;
-  password: string;
-  createAccount: boolean;
 }
 
 // Define Firebase user type
@@ -339,16 +336,13 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
   const [photoModalOpen, setPhotoModalOpen] = useState<boolean>(false);
   const [selectedPhoto, setSelectedPhoto] = useState<{url: string, name: string} | null>(null);
   const [formData, setFormData] = useState<FormData>({
-    id: '',
     displayName: '',
     email: '',
-    phoneNumber: '',
+    phone: '',
     level: 'beginner',
     photoURL: '',
     instructorId: '',
-    schoolId: '',
-    password: '',
-    createAccount: false
+    schoolId: ''
   });
 
   // Check if current user is super admin
@@ -504,16 +498,13 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
   const editStudent = (student: FirebaseUser): void => {
     setSelectedStudent(student);
     setFormData({
-      id: student.id,
       displayName: student.displayName,
       email: student.email,
-      phoneNumber: student.phoneNumber || '',
+      phone: student.phoneNumber || '',
       level: student.level || 'beginner',
       photoURL: student.photoURL || '',
       instructorId: student.instructorId || '',
       schoolId: student.schoolId || '',
-      password: '',
-      createAccount: false
     });
     setEditMode(true);
   };
@@ -522,23 +513,20 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
   const addNewStudent = (): void => {
     setSelectedStudent(null);
     setFormData({
-      id: '',
       displayName: '',
       email: '',
-      phoneNumber: '',
+      phone: '',
       level: 'beginner',
       photoURL: generateInitialsAvatar('?', 'student'),
       instructorId: '',
-      schoolId: '',
-      password: '',
-      createAccount: false
+      schoolId: ''
     });
     setEditMode(true);
   };
 
   // Update handleInputChange function
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { name: string; value: string; type?: string; checked?: boolean } } | string,
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { name: string; value: any } } | string,
     fieldName?: string
   ): void => {
     if (typeof e === 'string' && fieldName) {
@@ -549,7 +537,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
       }));
     } else if (typeof e === 'object' && 'target' in e) {
       // Handle event-based changes
-      const target = e.target as { name: string; value: string; type?: string; checked?: boolean };
+      const target = e.target as { name: string; value: any; type?: string; checked?: boolean };
       setFormData(prev => ({
         ...prev,
         [target.name]: target.type === 'checkbox' ? !!target.checked : target.value
@@ -691,7 +679,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
         // Öğrenci güncellenirken role değeri korunur (değiştirilmez)
         const updateData = {
           displayName: formData.displayName,
-          phoneNumber: formData.phoneNumber,
+          phone: formData.phone,
           level: formData.level,
           instructorId: formData.instructorId || null,
           instructorName: instructorName || null,
@@ -711,7 +699,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
               ? { 
                   ...student, 
                   displayName: formData.displayName,
-                  phoneNumber: formData.phoneNumber,
+                  phone: formData.phone,
                   level: formData.level,
                   instructorId: formData.instructorId || null,
                   instructorName: instructorName || null,
@@ -765,7 +753,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
         await sendInvitationEmail(formData.email, {
           displayName: formData.displayName,
           level: formData.level,
-          phoneNumber: formData.phoneNumber,
+          phoneNumber: formData.phone,
           instructorId: formData.instructorId,
           instructorName: instructorName,
           schoolId: formData.schoolId,
@@ -897,6 +885,13 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
     );
   };
 
+  const handleSelectChange = (value: string, fieldName: string): void => {
+    setFormData(prev => ({
+      ...prev,
+      [fieldName]: value
+    }));
+  };
+
   if (loading && students.length === 0) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -921,6 +916,42 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
         </div>
       )}
       
+      {/* Üst Başlık ve Arama Bölümü */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">Öğrenci Yönetimi</h2>
+          <p className="text-sm text-gray-600 mt-1">Öğrencilerinizi ekleyin, düzenleyin ve yönetin</p>
+        </div>
+        <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-grow sm:max-w-[200px]">
+            <input
+              type="text"
+              placeholder="Ad veya e-posta ile ara..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+            <span className="absolute right-3 top-2.5 text-gray-400">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </span>
+          </div>
+          {!editMode && (
+            <button 
+              onClick={addNewStudent}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+              disabled={loading}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              {loading ? 'Yükleniyor...' : 'Yeni Öğrenci Ekle'}
+            </button>
+          )}
+        </div>
+      </div>
+      
       {/* Photo Modal */}
       {selectedPhoto && (
         <PhotoModal 
@@ -932,21 +963,8 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
         />
       )}
       
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Öğrenci Yönetimi</h2>
-        {!editMode && (
-          <button 
-            onClick={addNewStudent}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-            disabled={loading}
-          >
-            {loading ? 'Yükleniyor...' : 'Yeni Öğrenci Ekle'}
-          </button>
-        )}
-      </div>
-      
       {editMode ? (
-        <div className="bg-gray-50 p-6 rounded-lg">
+        <div className="bg-gray-50 p-4 sm:p-6 rounded-lg">
           <h3 className="text-lg font-semibold mb-4">
             {selectedStudent ? 'Öğrenci Düzenle' : 'Yeni Öğrenci Ekle'}
           </h3>
@@ -981,10 +999,11 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
               
               <div>
                 <CustomPhoneInput
-                  name="phoneNumber"
+                  name="phone"
                   label="Telefon"
-                  value={formData.phoneNumber}
-                  onChange={handleInputChange}
+                  required
+                  value={formData.phone}
+                  onChange={(value) => setFormData(prev => ({ ...prev, phone: value }))}
                   fullWidth
                 />
               </div>
@@ -994,7 +1013,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                   name="level"
                   label="Dans Seviyesi"
                   value={formData.level}
-                  onChange={(value) => handleInputChange(value, 'level')}
+                  onChange={(value) => handleSelectChange(value, 'level')}
                   options={[
                     { value: 'beginner', label: 'Başlangıç' },
                     { value: 'intermediate', label: 'Orta' },
@@ -1002,6 +1021,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                     { value: 'professional', label: 'Profesyonel' }
                   ]}
                   fullWidth
+                  required
                 />
               </div>
               
@@ -1014,6 +1034,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                   shape="circle"
                   width={96}
                   height={96}
+                  required
                 />
               </div>
               
@@ -1022,7 +1043,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                   name="instructorId"
                   label="Eğitmen"
                   value={formData.instructorId}
-                  onChange={(value) => handleInputChange(value, 'instructorId')}
+                  onChange={(value) => handleSelectChange(value, 'instructorId')}
                   options={[
                     { value: '', label: 'Eğitmen Seç...' },
                     ...instructors.map(instructor => ({
@@ -1031,6 +1052,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                     }))
                   ]}
                   fullWidth
+                  required
                 />
               </div>
               
@@ -1039,7 +1061,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                   name="schoolId"
                   label="Okul"
                   value={formData.schoolId}
-                  onChange={(value) => handleInputChange(value, 'schoolId')}
+                  onChange={(value) => handleSelectChange(value, 'schoolId')}
                   options={[
                     { value: '', label: 'Okul Seç...' },
                     ...schools.map(school => ({
@@ -1048,6 +1070,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                     }))
                   ]}
                   fullWidth
+                  required
                 />
               </div>
             </div>
@@ -1074,25 +1097,14 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
         </div>
       ) : (
         <>
-          <div className="mb-4 flex flex-col md:flex-row md:items-center gap-4">
-            <div className="md:flex-1">
-              <input
-                type="text"
-                placeholder="Ad veya e-posta ile ara..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-md"
-              />
-            </div>
-          </div>
-          
           {loading && (
             <div className="flex justify-center my-4">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
             </div>
           )}
           
-          <div className="overflow-x-auto">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -1128,6 +1140,84 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-4">
+            {filteredStudents.length > 0 ? (
+              filteredStudents.map((student) => (
+                <div key={student.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 h-10 w-10 relative bg-green-100 rounded-full overflow-hidden">
+                        <img 
+                          className="h-10 w-10 rounded-full object-cover absolute inset-0" 
+                          src={student.photoURL || generateInitialsAvatar(student.displayName, 'student')}
+                          alt={student.displayName}
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            target.onerror = null;
+                            target.src = generateInitialsAvatar(student.displayName, 'student');
+                          }}
+                        />
+                      </div>
+                      <div className="ml-3">
+                        <div className="text-sm font-medium text-gray-900">{student.displayName}</div>
+                        <div className="text-sm text-gray-500">{student.email}</div>
+                      </div>
+                    </div>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => editStudent(student)}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => deleteStudentHandler(student.id)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-gray-500">Dans Seviyesi:</span>
+                      <p className="font-medium">
+                        {student.level === 'beginner' && 'Başlangıç'}
+                        {student.level === 'intermediate' && 'Orta'}
+                        {student.level === 'advanced' && 'İleri'}
+                        {student.level === 'professional' && 'Profesyonel'}
+                        {!student.level && '-'}
+                      </p>
+                    </div>
+                    {student.phoneNumber && (
+                      <div>
+                        <span className="text-gray-500">Telefon:</span>
+                        <p className="font-medium">{student.phoneNumber}</p>
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-gray-500">Eğitmen:</span>
+                      <p className="font-medium">{student.instructorName || '-'}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Okul:</span>
+                      <p className="font-medium">{student.schoolName || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-4 text-sm text-gray-500">
+                {searchTerm ? 'Aramanıza uygun öğrenci bulunamadı.' : 'Henüz hiç öğrenci kaydı bulunmuyor.'}
+              </div>
+            )}
           </div>
         </>
       )}
