@@ -1,22 +1,69 @@
-import React, { useState, FormEvent } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '../../../types';
 import { motion } from 'framer-motion';
 import InstructorProfileForm from '../components/InstructorProfileForm';
 import CourseManagement from '../../../features/shared/components/courses/CourseManagement';
-import { query, where, orderBy } from 'firebase/firestore';
+import { query, where, orderBy, collection, getDocs } from 'firebase/firestore';
 import { usersRef } from '../../../firebase/firebaseConfig';
 import { currentUser } from '../../../firebase/firebaseConfig';
 import { StudentManagement } from '../../../features/shared/components/students/StudentManagement';
+import { db } from '../../../api/firebase/firebase';
 
 interface InstructorPanelProps {
-  user?: User | null;
+  user: any; // TODO: Add proper type
+}
+
+interface Course {
+  id: string;
+  name: string;
+  schedule: {
+    day: string;
+    time: string;
+  }[];
 }
 
 function InstructorPanel({ user }: InstructorPanelProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'courses' | 'students' | 'schedule'>('profile');
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Kullanıcı bilgilerini logla
   console.log('InstructorPanel - user:', user);
+
+  // Kursları getir
+  useEffect(() => {
+    const fetchCourses = async () => {
+      if (!user?.id) return;
+
+      try {
+        const coursesRef = collection(db, 'courses');
+        const q = query(coursesRef, where('instructorId', '==', user.id));
+        const querySnapshot = await getDocs(q);
+        
+        const coursesData: Course[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          coursesData.push({
+            id: doc.id,
+            name: data.name,
+            schedule: data.schedule || []
+          });
+        });
+        
+        setCourses(coursesData);
+      } catch (err) {
+        console.error('Kurslar yüklenirken hata:', err);
+        setError('Kurslar yüklenirken bir hata oluştu.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (activeTab === 'schedule') {
+      fetchCourses();
+    }
+  }, [activeTab, user?.id]);
 
   if (!user) {
     return <div>Yükleniyor...</div>;
@@ -103,15 +150,47 @@ function InstructorPanel({ user }: InstructorPanelProps) {
                 <h2 className="text-xl font-semibold">Ders Programım</h2>
               </div>
 
-              <p className="text-gray-600 mb-4">Haftalık ders programınız burada gösterilecektir.</p>
-
-              <div className="text-center py-8">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <p className="text-gray-500">Oluşturduğunuz kurslar programınızda otomatik olarak görüntülenecektir.</p>
-                <p className="text-sm text-gray-500 mt-2">Yeni bir kurs eklemek için "Kurslarım" sekmesini kullanın.</p>
+              <div className="grid grid-cols-7 gap-4 mb-6">
+                {['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'].map((day) => (
+                  <div key={day} className="text-center font-medium text-gray-700 bg-gray-100 py-2 rounded">
+                    {day}
+                  </div>
+                ))}
               </div>
+
+              {courses.length > 0 ? (
+                <div className="grid grid-cols-7 gap-4">
+                  {['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'].map((day) => (
+                    <div key={day} className="min-h-[200px] border border-gray-200 rounded p-2">
+                      {courses
+                        .filter(course => course.schedule.some(s => s.day === day))
+                        .map(course => (
+                          <div 
+                            key={course.id} 
+                            className="mb-2 p-2 bg-indigo-50 border border-indigo-100 rounded text-sm"
+                          >
+                            <div className="font-medium text-indigo-700">{course.name}</div>
+                            {course.schedule
+                              .filter(s => s.day === day)
+                              .map((schedule, index) => (
+                                <div key={index} className="text-gray-600 text-xs mt-1">
+                                  {schedule.time}
+                                </div>
+                              ))}
+                          </div>
+                        ))}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-gray-500">Henüz hiç kursunuz bulunmuyor.</p>
+                  <p className="text-sm text-gray-500 mt-2">Yeni bir kurs eklemek için "Kurslarım" sekmesini kullanın.</p>
+                </div>
+              )}
             </div>
           )}
         </div>
