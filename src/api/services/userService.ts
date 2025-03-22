@@ -87,32 +87,33 @@ export const resizeImageFromBase64 = (
 /**
  * Updates user profile information in both Firebase Auth and Firestore
  */
-export const updateUserProfile = async (
-  userId: string,
-  profileData: {
-    displayName?: string;
-    bio?: string;
-    danceStyles?: string[];
-    level?: DanceLevel;
-    phoneNumber?: string;
-  }
-): Promise<void> => {
+export const updateUserProfile = async (userId: string, userData: Partial<User>): Promise<User> => {
   try {
-    // Update Auth profile if displayName is provided
-    if (profileData.displayName && auth.currentUser) {
-      await updateProfile(auth.currentUser, {
-        displayName: profileData.displayName,
-      });
+    const userRef = doc(db, 'users', userId);
+    
+    // Add timestamps
+    const dataToUpdate = {
+      ...userData,
+      updatedAt: Timestamp.now()
+    };
+    
+    await updateDoc(userRef, dataToUpdate);
+    
+    // Get the updated user data
+    const updatedUserDoc = await getDoc(userRef);
+    if (!updatedUserDoc.exists()) {
+      throw new Error('User not found after update');
     }
-
-    // Update Firestore document with all provided fields
-    const userDocRef = doc(db, 'users', userId);
-    await updateDoc(userDocRef, {
-      ...profileData,
-      updatedAt: Timestamp.now(),
-    });
+    
+    const data = updatedUserDoc.data();
+    return {
+      id: updatedUserDoc.id,
+      ...data,
+      createdAt: data.createdAt?.toDate(),
+      updatedAt: data.updatedAt?.toDate()
+    } as User;
   } catch (error) {
-    console.error('Error updating profile:', error);
+    console.error('Error updating user profile:', error);
     throw error;
   }
 };

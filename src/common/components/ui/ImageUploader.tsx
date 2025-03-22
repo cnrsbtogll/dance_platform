@@ -196,143 +196,208 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       
       <Box
         component={motion.div}
-        whileHover={{ scale: 1.05 }}
-        onClick={handleImageClick}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        sx={{
+        whileHover={{ scale: 1.03 }}
+        sx={{ 
           position: 'relative',
-          width: width,
-          height: height,
-          borderRadius: shape === 'circle' ? '50%' : '8px',
-          overflow: 'hidden',
-          cursor: 'pointer',
-          '&:hover': {
-            '& .overlay': {
-              opacity: 1
-            }
-          }
+          mb: 2
         }}
       >
-        {/* Background image */}
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: '#e0e7ff',
-            backgroundImage: `url(${getDisplayImage()})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            transition: 'transform 0.3s ease-in-out',
-            '&:hover': {
-              transform: 'scale(1.1)'
-            }
-          }}
-        />
-        
-        {/* Gradient overlay on hover */}
-        {!previewURL && currentPhotoURL && !uploadSuccess && (
-          <Box
-            component={motion.div}
-            className="overlay"
-            initial={{ opacity: 0 }}
+        {/* Edit button overlay - Moved outside the inner Box */}
+        {!previewURL && currentPhotoURL && (
+          <IconButton 
+            size="small"
+            onClick={triggerFileSelect}
+            component={motion.button}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
             sx={{
               position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.7))',
-              opacity: 0,
-              transition: 'opacity 0.3s ease-in-out',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
+              right: -5,
+              bottom: 10,
+              backgroundColor: '#8B5CF6',
+              color: 'white',
+              boxShadow: '0 4px 12px rgba(139, 92, 246, 0.4)',
+              border: '2px solid white',
+              zIndex: 2,
+              '&:hover': {
+                backgroundColor: '#7C3AED',
+              }
             }}
           >
-            <Edit sx={{ color: 'white', fontSize: 24 }} />
-          </Box>
+            <Edit fontSize="small" />
+          </IconButton>
         )}
 
-        {/* Upload success animation */}
-        {uploadSuccess && (
+        <Box
+          onClick={handleImageClick}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          sx={{
+            position: 'relative',
+            width: width,
+            height: height,
+            borderRadius: shape === 'circle' ? '50%' : '8px',
+            overflow: 'hidden',
+            cursor: 'pointer',
+            border: '3px solid #8B5CF6',
+            boxShadow: '0 8px 24px rgba(149, 157, 165, 0.2)',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              boxShadow: '0 12px 28px rgba(149, 157, 165, 0.3)',
+              '& .overlay': {
+                opacity: 1
+              }
+            }
+          }}
+        >
+          {/* Background image */}
           <Box
-            component={motion.div}
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
             sx={{
               position: 'absolute',
               top: 0,
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: 'rgba(0,0,0,0.5)',
+              backgroundColor: '#e0e7ff',
+              backgroundImage: `url(${getDisplayImage()})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center'
+            }}
+          />
+
+          {/* Gradient overlay on hover */}
+          {!previewURL && currentPhotoURL && !uploadSuccess && (
+            <Box
+              component={motion.div}
+              className="overlay"
+              initial={{ opacity: 0 }}
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.6) 0%, rgba(139, 92, 246, 0.6) 100%)',
+                opacity: 0,
+                transition: 'opacity 0.3s ease-in-out',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1
+              }}
+            >
+              <AddAPhoto sx={{ color: 'white', fontSize: 32 }} />
+            </Box>
+          )}
+
+          {/* Upload success animation */}
+          {uploadSuccess && (
+            <Box
+              component={motion.div}
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <Check sx={{ color: 'white', fontSize: 40 }} />
+            </Box>
+          )}
+        </Box>
+
+        {/* Action buttons for preview */}
+        {previewURL && (
+          <Box 
+            component={motion.div}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            sx={{ 
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '100%',
+              height: '100%',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              background: 'rgba(0, 0, 0, 0.5)',
+              borderRadius: shape === 'circle' ? '50%' : '8px',
+              padding: 2,
+              zIndex: 1
             }}
           >
-            <Check sx={{ color: 'white', fontSize: 40 }} />
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <IconButton 
+                size="small"
+                onClick={handleConfirmUpload}
+                component={motion.button}
+                whileHover={{ scale: 1.1 }}
+                sx={{
+                  backgroundColor: 'white',
+                  color: '#8B5CF6',
+                  '&:hover': {
+                    backgroundColor: '#f9fafb',
+                  }
+                }}
+              >
+                <Check />
+              </IconButton>
+              <IconButton 
+                size="small"
+                onClick={cancelUpload}
+                component={motion.button}
+                whileHover={{ scale: 1.1 }}
+                sx={{
+                  backgroundColor: 'white',
+                  color: '#ef4444',
+                  '&:hover': {
+                    backgroundColor: '#f9fafb',
+                  }
+                }}
+              >
+                <Close />
+              </IconButton>
+            </Box>
           </Box>
         )}
       </Box>
 
-      {/* Action buttons */}
-      {previewURL && (
-        <Box 
+      {/* Helper text */}
+      {!previewURL && !currentPhotoURL && (
+        <Typography 
+          variant="body2" 
+          color="text.secondary" 
           sx={{ 
-            display: 'flex', 
-            gap: 1,
-            mt: 1
+            mt: 1,
+            textAlign: 'center',
+            fontWeight: 500
           }}
         >
-          <IconButton 
-            size="small"
-            onClick={handleConfirmUpload}
-            component={motion.button}
-            whileHover={{ scale: 1.1 }}
-            sx={{
-              backgroundColor: 'success.main',
-              color: 'white',
-              '&:hover': {
-                backgroundColor: 'success.dark'
-              }
-            }}
-          >
-            <Check />
-          </IconButton>
-          <IconButton 
-            size="small"
-            onClick={cancelUpload}
-            component={motion.button}
-            whileHover={{ scale: 1.1 }}
-            sx={{
-              backgroundColor: 'error.main',
-              color: 'white',
-              '&:hover': {
-                backgroundColor: 'error.dark'
-              }
-            }}
-          >
-            <Close />
-          </IconButton>
-        </Box>
-      )}
-      
-      {/* Error message */}
-      {error && (
-        <Typography variant="caption" color="error" sx={{ mt: 1 }}>
-          {error}
+          Fotoğraf yüklemek için tıklayın veya sürükleyip bırakın
         </Typography>
       )}
-      
-      {/* User guidance message */}
-      {!previewURL && !currentPhotoURL && (
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Fotoğraf yüklemek için tıklayın veya sürükleyip bırakın
+
+      {/* Error message */}
+      {error && (
+        <Typography 
+          component={motion.p}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          color="error" 
+          variant="body2" 
+          sx={{ mt: 2, textAlign: 'center', maxWidth: 300 }}
+        >
+          {error}
         </Typography>
       )}
     </Box>

@@ -1,6 +1,6 @@
 // src/types/index.ts
 
-export type DanceStyle = 'salsa' | 'bachata' | 'kizomba' | 'other';
+export type DanceStyle = 'salsa' | 'bachata' | 'kizomba' | 'zouk' | 'tango';
 
 export type DanceLevel = 'beginner' | 'intermediate' | 'advanced' | 'professional';
 
@@ -11,12 +11,18 @@ export interface User {
   email: string;
   displayName: string;
   photoURL?: string;
-  phoneNumber?: string;
-  role: UserRole[];
-  danceStyles?: DanceStyle[];
   level?: DanceLevel;
-  createdAt: string;
-  updatedAt: string;
+  phoneNumber?: string;
+  danceStyles?: DanceStyle[];
+  gender?: string;
+  age?: number;
+  city?: string;
+  height?: number;
+  weight?: number;
+  availableTimes?: string[];
+  roles?: string[];
+  createdAt?: Date;
+  updatedAt?: Date;
   schoolId?: string;  // Kullanıcının bağlı olduğu okul ID'si
   instructorId?: string; // Öğrencinin bağlı olduğu eğitmen ID'si
 }
