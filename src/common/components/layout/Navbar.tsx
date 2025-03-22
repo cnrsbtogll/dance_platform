@@ -26,27 +26,27 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
   // Kullanıcı rollerini kontrol et ve logla
   useEffect(() => {
     console.log('🔍 Kullanıcı rol bilgileri:', {
-      rawRole: user?.role,
-      isArray: Array.isArray(user?.role),
+      rawRole: user?.roles,
+      isArray: Array.isArray(user?.roles),
       user: user
     });
   }, [user]);
 
-  const hasInstructorRole = Array.isArray(user?.role) 
-    ? user?.role?.includes('instructor')
-    : user?.role === 'instructor';
-  const hasSchoolAdminRole = Array.isArray(user?.role)
-    ? user?.role?.includes('school_admin')
-    : user?.role === 'school_admin';
-  const hasSchoolRole = Array.isArray(user?.role)
-    ? user?.role?.includes('school')
-    : user?.role === 'school';
-  const hasSuperAdminRole = Array.isArray(user?.role)
-    ? user?.role?.includes('admin')
-    : user?.role === 'admin';
-  const hasStudentRole = (Array.isArray(user?.role) 
-    ? user?.role?.includes('student')
-    : user?.role === 'student') || 
+  const hasInstructorRole = Array.isArray(user?.roles) 
+    ? user?.roles?.includes('instructor')
+    : user?.roles === 'instructor';
+  const hasSchoolAdminRole = Array.isArray(user?.roles)
+    ? user?.roles?.includes('school_admin')
+    : user?.roles === 'school_admin';
+  const hasSchoolRole = Array.isArray(user?.roles)
+    ? user?.roles?.includes('school')
+    : user?.roles === 'school';
+  const hasSuperAdminRole = Array.isArray(user?.roles)
+    ? user?.roles?.includes('admin')
+    : user?.roles === 'admin';
+  const hasStudentRole = (Array.isArray(user?.roles) 
+    ? user?.roles?.includes('student')
+    : user?.roles === 'student') || 
     (!hasInstructorRole && !hasSchoolAdminRole && !hasSchoolRole && !hasSuperAdminRole && isAuthenticated);
 
   // Rol durumlarını logla
@@ -207,9 +207,9 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                 </Link>
               </div>
               <div className="hidden sm:ml-8 sm:flex sm:space-x-4">
-                {(!user?.role || (Array.isArray(user.role) ? 
-                  !user.role.includes('school') && !user.role.includes('instructor') : 
-                  user.role !== 'school' && user.role !== 'instructor')) && (
+                {(!user?.roles || (Array.isArray(user.roles) ? 
+                  !user.roles.includes('school') && !user.roles.includes('instructor') : 
+                  user.roles !== 'school' && user.roles !== 'instructor')) && (
                   <>
                     <Link 
                       to="/partners" 
@@ -263,7 +263,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                       console.log('🎯 Dans Okulu Aç butonuna tıklandı:', {
                         userId: user?.id,
                         userEmail: user?.email,
-                        userRole: user?.role,
+                        userRole: user?.roles,
                         roleChecks: {
                           hasInstructorRole,
                           hasSchoolRole,
@@ -453,7 +453,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                       console.log('🎯 Dans Okulu Aç butonuna tıklandı (Mobil):', {
                         userId: user?.id,
                         userEmail: user?.email,
-                        userRole: user?.role,
+                        userRole: user?.roles,
                         roleChecks: {
                           hasInstructorRole,
                           hasSchoolRole,
@@ -499,9 +499,9 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                     </div>
                   </div>
                   <div className="mt-3 space-y-1 px-4">
-                    {(!user?.role || (Array.isArray(user.role) ? 
-                      !user.role.includes('school') && !user.role.includes('instructor') : 
-                      user.role !== 'school' && user.role !== 'instructor')) && (
+                    {(!user?.roles || (Array.isArray(user.roles) ? 
+                      !user.roles.includes('school') && !user.roles.includes('instructor') : 
+                      user.roles !== 'school' && user.roles !== 'instructor')) && (
                       <>
                         <Link
                           to="/partners"

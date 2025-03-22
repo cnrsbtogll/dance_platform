@@ -209,9 +209,9 @@ export const fetchAllInstructors = async (): Promise<Array<Instructor & { user: 
               email: instructorData.email,
               displayName: instructorData.displayName,
               role: ['instructor'],
-              createdAt: instructorData.createdAt,
-              updatedAt: instructorData.updatedAt
-            } as UserWithProfile
+              createdAt: new Date(instructorData.createdAt),
+              updatedAt: new Date(instructorData.updatedAt)
+            } as unknown as UserWithProfile
           });
         }
       } catch (userError) {
@@ -223,9 +223,9 @@ export const fetchAllInstructors = async (): Promise<Array<Instructor & { user: 
             email: instructorData.email,
             displayName: instructorData.displayName,
             role: ['instructor'],
-            createdAt: instructorData.createdAt,
-            updatedAt: instructorData.updatedAt
-          } as UserWithProfile
+            createdAt: new Date(instructorData.createdAt),
+            updatedAt: new Date(instructorData.updatedAt)
+          } as unknown as UserWithProfile
         });
       }
     }
