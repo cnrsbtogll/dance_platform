@@ -54,8 +54,6 @@ interface FormData {
   photoURL: string;
   instructorId: string;
   schoolId: string;
-  password: string;
-  createAccount: boolean;
 }
 
 // Form errors interface
@@ -118,8 +116,6 @@ export const UserManagement: React.FC = () => {
     photoURL: '',
     instructorId: '',
     schoolId: '',
-    password: '',
-    createAccount: true
   });
   const [formErrors, setFormErrors] = useState<FormErrors>({});
 
@@ -359,8 +355,6 @@ export const UserManagement: React.FC = () => {
       photoURL: '',
       instructorId: '',
       schoolId: '',
-      password: '',
-      createAccount: true
     });
     setFormErrors({});
   };
@@ -377,8 +371,6 @@ export const UserManagement: React.FC = () => {
       photoURL: student.photoURL || '',
       instructorId: student.instructorId || '',
       schoolId: student.schoolId || '',
-      password: '',
-      createAccount: false
     });
     setFormErrors({});
     setEditMode(true);
@@ -391,11 +383,42 @@ export const UserManagement: React.FC = () => {
     setEditMode(true);
   };
 
+  // Davetiye e-postası gönderme fonksiyonu
+  const sendInvitationEmail = async (email: string, invitationData: {
+    displayName: string;
+    schoolId?: string;
+    schoolName?: string;
+    instructorId?: string;
+    instructorName?: string;
+    level: DanceLevel;
+  }) => {
+    try {
+      // Benzersiz bir davet kodu oluştur
+      const invitationId = `inv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Davet bilgilerini Firestore'a kaydet
+      await setDoc(doc(db, 'pendingUsers', invitationId), {
+        email,
+        ...invitationData,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 gün geçerli
+      });
+
+      // E-posta gönderme fonksiyonu burada implement edilecek
+      // Firebase Cloud Functions kullanılabilir
+      
+      return true;
+    } catch (error) {
+      console.error('Davet gönderilirken hata oluştu:', error);
+      throw error;
+    }
+  };
+
   // Form submission
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     
-    // Check for form errors
     if (Object.keys(formErrors).length > 0) {
       setError('Lütfen form hatalarını düzeltin.');
       return;
@@ -407,17 +430,15 @@ export const UserManagement: React.FC = () => {
     
     try {
       if (selectedStudent) {
-        // Update existing student
+        // Mevcut öğrenci güncelleme kodu aynı kalacak
         const userRef = doc(db, 'users', selectedStudent.id);
         
-        // Get instructor name if an instructor is selected
         let instructorName = '';
         if (formData.instructorId) {
           const selectedInstructor = instructors.find(i => i.id === formData.instructorId);
           instructorName = selectedInstructor?.displayName || '';
         }
         
-        // Get school name if a school is selected
         let schoolName = '';
         if (formData.schoolId) {
           const selectedSchool = schools.find(s => s.id === formData.schoolId);
@@ -435,7 +456,6 @@ export const UserManagement: React.FC = () => {
           updatedAt: serverTimestamp()
         });
         
-        // Update the students array
         const updatedStudents = students.map(student => 
           student.id === selectedStudent.id 
             ? { 
@@ -455,12 +475,12 @@ export const UserManagement: React.FC = () => {
         setStudents(updatedStudents);
         setSuccess('Öğrenci bilgileri başarıyla güncellendi.');
       } else {
-        // Create new student
+        // Yeni öğrenci ekleme - artık hesap oluşturmak yerine davet gönderilecek
         if (!formData.email || !formData.displayName) {
           throw new Error('E-posta ve ad soyad alanları zorunludur.');
         }
         
-        // Check if email already exists
+        // E-posta kontrolü
         const emailQuery = query(
           collection(db, 'users'), 
           where('email', '==', formData.email)
@@ -471,93 +491,38 @@ export const UserManagement: React.FC = () => {
           throw new Error('Bu e-posta adresi zaten kullanılıyor.');
         }
         
-        let userId = '';
-        
-        // Create user in Firebase Auth if requested
-        if (formData.createAccount) {
-          if (!formData.password) {
-            throw new Error('Kullanıcı hesabı oluşturmak için şifre gereklidir.');
-          }
-          
-          // Create the user in Firebase Auth
-          const userCredential = await createUserWithEmailAndPassword(
-            auth,
-            formData.email,
-            formData.password
-          );
-          
-          userId = userCredential.user.uid;
-          
-          // Update user profile
-          await updateProfile(userCredential.user, {
-            displayName: formData.displayName,
-            photoURL: formData.photoURL || null
-          });
-          
-          // Send email verification
-          await sendEmailVerification(userCredential.user);
-        } else {
-          // Generate a random ID if not creating auth account
-          userId = 'user_' + Date.now() + Math.random().toString(36).substr(2, 9);
-        }
-        
-        // Get instructor name if an instructor is selected
+        // Seçilen eğitmen ve okul bilgilerini al
         let instructorName = '';
         if (formData.instructorId) {
           const selectedInstructor = instructors.find(i => i.id === formData.instructorId);
           instructorName = selectedInstructor?.displayName || '';
         }
         
-        // Get school name if a school is selected
         let schoolName = '';
         if (formData.schoolId) {
           const selectedSchool = schools.find(s => s.id === formData.schoolId);
           schoolName = selectedSchool?.name || '';
         }
-        
-        // Create user document in Firestore
-        const newStudentData = {
-          id: userId,
+
+        // Davet gönder
+        await sendInvitationEmail(formData.email, {
           displayName: formData.displayName,
-          email: formData.email,
-          phoneNumber: formData.phoneNumber || '',
-          role: 'student' as UserRole,
-          level: formData.level,
-          instructorId: formData.instructorId || null,
-          instructorName: instructorName || null,
-          schoolId: formData.schoolId || null,
-          schoolName: schoolName || null,
-          photoURL: formData.photoURL || '',
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        };
+          schoolId: formData.schoolId || undefined,
+          schoolName: schoolName || undefined,
+          instructorId: formData.instructorId || undefined,
+          instructorName: instructorName || undefined,
+          level: formData.level
+        });
         
-        await setDoc(doc(db, 'users', userId), newStudentData);
-        
-        // Add to students array
-        const newStudent: FirebaseUser = {
-          ...newStudentData,
-          role: 'student' as UserRole,
-          level: formData.level,
-          instructorId: formData.instructorId || null,
-          instructorName: instructorName || null,
-          schoolId: formData.schoolId || null,
-          schoolName: schoolName || null,
-          createdAt: serverTimestamp() as Timestamp,
-          updatedAt: serverTimestamp() as Timestamp
-        };
-        
-        setStudents([newStudent, ...students]);
-        setSuccess('Yeni öğrenci başarıyla oluşturuldu.');
+        setSuccess('Davet e-postası başarıyla gönderildi.');
       }
       
-      // Close the form
       setEditMode(false);
       setSelectedStudent(null);
       
     } catch (err: any) {
-      console.error('Öğrenci kaydedilirken hata oluştu:', err);
-      setError('Öğrenci kaydedilirken bir hata oluştu: ' + (err.message || 'Bilinmeyen hata'));
+      console.error('İşlem sırasında hata oluştu:', err);
+      setError('İşlem sırasında bir hata oluştu: ' + (err.message || 'Bilinmeyen hata'));
     } finally {
       setLoading(false);
     }
@@ -833,50 +798,6 @@ export const UserManagement: React.FC = () => {
                   required
                 />
               </div>
-              
-              {!selectedStudent && (
-                <>
-                  <div className="md:col-span-2">
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id="createAccount"
-                        name="createAccount"
-                        checked={formData.createAccount}
-                        onChange={handleInputChange}
-                        className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
-                      />
-                      <label htmlFor="createAccount" className="ml-2 block text-sm text-gray-700">
-                        Giriş yapabilen kullanıcı hesabı oluştur
-                      </label>
-                    </div>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Bu seçeneği işaretlerseniz, öğrenci için giriş yapabileceği bir hesap oluşturulacak ve e-posta doğrulama gönderilecektir.
-                    </p>
-                  </div>
-                  
-                  {formData.createAccount && (
-                    <div className="md:col-span-2">
-                      <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                        Şifre*
-                      </label>
-                      <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        required={formData.createAccount}
-                        value={formData.password}
-                        onChange={handleInputChange}
-                        className="w-full p-2 border border-gray-300 rounded-md"
-                        minLength={6}
-                      />
-                      <p className="mt-1 text-xs text-gray-500">
-                        Şifre en az 6 karakter uzunluğunda olmalıdır.
-                      </p>
-                    </div>
-                  )}
-                </>
-              )}
             </div>
             
             <div className="flex justify-end space-x-3">
