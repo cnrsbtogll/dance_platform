@@ -846,7 +846,9 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
           </div>
         </td>
         <td className="px-6 py-4 whitespace-nowrap">
-          <div className="text-sm text-gray-900">{student.email}</div>
+          <div className="text-sm text-gray-900 max-w-[200px] truncate" title={student.email}>
+            {student.email}
+          </div>
         </td>
         <td className="px-6 py-4 whitespace-nowrap">
           <div className="text-sm text-gray-900">
@@ -867,19 +869,21 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
             {student.schoolName || '-'}
           </div>
         </td>
-        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-          <button
-            onClick={() => editStudent(student)}
-            className="text-indigo-600 hover:text-indigo-900 mr-2"
-          >
-            Düzenle
-          </button>
-          <button
-            onClick={() => deleteStudentHandler(student.id)}
-            className="text-red-600 hover:text-red-900"
-          >
-            Sil
-          </button>
+        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium min-w-[140px]">
+          <div className="flex justify-end space-x-2">
+            <button
+              onClick={() => editStudent(student)}
+              className="text-indigo-600 hover:text-indigo-900"
+            >
+              Düzenle
+            </button>
+            <button
+              onClick={() => deleteStudentHandler(student.id)}
+              className="text-red-600 hover:text-red-900"
+            >
+              Sil
+            </button>
+          </div>
         </td>
       </motion.tr>
     );
@@ -991,7 +995,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                   required
                   value={formData.email}
                   onChange={handleInputChange}
-                  disabled={!!selectedStudent}
+                  error={false}
                   fullWidth
                   helperText={selectedStudent ? "Mevcut öğrencilerin e-posta adresleri değiştirilemez." : ""}
                 />
@@ -1002,8 +1006,10 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                   name="phone"
                   label="Telefon"
                   required
-                  value={formData.phone}
-                  onChange={(value) => setFormData(prev => ({ ...prev, phone: value }))}
+                  countryCode="+90"
+                  phoneNumber={formData.phone}
+                  onCountryCodeChange={() => {}}
+                  onPhoneNumberChange={(value: string) => setFormData(prev => ({ ...prev, phone: value }))}
                   fullWidth
                 />
               </div>
@@ -1013,7 +1019,11 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                   name="level"
                   label="Dans Seviyesi"
                   value={formData.level}
-                  onChange={(value) => handleSelectChange(value, 'level')}
+                  onChange={(value: string | string[]) => {
+                    if (typeof value === 'string') {
+                      handleSelectChange(value, 'level');
+                    }
+                  }}
                   options={[
                     { value: 'beginner', label: 'Başlangıç' },
                     { value: 'intermediate', label: 'Orta' },
@@ -1034,7 +1044,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                   shape="circle"
                   width={96}
                   height={96}
-                  required
+                  maxSizeKB={5120}
                 />
               </div>
               
@@ -1043,7 +1053,11 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                   name="instructorId"
                   label="Eğitmen"
                   value={formData.instructorId}
-                  onChange={(value) => handleSelectChange(value, 'instructorId')}
+                  onChange={(value: string | string[]) => {
+                    if (typeof value === 'string') {
+                      handleSelectChange(value, 'instructorId');
+                    }
+                  }}
                   options={[
                     { value: '', label: 'Eğitmen Seç...' },
                     ...instructors.map(instructor => ({
@@ -1061,7 +1075,11 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                   name="schoolId"
                   label="Okul"
                   value={formData.schoolId}
-                  onChange={(value) => handleSelectChange(value, 'schoolId')}
+                  onChange={(value: string | string[]) => {
+                    if (typeof value === 'string') {
+                      handleSelectChange(value, 'schoolId');
+                    }
+                  }}
                   options={[
                     { value: '', label: 'Okul Seç...' },
                     ...schools.map(school => ({
@@ -1148,7 +1166,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
               filteredStudents.map((student) => (
                 <div key={student.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                   <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center">
+                    <div className="flex items-center max-w-[60%]">
                       <div className="flex-shrink-0 h-10 w-10 relative bg-green-100 rounded-full overflow-hidden">
                         <img 
                           className="h-10 w-10 rounded-full object-cover absolute inset-0" 
@@ -1161,12 +1179,12 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                           }}
                         />
                       </div>
-                      <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">{student.displayName}</div>
-                        <div className="text-sm text-gray-500">{student.email}</div>
+                      <div className="ml-3 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">{student.displayName}</div>
+                        <div className="text-sm text-gray-500 truncate" title={student.email}>{student.email}</div>
                       </div>
                     </div>
-                    <div className="flex space-x-2">
+                    <div className="flex space-x-2 flex-shrink-0">
                       <button
                         onClick={() => editStudent(student)}
                         className="text-indigo-600 hover:text-indigo-900"
