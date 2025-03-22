@@ -27,6 +27,7 @@ import { User, UserRole, DanceLevel, DanceStyle } from '../../../../types';
 import { useAuth } from '../../../../contexts/AuthContext';
 import CustomSelect from '../../../../common/components/ui/CustomSelect';
 import CustomPhoneInput from '../../../../common/components/ui/CustomPhoneInput';
+import { generateInitialsAvatar } from '../../../../common/utils/imageUtils';
 
 // Student interface with instructor and school
 interface Student {
@@ -593,6 +594,23 @@ export const UserManagement: React.FC = () => {
     );
   };
 
+  // Get avatar type based on user role
+  const getAvatarType = (role: UserRole | UserRole[]): "student" | "instructor" | "school" => {
+    const roleToCheck = Array.isArray(role) ? role[0] : role;
+    
+    switch (roleToCheck) {
+      case 'instructor':
+        return 'instructor';
+      case 'school':
+      case 'school_admin':
+        return 'school';
+      case 'admin':
+      case 'student':
+      default:
+        return 'student';
+    }
+  };
+
   // Render student row
   const renderStudent = (student: FirebaseUser) => {
     return (
@@ -605,15 +623,26 @@ export const UserManagement: React.FC = () => {
       >
         <td className="px-6 py-4 whitespace-nowrap">
           <div className="flex items-center">
-            <div className="flex-shrink-0 h-10 w-10">
-              <img
-                className="h-10 w-10 rounded-full object-cover"
-                src={student.photoURL || '/assets/default-avatar.svg'}
-                alt={student.displayName}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = "/assets/default-avatar.svg";
-                }}
-              />
+            <div className="flex-shrink-0 h-10 w-10 relative bg-green-100 rounded-full overflow-hidden">
+              {student.photoURL ? (
+                <img 
+                  className="h-10 w-10 rounded-full object-cover absolute inset-0" 
+                  src={student.photoURL}
+                  alt={student.displayName}
+                  onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                    const target = e.currentTarget;
+                    target.onerror = null;
+                    // Hata durumunda baş harf avatarını göster
+                    target.src = generateInitialsAvatar(student.displayName, getAvatarType(student.role));
+                  }}
+                />
+              ) : (
+                <img 
+                  className="h-10 w-10 rounded-full object-cover" 
+                  src={generateInitialsAvatar(student.displayName, getAvatarType(student.role))}
+                  alt={student.displayName}
+                />
+              )}
             </div>
             <div className="ml-4">
               <div className="text-sm font-medium text-gray-900">{student.displayName}</div>
