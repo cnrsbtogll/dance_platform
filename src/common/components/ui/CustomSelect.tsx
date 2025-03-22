@@ -39,14 +39,27 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
   };
 
   return (
-    <FormControl fullWidth={fullWidth} error={!!error} required={required} sx={{ minWidth: 120, marginTop: 1 }}>
+    <FormControl 
+      fullWidth={fullWidth} 
+      error={!!error} 
+      required={required} 
+      sx={{ 
+        minWidth: 120,
+        margin: 0,
+        '& .MuiInputBase-root': {
+          height: '45px'
+        }
+      }}
+    >
       <InputLabel 
         id={`${name}-label`} 
         sx={{ 
           backgroundColor: 'white', 
           px: 1,
+          transform: 'translate(14px, -9px) scale(0.75)',
           '&.MuiInputLabel-shrink': {
             backgroundColor: 'white',
+            transform: 'translate(14px, -9px) scale(0.75)'
           }
         }}
         shrink={true}
@@ -64,15 +77,17 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
         displayEmpty={true}
         sx={{
           '& .MuiSelect-select': {
-            padding: '14px',
+            padding: '10.5px 14px',
+            minHeight: '21px !important',
+            lineHeight: '1.5'
           },
           backgroundColor: 'white',
-          borderRadius: '0.75rem',
+          borderRadius: '0.375rem',
           '& .MuiOutlinedInput-notchedOutline': {
             borderColor: '#E5E7EB',
           },
           '&:hover .MuiOutlinedInput-notchedOutline': {
-            borderColor: '#A5B4FC',
+            borderColor: '#9CA3AF',
           },
           '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
             borderColor: '#6366F1',
