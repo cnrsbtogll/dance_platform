@@ -181,3 +181,106 @@ export interface Course {
   updatedAt: string;
   isActive: boolean;
 }
+
+export interface FirebaseUser {
+  id: string;
+  email: string;
+  displayName: string;
+  photoURL?: string;
+  phoneNumber?: string;
+  role: UserRole | UserRole[];
+  level?: DanceLevel;
+  instructorId?: string | null;
+  instructorName?: string | null;
+  schoolId?: string | null;
+  schoolName?: string | null;
+  danceStyles?: DanceStyle[];
+  createdAt: any;
+  updatedAt: any;
+  // Additional fields for instructor
+  specialties?: string[];
+  experience?: number;
+  bio?: string;
+  availability?: {
+    days: string[];
+    hours: string[];
+  };
+  // Additional fields for school
+  address?: string;
+  city?: string;
+  district?: string;
+  description?: string;
+  facilities?: string[];
+  contactPerson?: string;
+  website?: string;
+}
+
+// Update the invitation data type
+export interface InvitationData {
+  displayName: string;
+  roles: UserRole[];
+  level?: DanceLevel;
+  schoolId?: string;
+  schoolName?: string;
+  instructorId?: string;
+  instructorName?: string;
+}
+
+export interface BaseFormData {
+  id: string;
+  displayName: string;
+  email: string;
+  phoneNumber: string;
+  photoURL: string;
+  role: UserRole;
+}
+
+export interface StudentFormData extends BaseFormData {
+  level: DanceLevel;
+  instructorId: string;
+  schoolId: string;
+  danceStyles: DanceStyle[];
+}
+
+export interface InstructorFormData extends BaseFormData {
+  level: DanceLevel;
+  specialties: string[];
+  experience: number;
+  bio: string;
+  schoolId: string;
+  availability: {
+    days: string[];
+    hours: string[];
+  };
+}
+
+export interface SchoolFormData extends BaseFormData {
+  address: string;
+  city: string;
+  district: string;
+  description: string;
+  facilities: string[];
+  contactPerson: string;
+  website: string;
+  level?: never; // Schools don't have a level
+  instructorId?: never; // Schools don't have an instructor
+  schoolId?: never; // Schools don't have a school
+}
+
+export type FormDataType = StudentFormData | InstructorFormData | SchoolFormData;
+
+// Type guard functions
+export const isStudentForm = (data: FormDataType): data is StudentFormData => {
+  return data.role === 'student';
+};
+
+export const isInstructorForm = (data: FormDataType): data is InstructorFormData => {
+  return data.role === 'instructor';
+};
+
+export const isSchoolForm = (data: FormDataType): data is SchoolFormData => {
+  return data.role === 'school';
+};
+
+// Helper type for form data updates
+export type FormDataUpdate<T extends FormDataType> = Partial<T> & { role?: never };

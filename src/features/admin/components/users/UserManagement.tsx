@@ -24,7 +24,22 @@ import {
 } from 'firebase/auth';
 import { db, auth } from '../../../../api/firebase/firebase';
 import { motion } from 'framer-motion';
-import { User, UserRole, DanceLevel, DanceStyle } from '../../../../types';
+import { 
+  User, 
+  UserRole, 
+  DanceLevel, 
+  DanceStyle, 
+  FirebaseUser,
+  StudentFormData,
+  InstructorFormData,
+  SchoolFormData,
+  FormDataType,
+  isStudentForm,
+  isInstructorForm,
+  isSchoolForm,
+  InvitationData,
+  FormDataUpdate
+} from '../../../../types';
 import { useAuth } from '../../../../contexts/AuthContext';
 import CustomSelect from '../../../../common/components/ui/CustomSelect';
 import CustomPhoneInput from '../../../../common/components/ui/CustomPhoneInput';
@@ -35,7 +50,6 @@ import { Button, TablePagination, TableSortLabel } from '@mui/material';
 import { StudentForm } from './forms/StudentForm';
 import { InstructorForm } from './forms/InstructorForm';
 import { SchoolForm } from './forms/SchoolForm';
-import { StudentFormData, InstructorFormData, SchoolFormData } from './types';
 
 // Student interface with instructor and school
 interface Student {
@@ -87,24 +101,6 @@ interface FormErrors {
   [key: string]: string | undefined;
 }
 
-// Define Firebase user type
-interface FirebaseUser {
-  id: string;
-  email: string;
-  displayName: string;
-  photoURL?: string;
-  phoneNumber: string;
-  role: UserRole | UserRole[];
-  level: DanceLevel;
-  instructorId?: string | null;
-  instructorName?: string | null;
-  schoolId?: string | null;
-  schoolName?: string | null;
-  danceStyles?: DanceStyle[];
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-}
-
 // Instructor type
 interface Instructor {
   id: string;
@@ -129,16 +125,28 @@ interface FilterConfig {
   roles: string[];
 }
 
-type FormDataType = StudentFormData | InstructorFormData | SchoolFormData;
+// Type guard functions
+const isStudentFormData = (data: FormDataType): data is StudentFormData => {
+  return data.role === 'student';
+};
+
+const isInstructorFormData = (data: FormDataType): data is InstructorFormData => {
+  return data.role === 'instructor';
+};
+
+const isSchoolFormData = (data: FormDataType): data is SchoolFormData => {
+  return data.role === 'school';
+};
 
 export const UserManagement: React.FC = () => {
-  console.log('UserManagement component rendered');
   const { currentUser } = useAuth();
   const [students, setStudents] = useState<FirebaseUser[]>([]);
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [editMode, setEditMode] = useState<boolean>(false);
   const [selectedStudent, setSelectedStudent] = useState<FirebaseUser | null>(null);
+  const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
+  const [selectedInstructor, setSelectedInstructor] = useState<Instructor | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -492,41 +500,18 @@ export const UserManagement: React.FC = () => {
     setEditMode(true);
   };
 
-  // Davetiye e-postası gönderme fonksiyonu
-  const sendInvitationEmail = async (email: string, invitationData: {
-    displayName: string;
-    schoolId?: string;
-    schoolName?: string;
-    instructorId?: string;
-    instructorName?: string;
-    level: DanceLevel;
-    roles: UserRole[];
-  }) => {
+  // Update the sendInvitationEmail function
+  const sendInvitationEmail = async (email: string, invitationData: InvitationData) => {
     try {
-      // Benzersiz bir davet kodu oluştur
       const invitationId = `inv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // Remove undefined values and create clean data object
-      const cleanData = {
-        email,
-        displayName: invitationData.displayName,
-        roles: invitationData.roles,
-        level: invitationData.level,
-        status: 'pending',
-        createdAt: serverTimestamp(),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 gün geçerli
-        ...(invitationData.schoolId ? { schoolId: invitationData.schoolId } : {}),
-        ...(invitationData.schoolName ? { schoolName: invitationData.schoolName } : {}),
-        ...(invitationData.instructorId ? { instructorId: invitationData.instructorId } : {}),
-        ...(invitationData.instructorName ? { instructorName: invitationData.instructorName } : {})
+      // Create the data to be stored in Firestore
+      const invitationDataWithEmail = {
+        ...invitationData,
+        targetEmail: email // Store email with a different field name
       };
 
-      // Davet bilgilerini Firestore'a kaydet
-      await setDoc(doc(db, 'pendingUsers', invitationId), cleanData);
-
-      // E-posta gönderme fonksiyonu burada implement edilecek
-      // Firebase Cloud Functions kullanılabilir
-      
+      await setDoc(doc(db, 'pendingUsers', invitationId), invitationDataWithEmail);
       return true;
     } catch (error) {
       console.error('Davet gönderilirken hata oluştu:', error);
@@ -534,7 +519,75 @@ export const UserManagement: React.FC = () => {
     }
   };
 
-  // Handle form submission
+  // Update the createInvitationData function
+  const createInvitationData = (formData: FormDataType): InvitationData => {
+    const baseData: InvitationData = {
+      displayName: formData.displayName,
+      roles: [formData.role]
+    };
+
+    if (isStudentForm(formData)) {
+      // For student form, we can safely access instructorId
+      const invitationData: InvitationData = {
+        ...baseData,
+        level: formData.level,
+        schoolId: formData.schoolId,
+        instructorId: formData.instructorId
+      };
+
+      // Only add schoolName and instructorName if they exist
+      if (selectedSchool) {
+        invitationData.schoolName = selectedSchool.displayName;
+      }
+      if (selectedInstructor) {
+        invitationData.instructorName = selectedInstructor.displayName;
+      }
+
+      return invitationData;
+    } else if (isInstructorForm(formData)) {
+      // For instructor form, we only include school-related fields
+      const invitationData: InvitationData = {
+        ...baseData,
+        level: formData.level,
+        schoolId: formData.schoolId
+      };
+
+      // Only add schoolName if it exists
+      if (selectedSchool) {
+        invitationData.schoolName = selectedSchool.displayName;
+      }
+
+      return invitationData;
+    }
+
+    return baseData;
+  };
+
+  // Update the school data creation
+  const createSchoolData = (formData: FormDataType) => {
+    if (!isSchoolForm(formData)) {
+      throw new Error('Invalid form data type for school');
+    }
+
+    return {
+      email: formData.email,
+      displayName: formData.displayName,
+      photoURL: formData.photoURL || generateInitialsAvatar(formData.displayName, 'school'),
+      phoneNumber: formData.phoneNumber || '',
+      role: ['school'] as UserRole[],
+      address: formData.address,
+      city: formData.city,
+      district: formData.district,
+      description: formData.description,
+      facilities: formData.facilities,
+      contactPerson: formData.contactPerson,
+      website: formData.website,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+  };
+
+  // Update the handleSubmit function
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     
@@ -630,12 +683,19 @@ export const UserManagement: React.FC = () => {
               ? {
                   ...student,
                   ...commonFields,
-                  ...(formData.role === 'student' && { danceStyles: (formData as StudentFormData).danceStyles }),
+                  ...(formData.role === 'student' && {
+                    level: (formData as StudentFormData).level,
+                    danceStyles: (formData as StudentFormData).danceStyles,
+                    instructorId: (formData as StudentFormData).instructorId,
+                    schoolId: (formData as StudentFormData).schoolId
+                  }),
                   ...(formData.role === 'instructor' && {
+                    level: (formData as InstructorFormData).level,
                     specialties: (formData as InstructorFormData).specialties,
                     experience: (formData as InstructorFormData).experience,
                     bio: (formData as InstructorFormData).bio,
-                    availability: (formData as InstructorFormData).availability
+                    availability: (formData as InstructorFormData).availability,
+                    schoolId: (formData as InstructorFormData).schoolId
                   }),
                   ...(formData.role === 'school' && {
                     address: (formData as SchoolFormData).address,
@@ -646,7 +706,7 @@ export const UserManagement: React.FC = () => {
                     contactPerson: (formData as SchoolFormData).contactPerson,
                     website: (formData as SchoolFormData).website
                   })
-                }
+                } as FirebaseUser
               : student
           )
         );
@@ -657,12 +717,12 @@ export const UserManagement: React.FC = () => {
         setSelectedUserType(null);
         resetForm();
       } else {
-        // Yeni kullanıcı için kontroller
+        // Validate required fields
         if (!formData.email || !formData.displayName) {
           throw new Error('E-posta ve ad soyad alanları zorunludur.');
         }
         
-        // E-posta kontrolü
+        // Check if email is already in use
         const emailQuery = query(
           collection(db, 'users'), 
           where('email', '==', formData.email)
@@ -673,44 +733,13 @@ export const UserManagement: React.FC = () => {
           throw new Error('Bu e-posta adresi zaten kullanılıyor.');
         }
 
-        // Seçilen eğitmen ve okul bilgilerini al
-        let instructorName = '';
-        if (formData.instructorId) {
-          const selectedInstructor = instructors.find(i => i.id === formData.instructorId);
-          instructorName = selectedInstructor?.displayName || '';
-        }
-        
-        let schoolName = '';
-        if (formData.schoolId) {
-          const selectedSchool = schools.find(s => s.id === formData.schoolId);
-          schoolName = selectedSchool?.displayName || '';
-        }
-
-        // Eğer okul ekliyorsak
-        if (formData.role === 'school') {
-          const newSchoolRef = doc(collection(db, 'users'));
-          const schoolData = {
-            email: formData.email,
-            displayName: formData.displayName,
-            photoURL: formData.photoURL || generateInitialsAvatar(formData.displayName, 'school'),
-            phoneNumber: formData.phoneNumber || '',
-            role: ['school'] as UserRole[],
-            level: formData.level,
-            address: formData.address || '',
-            city: formData.city || '',
-            district: formData.district || '',
-            description: formData.description || '',
-            facilities: formData.facilities || [],
-            contactPerson: formData.contactPerson || '',
-            website: formData.website || '',
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-          };
-
+        if (isSchoolForm(formData)) {
+          const schoolData = createSchoolData(formData);
           // Batch write için
           const batch = writeBatch(db);
 
           // Users koleksiyonuna ekle
+          const newSchoolRef = doc(collection(db, 'users'));
           batch.set(newSchoolRef, schoolData);
 
           // Schools koleksiyonuna ekle
@@ -740,88 +769,34 @@ export const UserManagement: React.FC = () => {
           setStudents(prev => [...prev, newSchool]);
           
           setSuccess('Dans okulu başarıyla eklendi.');
-        } 
-        // Eğer eğitmen ekliyorsak
-        else if (formData.role === 'instructor') {
-          const newInstructorRef = doc(collection(db, 'users'));
-          const instructorData = {
-            email: formData.email,
-            displayName: formData.displayName,
-            photoURL: formData.photoURL || generateInitialsAvatar(formData.displayName, 'instructor'),
-            phoneNumber: formData.phoneNumber || '',
-            role: ['instructor'] as UserRole[],
-            level: formData.level,
-            specialties: formData.specialties || [],
-            experience: formData.experience || 0,
-            bio: formData.bio || '',
-            availability: formData.availability || { days: [], hours: [] },
-            schoolId: formData.schoolId || null,
-            schoolName: schoolName || null,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-          };
-
-          // Batch write için
-          const batch = writeBatch(db);
-
-          // Users koleksiyonuna ekle
-          batch.set(newInstructorRef, instructorData);
-
-          // Instructors koleksiyonuna ekle
-          const instructorsRef = doc(collection(db, 'instructors'), newInstructorRef.id);
-          batch.set(instructorsRef, {
-            ...instructorData,
-            userId: newInstructorRef.id, // users koleksiyonundaki ID'yi referans olarak saklıyoruz
-          });
-
-          // Batch işlemini gerçekleştir
-          await batch.commit();
-
-          // State'i güncelle
-          const newInstructor: FirebaseUser = {
-            id: newInstructorRef.id,
-            ...instructorData,
-            createdAt: Timestamp.now(),
-            updatedAt: Timestamp.now()
-          };
-
-          setInstructors(prev => [...prev, {
-            id: newInstructorRef.id,
-            displayName: formData.displayName,
-            email: formData.email
-          }]);
-
-          setStudents(prev => [...prev, newInstructor]);
-          
-          setSuccess('Eğitmen başarıyla eklendi.');
-        }
-        // Diğer kullanıcı tipleri için davet gönder
-        else {
-          const invitationData = {
-            displayName: formData.displayName,
-            roles: [formData.role],
-            level: formData.level,
-            ...(formData.schoolId && { schoolId: formData.schoolId }),
-            ...(schoolName && { schoolName }),
-            ...(formData.instructorId && { instructorId: formData.instructorId }),
-            ...(instructorName && { instructorName })
-          };
-
+        } else {
+          const invitationData = createInvitationData(formData);
           await sendInvitationEmail(formData.email, invitationData);
-
-          // Yeni kullanıcıyı state'e ekle
+          
+          // Create new user object based on form data type
           const newUser: FirebaseUser = {
             id: `pending_${Date.now()}`,
             email: formData.email,
             displayName: formData.displayName,
             photoURL: formData.photoURL,
             phoneNumber: formData.phoneNumber,
-            role: formData.role,
-            level: formData.level,
-            instructorId: formData.instructorId || null,
-            instructorName: instructorName || null,
-            schoolId: formData.schoolId || null,
-            schoolName: schoolName || null,
+            role: [formData.role],
+            ...(isStudentForm(formData) && {
+              level: formData.level,
+              instructorId: formData.instructorId,
+              schoolId: formData.schoolId,
+              ...(selectedSchool && { schoolName: selectedSchool.displayName }),
+              ...(selectedInstructor && { instructorName: selectedInstructor.displayName })
+            }),
+            ...(isInstructorForm(formData) && {
+              level: formData.level,
+              schoolId: formData.schoolId,
+              specialties: formData.specialties,
+              experience: formData.experience,
+              bio: formData.bio,
+              availability: formData.availability,
+              ...(selectedSchool && { schoolName: selectedSchool.displayName })
+            }),
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now()
           };
@@ -1145,6 +1120,35 @@ export const UserManagement: React.FC = () => {
         return null;
     }
   };
+
+  // Add handlers for school and instructor selection
+  const handleSchoolChange = useCallback((schoolId: string) => {
+    const school = schools.find((s: School) => s.id === schoolId);
+    setSelectedSchool(school || null);
+
+    // Update form data based on the current form type
+    setFormData((prev: FormDataType) => {
+      if (isStudentForm(prev) || isInstructorForm(prev)) {
+        const update: FormDataUpdate<typeof prev> = { schoolId };
+        return { ...prev, ...update };
+      }
+      return prev;
+    });
+  }, [schools]);
+
+  const handleInstructorChange = useCallback((instructorId: string) => {
+    const instructor = instructors.find((i: Instructor) => i.id === instructorId);
+    setSelectedInstructor(instructor || null);
+
+    // Update form data based on the current form type
+    setFormData((prev: FormDataType) => {
+      if (isStudentForm(prev)) {
+        const update: FormDataUpdate<typeof prev> = { instructorId };
+        return { ...prev, ...update };
+      }
+      return prev;
+    });
+  }, [instructors]);
 
   if (loading && students.length === 0) {
     return (

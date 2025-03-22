@@ -210,10 +210,10 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEnroll }) => {
                     </div>
                   )}
 
-                  {course.address && (
+                  {course.location?.address && (
                     <div>
                       <h4 className="text-sm font-medium text-gray-500">Adres</h4>
-                      <p className="text-base text-gray-900">{course.address}</p>
+                      <p className="text-base text-gray-900">{course.location.address}</p>
                     </div>
                   )}
 

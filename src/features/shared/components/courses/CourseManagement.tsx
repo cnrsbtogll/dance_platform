@@ -464,35 +464,13 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
     try {
       console.log('Eğitmenler getiriliyor...');
       const instructorsRef = collection(db, 'instructors');
-      console.log('Instructors koleksiyonu referansı:', instructorsRef);
-
-      // Önce tüm eğitmenleri getir, filtrelemeyi client-side yap
-      const q = query(instructorsRef);
-      console.log('Oluşturulan query:', q);
-
-      const querySnapshot = await getDocs(q);
-      console.log('Query sonuçları:', {
-        empty: querySnapshot.empty,
-        size: querySnapshot.size,
-        docs: querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          data: doc.data()
-        }))
-      });
       
-      const instructorsList = querySnapshot.docs
+      const q = query(instructorsRef);
+      const querySnapshot = await getDocs(q);
+      
+      const instructorsData = querySnapshot.docs
         .map(doc => {
           const data = doc.data();
-          console.log('Eğitmen verisi işleniyor:', {
-            id: doc.id,
-            data: data,
-            displayName: data.displayName,
-            status: data.status,
-            userId: data.userId,
-            email: data.email
-          });
-
-          // Sadece aktif eğitmenleri al
           if (data.status === 'active') {
             return {
               label: data.displayName || data.email || 'İsimsiz Eğitmen',
@@ -501,20 +479,12 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
           }
           return null;
         })
-        .filter(Boolean) // null değerleri filtrele
-        .sort((a, b) => a.label.localeCompare(b.label)); // displayName'e göre sırala
+        .filter((instructor): instructor is { label: string; value: string } => instructor !== null)
+        .sort((a, b) => a.label.localeCompare(b.label));
       
-      console.log('İşlenmiş eğitmen listesi:', instructorsList);
-      setInstructors(instructorsList);
+      setInstructors(instructorsData);
     } catch (error) {
-      console.error('Eğitmenler yüklenirken hata detayı:', {
-        error,
-        message: error instanceof Error ? error.message : 'Bilinmeyen hata',
-        code: error instanceof Error ? (error as any).code : undefined,
-        stack: error instanceof Error ? error.stack : undefined
-      });
-      
-      // Varsayılan eğitmen listesi
+      console.error('Eğitmenler yüklenirken hata:', error);
       setInstructors([
         { label: 'Test Eğitmen 1', value: 'test-instructor-1' },
         { label: 'Test Eğitmen 2', value: 'test-instructor-2' }
@@ -1149,15 +1119,16 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
                         onChange={handleInputChange}
                         className="flex-1 p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                       />
-                      <CustomSelect
-                        name="currency"
-                        label=""
-                        value={formData.currency}
-                        onChange={(value) => setFormData(prev => ({ ...prev, currency: value as string }))}
-                        options={currencyOptions}
-                        placeholder="Para Birimi"
-                        className="w-32"
-                      />
+                      <div className="w-32">
+                        <CustomSelect
+                          name="currency"
+                          label="Para Birimi"
+                          value={formData.currency}
+                          onChange={(value) => setFormData(prev => ({ ...prev, currency: value as string }))}
+                          options={currencyOptions}
+                          fullWidth={false}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

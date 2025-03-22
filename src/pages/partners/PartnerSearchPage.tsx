@@ -54,6 +54,12 @@ interface DanceStyle {
   value: string;
 }
 
+// Option interface for CustomSelect
+interface Option {
+  value: string;
+  label: string;
+}
+
 // Firestore User interface
 interface FirestoreUser {
   id: string;
@@ -67,7 +73,7 @@ interface FirestoreUser {
   age?: number;
   rating?: number;
   createdAt?: any;
-  role?: string;
+  role?: string | string[];  // Updated to accept both string and string[]
   height?: number;
   weight?: number;
 }
@@ -316,7 +322,7 @@ function PartnerSearchPage(): JSX.Element {
         availableTimes: extendedCurrentUser.availableTimes || [],
         gender: extendedCurrentUser.gender || '',
         age: extendedCurrentUser.age || 0,
-        role: extendedCurrentUser.role,
+        role: Array.isArray(extendedCurrentUser.role) ? extendedCurrentUser.role : extendedCurrentUser.role ? [extendedCurrentUser.role] : undefined,
         height: extendedCurrentUser.height,
         weight: extendedCurrentUser.weight,
       } : null;
@@ -771,11 +777,12 @@ function PartnerSearchPage(): JSX.Element {
   };
 
   // Dans türü değiştiğinde filtreleri uygula
-  const handleDansTuruChange = (value: string): void => {
-    console.log("Dans türü değişti, yeni değer:", value);
+  const handleDansTuruChange = (value: string | string[]): void => {
+    const newValue = Array.isArray(value) ? value[0] : value;
+    console.log("Dans türü değişti, yeni değer:", newValue);
     
     // Mevcut değer ile aynıysa ve boş değilse, filtreyi temizle
-    if (value === dansTuru && value !== '') {
+    if (newValue === dansTuru && newValue !== '') {
       console.log("Aynı dans türü tekrar seçildi, filtre sıfırlanıyor.");
       setDansTuru('');
       // Burada doğrudan boş değerle filtreleme yapalım
@@ -783,23 +790,25 @@ function PartnerSearchPage(): JSX.Element {
       return;
     }
     
-    setDansTuru(value);
+    setDansTuru(newValue);
     // Güncel değerle hemen filtreleme yapalım
-    applyFiltersWithValues(value, cinsiyet, seviye, konum, uygunSaatler);
+    applyFiltersWithValues(newValue, cinsiyet, seviye, konum, uygunSaatler);
   };
 
   // Cinsiyet değiştiğinde filtreleri uygula
-  const handleCinsiyetChange = (value: string): void => {
-    setCinsiyet(value);
+  const handleCinsiyetChange = (value: string | string[]): void => {
+    const newValue = Array.isArray(value) ? value[0] : value;
+    setCinsiyet(newValue);
     // Güncel değerle hemen filtreleme yapalım
-    applyFiltersWithValues(dansTuru, value, seviye, konum, uygunSaatler);
+    applyFiltersWithValues(dansTuru, newValue, seviye, konum, uygunSaatler);
   };
 
   // Seviye değiştiğinde filtreleri uygula
-  const handleSeviyeChange = (value: string): void => {
-    setSeviye(value);
+  const handleSeviyeChange = (value: string | string[]): void => {
+    const newValue = Array.isArray(value) ? value[0] : value;
+    setSeviye(newValue);
     // Güncel değerle hemen filtreleme yapalım
-    applyFiltersWithValues(dansTuru, cinsiyet, value, konum, uygunSaatler);
+    applyFiltersWithValues(dansTuru, cinsiyet, newValue, konum, uygunSaatler);
   };
 
   // Konum değiştiğinde filtreleri uygula
@@ -1300,6 +1309,17 @@ function PartnerSearchPage(): JSX.Element {
   // Toplam sayfa sayısını hesapla
   const totalPages = Math.ceil(partnerler.length / partnersPerPage);
 
+  // Convert arrays to Option[] format
+  const cinsiyetOptions: Option[] = cinsiyetler.map(cinsiyet => ({
+    value: cinsiyet,
+    label: cinsiyet
+  }));
+
+  const seviyeOptions: Option[] = seviyeler.map(seviye => ({
+    value: seviye,
+    label: seviye
+  }));
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Render the login prompt modal */}
@@ -1363,6 +1383,7 @@ function PartnerSearchPage(): JSX.Element {
                 ) : (
                   <CustomSelect 
                     label="Dans Türü"
+                    name="dansTuru"
                     options={danceStyles}
                     value={dansTuru}
                     onChange={handleDansTuruChange}
@@ -1372,7 +1393,8 @@ function PartnerSearchPage(): JSX.Element {
                 
                 <CustomSelect 
                   label="Cinsiyet"
-                  options={cinsiyetler}
+                  name="cinsiyet"
+                  options={cinsiyetOptions}
                   value={cinsiyet}
                   onChange={handleCinsiyetChange}
                   placeholder="Hepsi"
@@ -1380,7 +1402,8 @@ function PartnerSearchPage(): JSX.Element {
                 
                 <CustomSelect 
                   label="Seviye"
-                  options={seviyeler}
+                  name="seviye"
+                  options={seviyeOptions}
                   value={seviye}
                   onChange={handleSeviyeChange}
                   placeholder="Tüm seviyeler"
