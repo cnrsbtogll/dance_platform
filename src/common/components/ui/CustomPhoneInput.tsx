@@ -92,7 +92,7 @@ const CustomPhoneInput: React.FC<CustomPhoneInputProps> = ({
       const validation = validatePhoneNumber(value);
       onValidation(validation.isValid, validation.errorMessage);
     }
-  }, [value, onValidation]);
+  }, [value]);
 
   return (
     <div className="w-full">
