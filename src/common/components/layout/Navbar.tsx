@@ -177,30 +177,36 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                 </Link>
               </div>
               <div className="hidden sm:ml-8 sm:flex sm:space-x-8">
-                <Link 
-                  to="/partners" 
-                  className={`${isActive('/partners') 
-                    ? 'border-indigo-500 text-indigo-700 font-medium' 
-                    : 'border-transparent text-gray-500 hover:text-indigo-600 hover:border-indigo-400'} inline-flex items-center px-1 pt-1 border-b-2 text-sm transition-all duration-200`}
-                >
-                  Partner Bul
-                </Link>
-                <Link 
-                  to="/courses" 
-                  className={`${isActive('/courses') 
-                    ? 'border-indigo-500 text-indigo-700 font-medium' 
-                    : 'border-transparent text-gray-500 hover:text-indigo-600 hover:border-indigo-400'} inline-flex items-center px-1 pt-1 border-b-2 text-sm transition-all duration-200`}
-                >
-                  Kurs Bul
-                </Link>
-                <button 
-                  onClick={() => handleProtectedFeatureClick('progress') && navigate('/progress')}
-                  className={`${isActive('/progress') 
-                    ? 'border-indigo-500 text-indigo-700 font-medium' 
-                    : 'border-transparent text-gray-500 hover:text-indigo-600 hover:border-indigo-400'} inline-flex items-center px-1 pt-1 border-b-2 text-sm transition-all duration-200`}
-                >
-                  İlerleme Durumum
-                </button>
+                {(!user?.role || (Array.isArray(user.role) ? 
+                  !user.role.includes('school') && !user.role.includes('instructor') : 
+                  user.role !== 'school' && user.role !== 'instructor')) && (
+                  <>
+                    <Link 
+                      to="/partners" 
+                      className={`${isActive('/partners') 
+                        ? 'border-indigo-500 text-indigo-700 font-medium' 
+                        : 'border-transparent text-gray-500 hover:text-indigo-600 hover:border-indigo-400'} inline-flex items-center px-1 pt-1 border-b-2 text-sm transition-all duration-200`}
+                    >
+                      Partner Bul
+                    </Link>
+                    <Link 
+                      to="/courses" 
+                      className={`${isActive('/courses') 
+                        ? 'border-indigo-500 text-indigo-700 font-medium' 
+                        : 'border-transparent text-gray-500 hover:text-indigo-600 hover:border-indigo-400'} inline-flex items-center px-1 pt-1 border-b-2 text-sm transition-all duration-200`}
+                    >
+                      Kurs Bul
+                    </Link>
+                    <button 
+                      onClick={() => handleProtectedFeatureClick('progress') && navigate('/progress')}
+                      className={`${isActive('/progress') 
+                        ? 'border-indigo-500 text-indigo-700 font-medium' 
+                        : 'border-transparent text-gray-500 hover:text-indigo-600 hover:border-indigo-400'} inline-flex items-center px-1 pt-1 border-b-2 text-sm transition-all duration-200`}
+                    >
+                      İlerleme Durumum
+                    </button>
+                  </>
+                )}
               </div>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:items-center">
@@ -432,31 +438,37 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                     </div>
                   </div>
                   <div className="mt-1 space-y-0 px-2">
-                    <Link
-                      to="/partners"
-                      className="block px-3 py-1 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Partner Bul
-                    </Link>
-                    <Link
-                      to="/courses"
-                      className="block px-3 py-1 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Kurs Bul
-                    </Link>
-                    <button
-                      className="block w-full text-left px-3 py-1 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
-                      onClick={() => {
-                        if (handleProtectedFeatureClick('progress')) {
-                          navigate('/progress');
-                          setIsMenuOpen(false);
-                        }
-                      }}
-                    >
-                      İlerleme Durumum
-                    </button>
+                    {(!user?.role || (Array.isArray(user.role) ? 
+                      !user.role.includes('school') && !user.role.includes('instructor') : 
+                      user.role !== 'school' && user.role !== 'instructor')) && (
+                      <>
+                        <Link
+                          to="/partners"
+                          className="block px-3 py-1 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          Partner Bul
+                        </Link>
+                        <Link
+                          to="/courses"
+                          className="block px-3 py-1 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          Kurs Bul
+                        </Link>
+                        <button
+                          className="block w-full text-left px-3 py-1 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
+                          onClick={() => {
+                            if (handleProtectedFeatureClick('progress')) {
+                              navigate('/progress');
+                              setIsMenuOpen(false);
+                            }
+                          }}
+                        >
+                          İlerleme Durumum
+                        </button>
+                      </>
+                    )}
                     
                     {/* Admin Panel Linkleri - Mobil */}
                     {hasSuperAdminRole && (
