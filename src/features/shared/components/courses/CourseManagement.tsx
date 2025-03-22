@@ -457,7 +457,7 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
         latitude: 0,
         longitude: 0
       },
-      imageUrl: '',
+      imageUrl: '/placeholders/default-course-image.png',
       highlights: [],
       tags: []
     });
@@ -613,7 +613,7 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
         latitude: 0,
         longitude: 0
       },
-      imageUrl: courseData.imageUrl || '',
+      imageUrl: courseData.imageUrl || '/placeholders/default-course-image.png',
       highlights: courseData.highlights || [],
       tags: courseData.tags || [],
       createdAt: courseData.createdAt,
