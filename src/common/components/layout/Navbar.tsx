@@ -23,31 +23,114 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const hasInstructorRole = user?.role === 'instructor';
+  const hasSchoolAdminRole = user?.role === 'school_admin';
+  const hasSchoolRole = user?.role === 'school';
+  const hasSuperAdminRole = user?.role === 'admin';
+  const hasStudentRole = user?.role === 'student' || 
+    (!hasInstructorRole && !hasSchoolAdminRole && !hasSchoolRole && !hasSuperAdminRole && isAuthenticated);
+
+  // Kullanıcı rollerini kontrol et ve logla
+  useEffect(() => {
+    console.log('👥 Kullanıcı Role Detaylı Bilgi:', {
+      timestamp: new Date().toISOString(),
+      role: user?.role,
+      roleType: typeof user?.role,
+      userObject: {
+        id: user?.id,
+        email: user?.email,
+        displayName: user?.displayName,
+        role: user?.role,
+      },
+      roleChecks: {
+        hasInstructorRole,
+        hasSchoolAdminRole,
+        hasSchoolRole,
+        hasSuperAdminRole,
+        hasStudentRole
+      }
+    });
+
+    // Firestore users tablosundan role bilgisini kontrol et
+    const checkFirestoreRole = async () => {
+      if (!user?.id) return;
+
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.id));
+        if (userDoc.exists()) {
+          const firestoreData = userDoc.data();
+          console.log('🔄 Firestore Users Role Detayları:', {
+            timestamp: new Date().toISOString(),
+            userId: user.id,
+            firestoreRole: firestoreData.role,
+            authRole: user.role,
+            comparison: {
+              hasRole: !!firestoreData.role,
+              roleMatch: firestoreData.role === user.role
+            }
+          });
+        } else {
+          console.warn('⚠️ Firestore\'da kullanıcı dokümanı bulunamadı:', user.id);
+        }
+      } catch (error) {
+        console.error('❌ Firestore role kontrolü hatası:', error);
+      }
+    };
+
+    checkFirestoreRole();
+  }, [user, hasInstructorRole, hasSchoolAdminRole, hasSchoolRole, hasSuperAdminRole, hasStudentRole]);
+
   // Kullanıcı rollerini kontrol et ve logla
   useEffect(() => {
     console.log('🔍 Kullanıcı rol bilgileri:', {
-      rawRole: user?.roles,
-      isArray: Array.isArray(user?.roles),
+      rawRole: user?.role,
+      isArray: Array.isArray(user?.role),
       user: user
     });
   }, [user]);
 
-  const hasInstructorRole = Array.isArray(user?.roles) 
-    ? user?.roles?.includes('instructor')
-    : user?.roles === 'instructor';
-  const hasSchoolAdminRole = Array.isArray(user?.roles)
-    ? user?.roles?.includes('school_admin')
-    : user?.roles === 'school_admin';
-  const hasSchoolRole = Array.isArray(user?.roles)
-    ? user?.roles?.includes('school')
-    : user?.roles === 'school';
-  const hasSuperAdminRole = Array.isArray(user?.roles)
-    ? user?.roles?.includes('admin')
-    : user?.roles === 'admin';
-  const hasStudentRole = (Array.isArray(user?.roles) 
-    ? user?.roles?.includes('student')
-    : user?.roles === 'student') || 
-    (!hasInstructorRole && !hasSchoolAdminRole && !hasSchoolRole && !hasSuperAdminRole && isAuthenticated);
+  // Firebase kullanıcı bilgilerini logla
+  useEffect(() => {
+    if (user) {
+      console.log('🔥 Firebase Kullanıcı Bilgileri:', {
+        timestamp: new Date().toISOString(),
+        basicInfo: {
+          id: user.id,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+        },
+        customData: {
+          role: user.role,
+          phoneNumber: user.phoneNumber
+        },
+        authState: {
+          isAuthenticated
+        }
+      });
+
+      // Firestore'dan ek kullanıcı bilgilerini getir
+      const fetchUserDetails = async () => {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.id));
+          if (userDoc.exists()) {
+            console.log('📄 Firestore Kullanıcı Detayları:', {
+              timestamp: new Date().toISOString(),
+              exists: true,
+              data: userDoc.data(),
+              id: userDoc.id
+            });
+          } else {
+            console.log('⚠️ Firestore\'da kullanıcı dokümanı bulunamadı');
+          }
+        } catch (error) {
+          console.error('❌ Firestore kullanıcı bilgileri getirme hatası:', error);
+        }
+      };
+
+      fetchUserDetails();
+    }
+  }, [user, isAuthenticated]);
 
   // Rol durumlarını logla
   useEffect(() => {
@@ -60,6 +143,26 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
       isAuthenticated
     });
   }, [hasInstructorRole, hasSchoolAdminRole, hasSchoolRole, hasSuperAdminRole, hasStudentRole, isAuthenticated]);
+
+  // Kullanıcı rolünü detaylı logla
+  useEffect(() => {
+    console.log('👤 Kullanıcı Rol Detayları:', {
+      timestamp: new Date().toISOString(),
+      userId: user?.id,
+      email: user?.email,
+      displayName: user?.displayName,
+      role: user?.role,
+      roleType: typeof user?.role,
+      parsedRoles: {
+        isInstructor: hasInstructorRole,
+        isSchoolAdmin: hasSchoolAdminRole,
+        isSchool: hasSchoolRole,
+        isSuperAdmin: hasSuperAdminRole,
+        isStudent: hasStudentRole
+      },
+      isAuthenticated
+    });
+  }, [user, hasInstructorRole, hasSchoolAdminRole, hasSchoolRole, hasSuperAdminRole, hasStudentRole, isAuthenticated]);
 
   // Profil fotoğrafını Firestore'dan getir
   useEffect(() => {
@@ -207,9 +310,9 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                 </Link>
               </div>
               <div className="hidden sm:ml-8 sm:flex sm:space-x-4">
-                {(!user?.roles || (Array.isArray(user.roles) ? 
-                  !user.roles.includes('school') && !user.roles.includes('instructor') : 
-                  user.roles !== 'school' && user.roles !== 'instructor')) && (
+                {(!user?.role || (Array.isArray(user.role) ? 
+                  !user.role.includes('school') && !user.role.includes('instructor') : 
+                  user.role !== 'school' && user.role !== 'instructor')) && !hasInstructorRole && (
                   <>
                     <Link 
                       to="/partners" 
@@ -242,7 +345,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
             <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-2">
               {/* Kullanıcının rolüne göre butonları göster */}
               <div className="flex space-x-2">
-                {/* 'Eğitmen Ol' butonunu eğitmen olmayanlar ve okul sahibi olmayanlar görür */}
+                {/* 'Eğitmen Ol' butonunu eğitmen olmayanlar görür */}
                 {!hasInstructorRole && !hasSchoolRole && (
                   <Link
                     to="/become-instructor"
@@ -254,26 +357,12 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                     Eğitmen Ol
                   </Link>
                 )}
+
                 
-                {/* 'Dans Okulu Aç' butonunu herkes görebilir */}
+                {/* Dans Okulu Aç butonu - herkes görebilir */}
                 {!hasSchoolRole && (
                   <Link
                     to="/become-school"
-                    onClick={() => {
-                      console.log('🎯 Dans Okulu Aç butonuna tıklandı:', {
-                        userId: user?.id,
-                        userEmail: user?.email,
-                        userRole: user?.roles,
-                        roleChecks: {
-                          hasInstructorRole,
-                          hasSchoolRole,
-                          hasSchoolAdminRole,
-                          hasSuperAdminRole
-                        },
-                        timestamp: new Date().toISOString(),
-                        currentPath: location.pathname
-                      });
-                    }}
                     className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -453,7 +542,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                       console.log('🎯 Dans Okulu Aç butonuna tıklandı (Mobil):', {
                         userId: user?.id,
                         userEmail: user?.email,
-                        userRole: user?.roles,
+                        userRole: user?.role,
                         roleChecks: {
                           hasInstructorRole,
                           hasSchoolRole,
@@ -499,9 +588,9 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                     </div>
                   </div>
                   <div className="mt-3 space-y-1 px-4">
-                    {(!user?.roles || (Array.isArray(user.roles) ? 
-                      !user.roles.includes('school') && !user.roles.includes('instructor') : 
-                      user.roles !== 'school' && user.roles !== 'instructor')) && (
+                    {(!user?.role || (Array.isArray(user.role) ? 
+                      !user.role.includes('school') && !user.role.includes('instructor') : 
+                      user.role !== 'school' && user.role !== 'instructor')) && !hasInstructorRole && (
                       <>
                         <Link
                           to="/partners"

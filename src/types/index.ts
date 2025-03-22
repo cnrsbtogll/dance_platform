@@ -21,6 +21,7 @@ export interface User {
   weight?: number;
   availableTimes?: string[];
   roles?: string[];
+  role?: UserRole | string;  // Tekil role alanı
   createdAt?: Date;
   updatedAt?: Date;
   schoolId?: string;  // Kullanıcının bağlı olduğu okul ID'si
