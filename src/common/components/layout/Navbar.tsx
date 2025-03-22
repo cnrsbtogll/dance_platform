@@ -27,8 +27,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
   const hasSchoolAdminRole = user?.role === 'school_admin';
   const hasSchoolRole = user?.role === 'school';
   const hasSuperAdminRole = user?.role === 'admin';
-  const hasStudentRole = user?.role === 'student' || 
-    (!hasInstructorRole && !hasSchoolAdminRole && !hasSchoolRole && !hasSuperAdminRole && isAuthenticated);
+  const hasStudentRole = !user?.role || (!hasInstructorRole && !hasSchoolAdminRole && !hasSchoolRole && !hasSuperAdminRole && isAuthenticated);
 
   // Kullanıcı rollerini kontrol et ve logla
   useEffect(() => {
@@ -310,9 +309,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                 </Link>
               </div>
               <div className="hidden sm:ml-8 sm:flex sm:space-x-4">
-                {(!user?.role || (Array.isArray(user.role) ? 
-                  !user.role.includes('school') && !user.role.includes('instructor') : 
-                  user.role !== 'school' && user.role !== 'instructor')) && !hasInstructorRole && (
+                {!hasSchoolRole && !hasInstructorRole && (
                   <>
                     <Link 
                       to="/partners" 
@@ -345,8 +342,8 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
             <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-2">
               {/* Kullanıcının rolüne göre butonları göster */}
               <div className="flex space-x-2">
-                {/* 'Eğitmen Ol' butonunu eğitmen olmayanlar görür */}
-                {!hasInstructorRole && !hasSchoolRole && (
+                {/* 'Eğitmen Ol' butonunu eğitmen ve okul olmayanlar görür */}
+                {!hasInstructorRole && !hasSchoolRole && !hasSchoolAdminRole && (
                   <Link
                     to="/become-instructor"
                     className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
@@ -358,9 +355,8 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                   </Link>
                 )}
 
-                
-                {/* Dans Okulu Aç butonu - herkes görebilir */}
-                {!hasSchoolRole && (
+                {/* Dans Okulu Aç butonu - okul rolü olmayanlar görebilir */}
+                {!hasSchoolRole && !hasSchoolAdminRole && (
                   <Link
                     to="/become-school"
                     className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
@@ -384,6 +380,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                       Admin Panel
                     </Link>
                   )}
+                  {/* Okul Yönetim Paneli - sadece okul rolü olanlar görebilir */}
                   {hasSchoolRole && !hasSuperAdminRole && (
                     <Link
                       to="/school-admin"
@@ -392,25 +389,6 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                       Okul Yönetim Paneli
                     </Link>
                   )}
-                  {hasSchoolAdminRole && !hasSuperAdminRole && !hasSchoolRole && (
-                    <Link
-                      to="/school-admin"
-                      className="mr-3 inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
-                    >
-                      Okul Yönetimi Paneli
-                    </Link>
-                  )}
-                  {hasInstructorRole && !hasSchoolAdminRole && !hasSchoolRole && !hasSuperAdminRole && (
-                    <Link
-                      to="/instructor"
-                      className="mr-3 inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
-                    >
-                      Eğitmen Paneli
-                    </Link>
-                  )}
-                  {/* Öğrenci Teşvik Butonları */}
-                  {/* Öğrenci Teşvik butonları kaldırıldı ve her zaman gösterilecek şekilde taşındı */}
-
                   <div className="ml-3 relative">
                     <div className="flex items-center">
                       {/* Kullanıcı Bilgileri - Masaüstü */}
@@ -519,7 +497,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
             <div className="pt-2 pb-3 border-t border-gray-200 bg-gray-50/80 backdrop-blur-sm">
               {/* Her durumda gösterilecek butonlar */}
               <div className="px-4 space-y-2">
-                {!hasInstructorRole && !hasSchoolRole && (
+                {!hasInstructorRole && !hasSchoolRole && !hasSchoolAdminRole && (
                   <Link 
                     to="/become-instructor"
                     className="block w-full px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500 focus:ring-offset-1 shadow-sm transition-all duration-200"
@@ -535,7 +513,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                 )}
                 
                 {/* Dans Okulu Aç butonu - Mobil */}
-                {!hasSchoolRole && (
+                {!hasSchoolRole && !hasSchoolAdminRole && (
                   <Link 
                     to="/become-school"
                     onClick={() => {
@@ -588,9 +566,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                     </div>
                   </div>
                   <div className="mt-3 space-y-1 px-4">
-                    {(!user?.role || (Array.isArray(user.role) ? 
-                      !user.role.includes('school') && !user.role.includes('instructor') : 
-                      user.role !== 'school' && user.role !== 'instructor')) && !hasInstructorRole && (
+                    {!hasSchoolRole && !hasInstructorRole && (
                       <>
                         <Link
                           to="/partners"
@@ -637,24 +613,6 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                         onClick={() => setIsMenuOpen(false)}
                       >
                         Okul Yönetim Paneli
-                      </Link>
-                    )}
-                    {hasSchoolAdminRole && !hasSuperAdminRole && !hasSchoolRole && (
-                      <Link
-                        to="/school-admin"
-                        className="block px-3 py-1 mt-2 rounded-md text-base font-medium text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 transition-colors duration-150"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        Okul Yönetimi Paneli
-                      </Link>
-                    )}
-                    {hasInstructorRole && !hasSchoolAdminRole && !hasSchoolRole && !hasSuperAdminRole && (
-                      <Link
-                        to="/instructor"
-                        className="block px-3 py-1 mt-2 rounded-md text-base font-medium text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 transition-colors duration-150"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        Eğitmen Paneli
                       </Link>
                     )}
                     
