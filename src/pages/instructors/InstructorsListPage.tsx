@@ -197,7 +197,6 @@ const InstructorsListPage: React.FC = () => {
       <div className="bg-white rounded-lg shadow-sm p-4 mb-8">
         <div className="md:flex justify-between">
           <div className="mb-4 md:mb-0 md:w-1/3">
-            <label htmlFor="search" className="block text-gray-700 text-sm font-medium mb-2">Eğitmen Ara</label>
             <input
               type="text"
               id="search"

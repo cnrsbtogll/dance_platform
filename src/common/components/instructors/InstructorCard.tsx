@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Instructor, UserWithProfile } from '../../../types';
+import { useAuth } from '../../../contexts/AuthContext';
+import { ChatDialog } from '../../../features/chat/components/ChatDialog';
+import LoginRequiredModal from '../modals/LoginRequiredModal';
 
 interface InstructorWithUser extends Instructor {
   user: UserWithProfile;
@@ -17,6 +20,19 @@ const InstructorCard: React.FC<InstructorCardProps> = ({
   index = 0,
   showDetailLink = true 
 }) => {
+  const { currentUser } = useAuth();
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
+  const handleContactClick = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent card link click
+    if (!currentUser) {
+      setShowLoginModal(true);
+      return;
+    }
+    setIsChatOpen(true);
+  };
+
   // Kart içeriği
   const cardContent = (
     <>
@@ -52,19 +68,49 @@ const InstructorCard: React.FC<InstructorCardProps> = ({
               : "Çeşitli Dans Stilleri"
           }</p>
         </div>
+        <div className="mt-4">
+          <button
+            onClick={handleContactClick}
+            className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition"
+          >
+            İletişime Geç
+          </button>
+        </div>
       </div>
+
+      {/* Login Required Modal */}
+      <LoginRequiredModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        message="Eğitmen ile iletişime geçmek için giriş yapmanız gerekmektedir."
+      />
+
+      {/* Chat Dialog */}
+      <ChatDialog
+        open={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        partner={{
+          id: instructor.id,
+          displayName: instructor.user.displayName,
+          photoURL: instructor.user.photoURL,
+          role: 'instructor'
+        }}
+        chatType="student-instructor"
+      />
     </>
   );
 
   // Eğer showDetailLink true ise, kartı link olarak göster
   if (showDetailLink) {
     return (
-      <Link
-        to={`/instructors/${instructor.id}`}
-        className="bg-white rounded-xl shadow-md hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 overflow-hidden"
-      >
-        {cardContent}
-      </Link>
+      <div className="bg-white rounded-xl shadow-md hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 overflow-hidden">
+        <Link
+          to={`/instructors/${instructor.id}`}
+          className="block"
+        >
+          {cardContent}
+        </Link>
+      </div>
     );
   }
 

@@ -7,6 +7,7 @@ import { fetchAllInstructors } from '../../api/services/userService';
 import { ChatDialog } from '../../features/chat/components/ChatDialog';
 import { useAuth } from '../../contexts/AuthContext';
 import LoginRequiredModal from '../../common/components/modals/LoginRequiredModal';
+import ContactButton from '../../common/components/ui/ContactButton';
 
 // Eğitmen ve kullanıcı bilgisini birleştiren tip tanımı
 interface InstructorWithUser extends Omit<Instructor, 'specialties' | 'experience'> {
@@ -313,13 +314,6 @@ const InstructorDetailPage: React.FC = () => {
               >
                 İletişime Geç
               </button>
-              
-              <Link 
-                to={`/courses?instructorId=${instructor?.id}`}
-                className="bg-white text-indigo-600 border border-indigo-200 py-2 px-6 rounded-md hover:bg-indigo-50 transition"
-              >
-                Derslerini Görüntüle
-              </Link>
             </div>
           </div>
         </div>
