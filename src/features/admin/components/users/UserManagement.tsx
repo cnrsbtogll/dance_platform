@@ -136,6 +136,15 @@ const isSchoolFormData = (data: FormDataType): data is SchoolFormData => {
   return data.role === 'school';
 };
 
+// Role dönüşüm fonksiyonu
+const normalizeRole = (role: string | string[]): UserRole => {
+  if (Array.isArray(role)) {
+    // Array ise ilk rolü al (geriye uyumluluk için)
+    return role[0] as UserRole;
+  }
+  return role as UserRole;
+};
+
 export const UserManagement: React.FC = () => {
   const { currentUser } = useAuth();
   const [students, setStudents] = useState<FirebaseUser[]>([]);
@@ -250,16 +259,17 @@ export const UserManagement: React.FC = () => {
       const schoolsData: School[] = [];
       
       querySnapshot.forEach((doc) => {
-        const data = { ...doc.data(), id: doc.id } as FirebaseUser;
-        console.log('Processing user:', data.email, 'with roles:', data.role);
+        const rawData = doc.data();
+        const data = { 
+          ...rawData, 
+          id: doc.id,
+          role: normalizeRole(rawData.role)
+        } as FirebaseUser;
         
-        // Convert role to array if it's a string
-        if (!Array.isArray(data.role)) {
-          data.role = [data.role];
-        }
-
+        console.log('Processing user:', data.email, 'with role:', data.role);
+        
         // For admin, filter out admin users in memory
-        if (isSuperAdmin && data.role.includes('admin')) {
+        if (isSuperAdmin && data.role === 'admin') {
           console.log('Skipping admin user:', data.email);
           return;
         }
@@ -268,7 +278,7 @@ export const UserManagement: React.FC = () => {
         usersData.push(data);
         
         // Add to specific role lists
-        if (data.role.includes('instructor')) {
+        if (data.role === 'instructor') {
           instructorsData.push({
             id: doc.id,
             displayName: data.displayName || 'İsimsiz Eğitmen',
@@ -276,7 +286,7 @@ export const UserManagement: React.FC = () => {
           });
         }
         
-        if (data.role.includes('school')) {
+        if (data.role === 'school') {
           schoolsData.push({
             id: doc.id,
             displayName: data.displayName || 'İsimsiz Okul',
@@ -521,7 +531,7 @@ export const UserManagement: React.FC = () => {
   const createInvitationData = (formData: FormDataType): InvitationData => {
     const baseData: InvitationData = {
       displayName: formData.displayName,
-      roles: [formData.role]
+      role: formData.role as UserRole
     };
 
     if (isStudentForm(formData)) {
@@ -780,6 +790,7 @@ export const UserManagement: React.FC = () => {
           const newSchool: FirebaseUser = {
             id: newSchoolRef.id,
             ...schoolData,
+            role: 'school' as UserRole,
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now()
           };
@@ -804,7 +815,7 @@ export const UserManagement: React.FC = () => {
             displayName: formData.displayName,
             photoURL: formData.photoURL,
             phoneNumber: formData.phoneNumber,
-            role: [formData.role],
+            role: formData.role as UserRole,
             ...(isStudentForm(formData) && {
               level: formData.level,
               instructorId: formData.instructorId,

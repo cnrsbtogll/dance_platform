@@ -14,7 +14,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../../../../api/firebase/firebase';
-import { Instructor as InstructorType } from '../../../../types';
+import { Instructor as InstructorType, UserRole } from '../../../../types';
 import Avatar from '../../../../common/components/ui/Avatar';
 
 interface InstructorRequest {
@@ -147,7 +147,7 @@ function InstructorRequests() {
         email: userData.email || requestData.userEmail,
         photoURL: requestData.photoURL || userData.photoURL || "/assets/images/dance/egitmen_default.jpg",
         phoneNumber: userData.phoneNumber || requestData.contactNumber,
-        role: 'instructor',
+        role: 'instructor' as UserRole,
         specialties: requestData.danceStyles,
         experience: parseInt(requestData.experience) || 0,
         bio: requestData.bio || '',

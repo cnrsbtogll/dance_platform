@@ -38,9 +38,10 @@ export interface Instructor {
   email: string;
   photoURL?: string;
   phoneNumber?: string;
-  role: string[];
+  role: UserRole;
   specialties: string[];
   experience: number;
+  bio: string;
   level: DanceLevel;
   schoolId?: string;
   schoolName?: string;

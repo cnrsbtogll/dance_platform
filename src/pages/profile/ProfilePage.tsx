@@ -1,7 +1,7 @@
 import React, { useEffect, useState, ChangeEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { updateUserProfile } from '../../api/services/userService';
-import { DanceLevel, DanceStyle, User } from '../../types';
+import { DanceLevel, DanceStyle, User, UserRole } from '../../types';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../../api/firebase/firebase';
 import CustomInput from '../../common/components/ui/CustomInput';
@@ -27,7 +27,7 @@ interface FormData {
   photoURL?: string;
   danceStyles: DanceStyle[];
   availableTimes: string[];
-  roles?: string[];
+  role?: UserRole;
 }
 
 const ProfilePage: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
@@ -47,7 +47,7 @@ const ProfilePage: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
     photoURL: user?.photoURL,
     danceStyles: user?.danceStyles || [],
     availableTimes: user?.availableTimes || [],
-    roles: user?.roles
+    role: user?.role
   });
 
   useEffect(() => {
