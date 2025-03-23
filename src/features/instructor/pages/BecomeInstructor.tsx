@@ -9,7 +9,8 @@ import {
   getDocs,
   doc,
   getDoc,
-  orderBy 
+  orderBy,
+  setDoc
 } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { db, auth } from '../../../api/firebase/firebase';
@@ -298,6 +299,21 @@ function BecomeInstructor() {
 
           userId = userCredential.user.uid;
           userEmail = userCredential.user.email;
+
+          // Users koleksiyonuna yeni kullanıcı verisi ekleniyor
+          const userDocRef = doc(db, 'users', userId);
+          await setDoc(userDocRef, {
+            id: userId,
+            email: userEmail,
+            displayName: `${formData.firstName} ${formData.lastName}`,
+            photoURL: formData.photoURL,
+            phoneNumber: formData.contactNumber,
+            role: 'student', // Başlangıçta student olarak ayarlanıyor, onay sonrası instructor olacak
+            danceStyles: formData.danceStyles,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            status: 'active'
+          });
 
           console.log('✅ Yeni kullanıcı oluşturuldu:', userId);
         } catch (authError) {
