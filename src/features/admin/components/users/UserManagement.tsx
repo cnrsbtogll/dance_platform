@@ -47,9 +47,7 @@ import { generateInitialsAvatar } from '../../../../common/utils/imageUtils';
 import ImageUploader from '../../../../common/components/ui/ImageUploader';
 import CustomInput from '../../../../common/components/ui/CustomInput';
 import { Button, TablePagination, TableSortLabel } from '@mui/material';
-import { StudentForm } from './forms/StudentForm';
-import { InstructorForm } from './forms/InstructorForm';
-import { SchoolForm } from './forms/SchoolForm';
+import { UserForm } from './forms/UserForm';
 
 // Student interface with instructor and school
 interface Student {
@@ -1106,45 +1104,22 @@ export const UserManagement: React.FC = () => {
     { value: 'school', label: 'Dans Okulu' }
   ];
 
-  // Render form based on user type
+  // Update renderForm function
   const renderForm = () => {
     if (!editMode) return null;
 
-    const commonProps = {
-      formErrors,
-      isEdit: !!selectedStudent,
-      onInputChange: handleInputChange,
-      onPhotoChange: handlePhotoChange
-    };
-
-    switch (selectedUserType) {
-      case 'student':
-        return (
-          <StudentForm
-            formData={formData as StudentFormData}
-            instructors={instructors}
-            schools={schools}
-            {...commonProps}
-          />
-        );
-      case 'instructor':
-        return (
-          <InstructorForm
-            formData={formData as InstructorFormData}
-            schools={schools}
-            {...commonProps}
-          />
-        );
-      case 'school':
-        return (
-          <SchoolForm
-            formData={formData as SchoolFormData}
-            {...commonProps}
-          />
-        );
-      default:
-        return null;
-    }
+    return (
+      <UserForm
+        formData={formData}
+        formErrors={formErrors}
+        isEdit={!!selectedStudent}
+        userType={selectedUserType!}
+        instructors={instructors}
+        schools={schools}
+        onInputChange={handleInputChange}
+        onPhotoChange={handlePhotoChange}
+      />
+    );
   };
 
   // Add handlers for school and instructor selection
@@ -1190,37 +1165,37 @@ export const UserManagement: React.FC = () => {
       {/* Error and Success Messages */}
       {error && (
         <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
-          <p>{error}</p>
+          <p className="text-sm sm:text-base">{error}</p>
         </div>
       )}
       
       {success && (
         <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4" role="alert">
-          <p>{success}</p>
+          <p className="text-sm sm:text-base">{success}</p>
         </div>
       )}
       
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Kullanıcı Yönetimi</h2>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+        <h2 className="text-lg sm:text-xl font-semibold">Kullanıcı Yönetimi</h2>
         {!editMode && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button 
               onClick={() => handleAddNewUser('student')}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+              className="flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
               disabled={loading}
             >
               {loading ? 'Yükleniyor...' : 'Yeni Öğrenci'}
             </button>
             <button 
               onClick={() => handleAddNewUser('instructor')}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              className="flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
               disabled={loading}
             >
               {loading ? 'Yükleniyor...' : 'Yeni Eğitmen'}
             </button>
             <button 
               onClick={() => handleAddNewUser('school')}
-              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+              className="flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
               disabled={loading}
             >
               {loading ? 'Yükleniyor...' : 'Yeni Dans Okulu'}
@@ -1230,51 +1205,68 @@ export const UserManagement: React.FC = () => {
       </div>
       
       {editMode ? (
-        <div className="bg-gray-50 p-6 rounded-lg relative">
-          <h3 className="text-lg font-semibold mb-4">
-            {selectedStudent ? 'Kullanıcı Düzenle' : `Yeni ${
-              selectedUserType === 'student' ? 'Öğrenci' :
-              selectedUserType === 'instructor' ? 'Eğitmen' :
-              'Dans Okulu'
-            } Ekle`}
-          </h3>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-4 sm:p-6 border-b border-gray-200">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+              {selectedStudent ? 'Kullanıcı Düzenle' : `Yeni ${
+                selectedUserType === 'student' ? 'Öğrenci' :
+                selectedUserType === 'instructor' ? 'Eğitmen' :
+                'Dans Okulu'
+              } Ekle`}
+            </h3>
+          </div>
           
-          <form onSubmit={handleSubmit}>
-            {renderForm()}
+          <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
+            <UserForm
+              formData={formData}
+              formErrors={formErrors}
+              isEdit={!!selectedStudent}
+              userType={selectedUserType!}
+              instructors={instructors}
+              schools={schools}
+              onInputChange={handleInputChange}
+              onPhotoChange={handlePhotoChange}
+            />
             
-            <div className="flex justify-end space-x-3 mt-4">
-              <Button
-                variant="outlined"
-                color="secondary"
-                onClick={() => {
-                  setEditMode(false);
-                  setSelectedUserType(null);
-                }}
-                disabled={loading}
-              >
-                İptal
-              </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                color="primary"
-                disabled={loading}
-              >
-                {loading ? 'Kaydediliyor...' : (selectedStudent ? 'Güncelle' : 'Ekle')}
-              </Button>
+            <div className="p-4 sm:p-6 bg-gray-50 border-t border-gray-200">
+              <div className="flex flex-col sm:flex-row-reverse gap-3 sm:gap-4">
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  disabled={loading}
+                  fullWidth={window.innerWidth < 640}
+                  className="sm:w-auto"
+                >
+                  {loading ? 'Kaydediliyor...' : (selectedStudent ? 'Güncelle' : 'Ekle')}
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  onClick={() => {
+                    setEditMode(false);
+                    setSelectedUserType(null);
+                  }}
+                  disabled={loading}
+                  fullWidth={window.innerWidth < 640}
+                  className="sm:w-auto"
+                >
+                  İptal
+                </Button>
+              </div>
             </div>
           </form>
         </div>
       ) : (
         <>
-          <div className="mb-4 flex flex-wrap gap-4 items-center">
+          <div className="mb-4 flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <input
                 type="text"
                 placeholder="Ad veya e-posta ile ara..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-md"
+                className="w-full p-2 border border-gray-300 rounded-md text-sm"
               />
             </div>
             <div className="flex flex-wrap gap-2">
@@ -1282,7 +1274,7 @@ export const UserManagement: React.FC = () => {
                 <button
                   key={role}
                   onClick={() => handleRoleFilter(role)}
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  className={`px-3 py-1 rounded-full text-xs font-medium ${
                     filterConfig.roles.includes(role)
                       ? 'bg-indigo-600 text-white'
                       : 'bg-gray-200 text-gray-700'
@@ -1300,86 +1292,165 @@ export const UserManagement: React.FC = () => {
             </div>
           )}
           
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <TableSortLabel
-                      active={sortConfig.field === 'displayName'}
-                      direction={sortConfig.field === 'displayName' ? sortConfig.direction : 'asc'}
-                      onClick={() => handleSort('displayName')}
-                    >
-                      Kullanıcı
-                    </TableSortLabel>
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <TableSortLabel
-                      active={sortConfig.field === 'email'}
-                      direction={sortConfig.field === 'email' ? sortConfig.direction : 'asc'}
-                      onClick={() => handleSort('email')}
-                    >
-                      E-posta
-                    </TableSortLabel>
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <TableSortLabel
-                      active={sortConfig.field === 'role'}
-                      direction={sortConfig.field === 'role' ? sortConfig.direction : 'asc'}
-                      onClick={() => handleSort('role')}
-                    >
-                      Roller
-                    </TableSortLabel>
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <TableSortLabel
-                      active={sortConfig.field === 'level'}
-                      direction={sortConfig.field === 'level' ? sortConfig.direction : 'asc'}
-                      onClick={() => handleSort('level')}
-                    >
-                      Dans Seviyesi
-                    </TableSortLabel>
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <TableSortLabel
-                      active={sortConfig.field === 'instructorName'}
-                      direction={sortConfig.field === 'instructorName' ? sortConfig.direction : 'asc'}
-                      onClick={() => handleSort('instructorName')}
-                    >
-                      Eğitmen
-                    </TableSortLabel>
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <TableSortLabel
-                      active={sortConfig.field === 'schoolName'}
-                      direction={sortConfig.field === 'schoolName' ? sortConfig.direction : 'asc'}
-                      onClick={() => handleSort('schoolName')}
-                    >
-                      Okul
-                    </TableSortLabel>
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    İşlemler
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {paginatedStudents.length > 0 ? (
-                  paginatedStudents.map((student) => renderStudent(student))
-                ) : (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">
-                      {searchTerm || filterConfig.roles.length > 0
-                        ? 'Aramanıza veya seçtiğiniz filtrelere uygun kullanıcı bulunamadı.'
-                        : 'Henüz hiç kullanıcı kaydı bulunmuyor.'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div className="-mx-4 sm:mx-0 overflow-hidden">
+            <div className="inline-block min-w-full align-middle">
+              <div className="overflow-x-auto border border-gray-200 sm:rounded-lg shadow-sm">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                        <TableSortLabel
+                          active={sortConfig.field === 'displayName'}
+                          direction={sortConfig.field === 'displayName' ? sortConfig.direction : 'asc'}
+                          onClick={() => handleSort('displayName')}
+                        >
+                          Kullanıcı
+                        </TableSortLabel>
+                      </th>
+                      <th scope="col" className="hidden sm:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                        <TableSortLabel
+                          active={sortConfig.field === 'email'}
+                          direction={sortConfig.field === 'email' ? sortConfig.direction : 'asc'}
+                          onClick={() => handleSort('email')}
+                        >
+                          E-posta
+                        </TableSortLabel>
+                      </th>
+                      <th scope="col" className="hidden md:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                        <TableSortLabel
+                          active={sortConfig.field === 'role'}
+                          direction={sortConfig.field === 'role' ? sortConfig.direction : 'asc'}
+                          onClick={() => handleSort('role')}
+                        >
+                          Roller
+                        </TableSortLabel>
+                      </th>
+                      <th scope="col" className="hidden lg:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                        <TableSortLabel
+                          active={sortConfig.field === 'level'}
+                          direction={sortConfig.field === 'level' ? sortConfig.direction : 'asc'}
+                          onClick={() => handleSort('level')}
+                        >
+                          Dans Seviyesi
+                        </TableSortLabel>
+                      </th>
+                      <th scope="col" className="hidden xl:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                        <TableSortLabel
+                          active={sortConfig.field === 'instructorName'}
+                          direction={sortConfig.field === 'instructorName' ? sortConfig.direction : 'asc'}
+                          onClick={() => handleSort('instructorName')}
+                        >
+                          Eğitmen
+                        </TableSortLabel>
+                      </th>
+                      <th scope="col" className="hidden xl:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                        <TableSortLabel
+                          active={sortConfig.field === 'schoolName'}
+                          direction={sortConfig.field === 'schoolName' ? sortConfig.direction : 'asc'}
+                          onClick={() => handleSort('schoolName')}
+                        >
+                          Okul
+                        </TableSortLabel>
+                      </th>
+                      <th scope="col" className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                        İşlemler
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {paginatedStudents.length > 0 ? (
+                      paginatedStudents.map((student) => (
+                        <tr key={student.id} className="hover:bg-gray-50">
+                          <td className="px-4 sm:px-6 py-4">
+                            <div className="flex items-center">
+                              <div className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10 relative bg-green-100 rounded-full overflow-hidden">
+                                {student.photoURL ? (
+                                  <img 
+                                    className="h-full w-full rounded-full object-cover absolute inset-0" 
+                                    src={student.photoURL}
+                                    alt={student.displayName}
+                                    onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                      const target = e.currentTarget;
+                                      target.onerror = null;
+                                      target.src = generateInitialsAvatar(student.displayName, getAvatarType(student.role));
+                                    }}
+                                  />
+                                ) : (
+                                  <img 
+                                    className="h-full w-full rounded-full object-cover" 
+                                    src={generateInitialsAvatar(student.displayName, getAvatarType(student.role))}
+                                    alt={student.displayName}
+                                  />
+                                )}
+                              </div>
+                              <div className="ml-3 sm:ml-4">
+                                <div className="text-xs sm:text-sm font-medium text-gray-900">{student.displayName}</div>
+                                <div className="text-xs text-gray-500 sm:hidden">{student.email}</div>
+                                {student.phoneNumber && (
+                                  <div className="text-xs text-gray-500">{student.phoneNumber}</div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="hidden sm:table-cell px-4 sm:px-6 py-4">
+                            <div className="text-xs sm:text-sm text-gray-900">{student.email}</div>
+                          </td>
+                          <td className="hidden md:table-cell px-4 sm:px-6 py-4">
+                            {renderRoleBadges(student.role)}
+                          </td>
+                          <td className="hidden lg:table-cell px-4 sm:px-6 py-4">
+                            <div className="text-xs sm:text-sm text-gray-900">
+                              {student.level === 'beginner' && 'Başlangıç'}
+                              {student.level === 'intermediate' && 'Orta'}
+                              {student.level === 'advanced' && 'İleri'}
+                              {student.level === 'professional' && 'Profesyonel'}
+                              {!student.level && '-'}
+                            </div>
+                          </td>
+                          <td className="hidden xl:table-cell px-4 sm:px-6 py-4">
+                            <div className="text-xs sm:text-sm text-gray-900">
+                              {student.instructorName || '-'}
+                            </div>
+                          </td>
+                          <td className="hidden xl:table-cell px-4 sm:px-6 py-4">
+                            <div className="text-xs sm:text-sm text-gray-900">
+                              {student.schoolName || '-'}
+                            </div>
+                          </td>
+                          <td className="px-4 sm:px-6 py-4 text-right text-xs sm:text-sm font-medium whitespace-nowrap">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => editStudent(student)}
+                                className="text-indigo-600 hover:text-indigo-900"
+                              >
+                                Düzenle
+                              </button>
+                              <button
+                                onClick={() => deleteStudentHandler(student.id)}
+                                className="text-red-600 hover:text-red-900"
+                              >
+                                Sil
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="px-4 sm:px-6 py-4 text-center text-xs sm:text-sm text-gray-500">
+                          {searchTerm || filterConfig.roles.length > 0
+                            ? 'Aramanıza veya seçtiğiniz filtrelere uygun kullanıcı bulunamadı.'
+                            : 'Henüz hiç kullanıcı kaydı bulunmuyor.'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
-          <div className="mt-4">
+          <div className="mt-4 flex justify-center sm:justify-end">
             <TablePagination
               component="div"
               count={filteredAndSortedStudents.length}
@@ -1390,7 +1461,7 @@ export const UserManagement: React.FC = () => {
               labelDisplayedRows={({ from, to, count }) =>
                 `${from}-${to} / ${count}`
               }
-              labelRowsPerPage="Sayfa başına satır:"
+              labelRowsPerPage="Sayfa başına:"
             />
           </div>
         </>
