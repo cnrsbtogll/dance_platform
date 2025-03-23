@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../../api/firebase/firebase';
 import { useAuth } from '../../../contexts/AuthContext';
-import { StudentManagement } from '../components';
+import { StudentManagement } from '../../../features/shared/components/students/StudentManagement';
 import InstructorManagement from '../components/InstructorManagement';
 import CourseManagement from '../../../features/shared/components/courses/CourseManagement';
 import AttendanceManagement from '../components/AttendanceManagement';
@@ -383,7 +383,7 @@ const SchoolAdmin: React.FC = () => {
           {activeTab === 'students' && schoolInfo && (
             <div>
               <StudentManagement 
-                schoolInfo={schoolInfo}
+                isAdmin={false}
               />
             </div>
           )}

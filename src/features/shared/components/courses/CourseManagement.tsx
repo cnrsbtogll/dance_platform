@@ -395,20 +395,34 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
         const coursesRef = collection(db, 'courses');
         console.log('Courses koleksiyonu referansı alındı:', coursesRef);
         
+        // Get current user's role
+        const userRef = doc(db, 'users', currentUser.uid);
+        const userDoc = await getDoc(userRef);
+        const userData = userDoc.data();
+        const userRole = userData?.role || '';
+        console.log('Current user role:', userRole);
+
         // Query oluştur
-        let q = query(coursesRef, orderBy('createdAt', 'desc'));
+        let q = query(coursesRef, orderBy('createdAt', 'desc')); // Default query for admin
         
-        // Eğer instructor veya school ID varsa, filtreleme ekle
-        if (instructorId) {
-          q = query(coursesRef, 
-            where('instructorId', '==', instructorId),
-            orderBy('createdAt', 'desc')
-          );
-        } else if (schoolId) {
-          q = query(coursesRef, 
-            where('schoolId', '==', schoolId),
-            orderBy('createdAt', 'desc')
-          );
+        if (!isAdmin) {
+          if (userRole === 'school') {
+            console.log('School: Okula ait kurslar getiriliyor -', currentUser.uid);
+            q = query(
+              coursesRef,
+              where('schoolId', '==', currentUser.uid),
+              orderBy('createdAt', 'desc')
+            );
+          } else if (userRole === 'instructor') {
+            console.log('Instructor: Eğitmene ait kurslar getiriliyor -', currentUser.uid);
+            q = query(
+              coursesRef,
+              where('instructorId', '==', currentUser.uid),
+              orderBy('createdAt', 'desc')
+            );
+          }
+        } else {
+          console.log('Admin: Tüm kurslar getiriliyor');
         }
 
         console.log('Ana query oluşturuldu:', q);

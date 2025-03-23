@@ -61,6 +61,7 @@ interface FormData {
   photoURL: string;
   instructorId: string;
   schoolId: string;
+  courseIds: string[];
 }
 
 // Define Firebase user type
@@ -77,6 +78,7 @@ interface FirebaseUser {
   schoolId?: string | null;
   schoolName?: string | null;
   danceStyles?: DanceStyle[];
+  courseIds?: string[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -319,6 +321,14 @@ interface StudentManagementProps {
   isAdmin?: boolean;
 }
 
+// Add Course interface
+interface Course {
+  id: string;
+  name: string;
+  schoolId: string;
+  instructorId: string;
+}
+
 export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = false }) => {
   const { currentUser } = useAuth();
   const [students, setStudents] = useState<FirebaseUser[]>([]);
@@ -342,8 +352,11 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
     level: 'beginner',
     photoURL: '',
     instructorId: '',
-    schoolId: ''
+    schoolId: '',
+    courseIds: []
   });
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [userRole, setUserRole] = useState<string>('');
 
   // Check if current user is super admin
   useEffect(() => {
@@ -380,75 +393,76 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
     try {
       // Get students
       const usersRef = collection(db, 'users');
-      let studentsQuery;
+      
+      // Initialize with a default query that returns no results
+      let studentsQuery = query(
+        usersRef,
+        where('role', '==', 'non-existent-role')
+      );
+      
+      // Get current user's role
+      const userRef = doc(db, 'users', currentUser?.uid || '');
+      const userDoc = await getDoc(userRef);
+      const userData = userDoc.data();
+      const userRole = userData?.role || '';
       
       if (isAdmin) {
         console.log('Admin mode: fetching all students');
         studentsQuery = query(
           usersRef, 
-          where('role', 'array-contains', 'student'),
+          where('role', '==', 'student'),
           orderBy('createdAt', 'desc')
         );
-      } else {
+      } else if (userRole === 'school') {
+        console.log('School mode: fetching students for school', currentUser?.uid);
+        studentsQuery = query(
+          usersRef, 
+          where('schoolId', '==', currentUser?.uid),
+          where('role', '==', 'student')
+        );
+      } else if (userRole === 'instructor') {
         console.log('Instructor mode: fetching students for instructor', currentUser?.uid);
         studentsQuery = query(
           usersRef, 
           where('instructorId', '==', currentUser?.uid),
-          orderBy('createdAt', 'desc')
+          where('role', '==', 'student')
         );
       }
-      
+
       const studentsSnapshot = await getDocs(studentsQuery);
-      const studentsData: FirebaseUser[] = studentsSnapshot.docs.map(doc => {
-        const data = doc.data();
-        // Verify if the document has role field and it includes 'student'
-        const roles = Array.isArray(data.role) ? data.role : [data.role];
-        if (!roles.includes('student')) {
-          return null;
-        }
-        console.log('Student data:', { id: doc.id, ...data });
-        return {
+      const studentsData: FirebaseUser[] = studentsSnapshot.docs
+        .map(doc => ({
           id: doc.id,
-          ...data
-        } as FirebaseUser;
-      }).filter(Boolean) as FirebaseUser[]; // Remove null values
+          ...doc.data()
+        } as FirebaseUser))
+        .filter(student => student.role === 'student');
 
-      // Get instructors
-      const instructorsQuery = query(
-        usersRef,
-        where('role', 'array-contains', 'instructor'),
-        orderBy('displayName', 'asc')
-      );
-      const instructorsSnapshot = await getDocs(instructorsQuery);
-      const instructorsData: Instructor[] = instructorsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        displayName: doc.data().displayName || 'İsimsiz Eğitmen',
-        email: doc.data().email || ''
-      }));
-
-      // Get schools
-      const schoolsQuery = query(
-        usersRef,
-        where('role', 'array-contains', 'school'),
-        orderBy('displayName', 'asc')
-      );
-      const schoolsSnapshot = await getDocs(schoolsQuery);
-      const schoolsData: School[] = schoolsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        displayName: doc.data().displayName || 'İsimsiz Okul',
-        email: doc.data().email || ''
-      }));
-      
-      console.log(`Found: ${studentsData.length} students, ${instructorsData.length} instructors, ${schoolsData.length} schools`);
-      console.log('Students:', studentsData.map(s => ({ id: s.id, name: s.displayName, instructorId: s.instructorId })));
-      
+      console.log('Students data:', studentsData);
       setStudents(studentsData);
       setFilteredStudents(studentsData);
-      setInstructors(instructorsData);
-      setSchools(schoolsData);
+
+      // Fetch instructors separately
+      await fetchInstructors();
+
+      // Get schools if admin
+      if (isAdmin) {
+        const schoolsQuery = query(
+          usersRef,
+          where('role', '==', 'school'),
+          orderBy('displayName', 'asc')
+        );
+        const schoolsSnapshot = await getDocs(schoolsQuery);
+        const schoolsData: School[] = schoolsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          displayName: doc.data().displayName || 'İsimsiz Okul',
+          email: doc.data().email || ''
+        }));
+        
+        setSchools(schoolsData);
+      }
     } catch (err) {
-      console.error('Kullanıcılar yüklenirken hata oluştu:', err);
-      setError(`Kullanıcılar yüklenirken bir hata oluştu: ${err instanceof Error ? err.message : 'Bilinmeyen hata'}. Lütfen sayfayı yenileyin.`);
+      console.error('Error loading users:', err);
+      setError(`Error loading users: ${err instanceof Error ? err.message : 'Unknown error'}. Please refresh the page.`);
     } finally {
       setLoading(false);
     }
@@ -494,6 +508,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
       photoURL: student.photoURL || '',
       instructorId: student.instructorId || '',
       schoolId: student.schoolId || '',
+      courseIds: student.courseIds || []
     });
     setEditMode(true);
   };
@@ -508,7 +523,8 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
       level: 'beginner',
       photoURL: generateInitialsAvatar('?', 'student'),
       instructorId: isAdmin ? '' : currentUser?.uid || '',
-      schoolId: ''
+      schoolId: '',
+      courseIds: []
     });
     setEditMode(true);
   };
@@ -579,6 +595,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
     schoolId?: string;
     schoolName?: string;
     photoURL?: string;
+    courseIds: string[];
   }) => {
     try {
       // Benzersiz bir davet kodu oluştur
@@ -615,6 +632,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
         instructorName: invitationData.instructorName || null,
         schoolId: invitationData.schoolId || null,
         schoolName: invitationData.schoolName || null,
+        courseIds: invitationData.courseIds || [],
         createdAt: now,
         updatedAt: now,
         status: 'pending'
@@ -639,6 +657,104 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
     }
   };
 
+  // Add useEffect to fetch user role
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (!currentUser?.uid) return;
+      
+      const userRef = doc(db, 'users', currentUser.uid);
+      const userDoc = await getDoc(userRef);
+      const userData = userDoc.data();
+      const role = userData?.role || '';
+      console.log('Current user role:', role);
+      setUserRole(role);
+    };
+
+    fetchUserRole();
+  }, [currentUser]);
+
+  // Add function to fetch courses
+  const fetchCourses = async () => {
+    if (!currentUser?.uid) return;
+
+    try {
+      const coursesRef = collection(db, 'courses');
+      
+      // First, get all courses to check the data
+      const allCoursesSnapshot = await getDocs(coursesRef);
+      console.log('All courses in collection:', allCoursesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })));
+
+      // Get current user's role
+      const userRef = doc(db, 'users', currentUser.uid);
+      const userDoc = await getDoc(userRef);
+      const userData = userDoc.data();
+      const userRole = userData?.role || '';
+      console.log('Current user role:', userRole);
+
+      // Query oluştur
+      let q = query(coursesRef, orderBy('createdAt', 'desc')); // Default query for admin
+      
+      if (!isAdmin) {
+        if (userRole === 'school') {
+          console.log('School: Okula ait kurslar getiriliyor -', currentUser.uid);
+          q = query(
+            coursesRef,
+            where('schoolId', '==', currentUser.uid),
+            orderBy('createdAt', 'desc')
+          );
+        } else if (userRole === 'instructor') {
+          console.log('Instructor: Eğitmene ait kurslar getiriliyor -', currentUser.uid);
+          q = query(
+            coursesRef,
+            where('instructorId', '==', currentUser.uid),
+            orderBy('createdAt', 'desc')
+          );
+        }
+      } else {
+        console.log('Admin: Tüm kurslar getiriliyor');
+      }
+
+      console.log('Ana query oluşturuldu:', q);
+      
+      console.log('Veriler çekiliyor...');
+      const snapshot = await getDocs(q);
+      console.log('Course query snapshot:', {
+        empty: snapshot.empty,
+        size: snapshot.size,
+        docs: snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+      });
+
+      const coursesData = snapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log('Raw course data:', { id: doc.id, ...data });
+        return {
+          id: doc.id,
+          name: data.name || 'İsimsiz Kurs',
+          schoolId: data.schoolId || '',
+          instructorId: data.instructorId
+        } as Course;
+      });
+      
+      console.log('Processed courses:', coursesData);
+      setCourses(coursesData);
+    } catch (err) {
+      console.error('Error fetching courses:', err);
+    }
+  };
+
+  // Call fetchCourses when userRole changes
+  useEffect(() => {
+    if (userRole.length > 0) {
+      fetchCourses();
+    }
+  }, [userRole]);
+
   // Form submission
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
@@ -647,6 +763,10 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
     setSuccess(null);
     
     try {
+      console.log('Form submission - Current user role:', userRole);
+      console.log('Form data:', formData);
+      console.log('Selected courses:', courses.filter(c => formData.courseIds.includes(c.id)));
+
       if (selectedStudent) {
         // Update existing student
         const userRef = doc(db, 'users', selectedStudent.id);
@@ -658,55 +778,55 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
           instructorName = selectedInstructor?.displayName || '';
         }
         
-        // Get school name if a school is selected
+        // Use current user's ID as schoolId for school users
+        const schoolId = userRole.includes('school') ? currentUser?.uid : formData.schoolId;
+        console.log('Using schoolId:', schoolId);
+        
+        // Get school name
         let schoolName = '';
-        if (formData.schoolId) {
-          const selectedSchool = schools.find(s => s.id === formData.schoolId);
+        if (schoolId) {
+          const selectedSchool = schools.find(s => s.id === schoolId);
           schoolName = selectedSchool?.displayName || '';
         }
         
-        // Öğrenci güncellenirken role değeri korunur (değiştirilmez)
         const updateData = {
           displayName: formData.displayName,
           phone: formData.phone,
           level: formData.level,
           instructorId: formData.instructorId || null,
           instructorName: instructorName || null,
-          schoolId: formData.schoolId || null,
+          schoolId: schoolId || null,
           schoolName: schoolName || null,
           photoURL: formData.photoURL || DEFAULT_STUDENT_IMAGE,
+          courseIds: formData.courseIds || [],
           updatedAt: serverTimestamp()
         };
         
-        try {
-          await updateDoc(userRef, updateData);
-          console.log('Öğrenci güncellendi:', selectedStudent.id);
-          
-          // Update the students array
-          const updatedStudents = students.map(student => 
-            student.id === selectedStudent.id 
-              ? { 
-                  ...student, 
-                  displayName: formData.displayName,
-                  phone: formData.phone,
-                  level: formData.level,
-                  instructorId: formData.instructorId || null,
-                  instructorName: instructorName || null,
-                  schoolId: formData.schoolId || null,
-                  schoolName: schoolName || null,
-                  photoURL: formData.photoURL || DEFAULT_STUDENT_IMAGE,
-                  updatedAt: serverTimestamp() as Timestamp 
-                } 
-              : student
-          );
-          
-          setStudents(updatedStudents);
-          setSuccess('Öğrenci bilgileri başarıyla güncellendi.');
-        } catch (updateError) {
-          console.error('Öğrenci güncellenirken hata:', updateError);
-          throw new Error('Öğrenci güncellenirken bir hata oluştu: ' + 
-            (updateError instanceof Error ? updateError.message : 'Bilinmeyen hata'));
-        }
+        console.log('Updating student with data:', updateData);
+        await updateDoc(userRef, updateData);
+        console.log('Öğrenci güncellendi:', selectedStudent.id);
+        
+        // Update the students array
+        const updatedStudents = students.map(student => 
+          student.id === selectedStudent.id 
+            ? { 
+                ...student, 
+                displayName: formData.displayName,
+                phone: formData.phone,
+                level: formData.level,
+                instructorId: formData.instructorId || null,
+                instructorName: instructorName || null,
+                schoolId: formData.schoolId || null,
+                schoolName: schoolName || null,
+                photoURL: formData.photoURL || DEFAULT_STUDENT_IMAGE,
+                courseIds: formData.courseIds || [],
+                updatedAt: serverTimestamp() as Timestamp 
+              } 
+            : student
+        );
+        
+        setStudents(updatedStudents);
+        setSuccess('Öğrenci bilgileri başarıyla güncellendi.');
       } else {
         // Create new student
         if (!formData.email || !formData.displayName) {
@@ -745,9 +865,10 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
           phoneNumber: formData.phone,
           instructorId: formData.instructorId,
           instructorName: instructorName,
-          schoolId: formData.schoolId,
+          schoolId: userRole.includes('school') ? currentUser?.uid : formData.schoolId,
           schoolName: schoolName,
-          photoURL: formData.photoURL
+          photoURL: formData.photoURL,
+          courseIds: formData.courseIds
         });
         
         setSuccess('Öğrenci başarıyla eklendi ve davet e-postası gönderildi.');
@@ -758,7 +879,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
       setSelectedStudent(null);
       
     } catch (err: any) {
-      console.error('İşlem sırasında hata oluştu:', err);
+      console.error('Error in form submission:', err);
       setError('İşlem sırasında bir hata oluştu: ' + (err.message || 'Bilinmeyen hata'));
     } finally {
       setLoading(false);
@@ -883,6 +1004,76 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
       ...prev,
       [fieldName]: value
     }));
+  };
+
+  // Get instructors
+  const fetchInstructors = async () => {
+    try {
+      console.log('Fetching instructors...');
+      const instructorsRef = collection(db, 'instructors');
+      
+      // Get current user's role
+      const userRef = doc(db, 'users', currentUser?.uid || '');
+      const userDoc = await getDoc(userRef);
+      const userData = userDoc.data();
+      const currentUserRole = userData?.role || '';
+      console.log('Current user role:', currentUserRole);
+
+      // Default query for no results
+      let q = query(
+        instructorsRef,
+        where('status', '==', 'inactive') // This ensures no results by default
+      );
+
+      if (isAdmin) {
+        console.log('Admin: fetching all active instructors');
+        q = query(
+          instructorsRef,
+          where('status', '==', 'active'),
+          orderBy('displayName', 'asc')
+        );
+      } else if (currentUserRole === 'school') {
+        console.log('School: fetching instructors for school', currentUser?.uid);
+        q = query(
+          instructorsRef,
+          where('schoolId', '==', currentUser?.uid),
+          where('status', '==', 'active'),
+          orderBy('displayName', 'asc')
+        );
+      } else {
+        console.log('No permission to fetch instructors');
+        setInstructors([]);
+        return;
+      }
+
+      const querySnapshot = await getDocs(q);
+      console.log('Query results:', {
+        empty: querySnapshot.empty,
+        size: querySnapshot.size,
+        docs: querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          displayName: doc.data().displayName,
+          email: doc.data().email
+        }))
+      });
+
+      const instructorsData = querySnapshot.docs
+        .map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            displayName: data.displayName || data.email || 'İsimsiz Eğitmen',
+            email: data.email || ''
+          };
+        })
+        .sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+      console.log('Processed instructors:', instructorsData);
+      setInstructors(instructorsData);
+    } catch (error) {
+      console.error('Error fetching instructors:', error);
+      setInstructors([]);
+    }
   };
 
   if (loading && students.length === 0) {
@@ -1063,23 +1254,63 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                 </div>
               )}
               
-              <div>
-                <CustomSelect
-                  name="schoolId"
-                  label="Okul"
-                  value={formData.schoolId}
-                  onChange={(value: string | string[]) => {
-                    if (typeof value === 'string') {
-                      handleSelectChange(value, 'schoolId');
-                    }
-                  }}
-                  options={[
-                    ...schools.map(school => ({
+              {/* School selection - only show for admin */}
+              {isAdmin ? (
+                <div>
+                  <CustomSelect
+                    name="schoolId"
+                    label="Okul"
+                    value={formData.schoolId}
+                    onChange={(value: string | string[]) => {
+                      if (typeof value === 'string') {
+                        console.log('School selection changed to:', value);
+                        handleSelectChange(value, 'schoolId');
+                      }
+                    }}
+                    options={schools.map(school => ({
                       value: school.id,
                       label: school.displayName
-                    }))
-                  ]}
+                    }))}
+                    fullWidth
+                    required
+                  />
+                </div>
+              ) : userRole.includes('school') && (
+                <div>
+                  <CustomInput
+                    name="schoolName"
+                    label="Okul"
+                    type="text"
+                    value={schools.find(s => s.id === currentUser?.uid)?.displayName || ''}
+                    onChange={() => {}}
+                    disabled
+                    fullWidth
+                  />
+                </div>
+              )}
+
+              {/* Course selection */}
+              <div>
+                <CustomSelect
+                  name="courseIds"
+                  label="Kurslar"
+                  value={formData.courseIds}
+                  onChange={(value: string | string[]) => {
+                    if (Array.isArray(value)) {
+                      console.log('Course selection changed to:', value);
+                      console.log('Selected courses:', courses.filter(c => value.includes(c.id)));
+                      setFormData(prev => ({
+                        ...prev,
+                        courseIds: value
+                      }));
+                    }
+                  }}
+                  options={courses.map(course => ({
+                    value: course.id,
+                    label: course.name
+                  }))}
                   fullWidth
+                  multiple
                   required
                 />
               </div>
