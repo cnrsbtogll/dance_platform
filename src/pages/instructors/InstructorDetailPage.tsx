@@ -4,10 +4,27 @@ import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firesto
 import { db } from '../../api/firebase/firebase';
 import { Instructor, UserWithProfile, DanceClass } from '../../types';
 import { fetchAllInstructors } from '../../api/services/userService';
+import { ChatDialog } from '../../features/chat/components/ChatDialog';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Eğitmen ve kullanıcı bilgisini birleştiren tip tanımı
-interface InstructorWithUser extends Instructor {
+interface InstructorWithUser extends Omit<Instructor, 'specialties' | 'experience'> {
+  id: string;
   user: UserWithProfile;
+  experience?: number;
+  tecrube?: number;
+  specialties?: string[];
+  uzmanlık?: string | string[];
+  rating?: number;
+  reviewCount?: number;
+  certifications?: string[];
+  socialMediaLinks?: {
+    instagram?: string;
+    facebook?: string;
+    youtube?: string;
+    tiktok?: string;
+  };
+  biography?: string;
 }
 
 type InstructorParams = {
@@ -17,11 +34,13 @@ type InstructorParams = {
 const InstructorDetailPage: React.FC = () => {
   const { id } = useParams<InstructorParams>();
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
 
   const [instructor, setInstructor] = useState<InstructorWithUser | null>(null);
   const [classes, setClasses] = useState<DanceClass[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   useEffect(() => {
     const fetchInstructorDetails = async () => {
@@ -89,6 +108,15 @@ const InstructorDetailPage: React.FC = () => {
 
     fetchInstructorDetails();
   }, [id]);
+
+  const handleContactClick = () => {
+    if (!currentUser) {
+      // Kullanıcı giriş yapmamışsa giriş sayfasına yönlendir
+      navigate('/login', { state: { from: `/instructors/${id}` } });
+      return;
+    }
+    setIsChatOpen(true);
+  };
 
   if (loading) {
     return (
@@ -280,13 +308,13 @@ const InstructorDetailPage: React.FC = () => {
             <div className="flex flex-wrap gap-3">
               <button 
                 className="bg-indigo-600 text-white py-2 px-6 rounded-md hover:bg-indigo-700 transition"
-                onClick={() => {/* İletişim modalını aç veya form sayfasına yönlendir */}}
+                onClick={handleContactClick}
               >
                 İletişime Geç
               </button>
               
               <Link 
-                to={`/courses?instructorId=${instructor.id}`}
+                to={`/courses?instructorId=${instructor?.id}`}
                 className="bg-white text-indigo-600 border border-indigo-200 py-2 px-6 rounded-md hover:bg-indigo-50 transition"
               >
                 Derslerini Görüntüle
@@ -335,6 +363,21 @@ const InstructorDetailPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Chat Dialog */}
+      {instructor && (
+        <ChatDialog
+          open={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          partner={{
+            id: instructor.id,
+            displayName: instructor.user.displayName,
+            photoURL: instructor.user.photoURL,
+            role: 'instructor'
+          }}
+          chatType="student-instructor"
+        />
+      )}
     </div>
   );
 };

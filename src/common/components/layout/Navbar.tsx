@@ -23,13 +23,145 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Kullanıcı rollerini kontrol et
-  const hasInstructorRole = user?.role?.includes('instructor');
-  const hasSchoolAdminRole = user?.role?.includes('school_admin');
-  const hasSchoolRole = user?.role?.includes('school');
-  const hasSuperAdminRole = user?.role?.includes('admin');
-  const hasStudentRole = user?.role?.includes('student') || 
-                       (!hasInstructorRole && !hasSchoolAdminRole && !hasSchoolRole && !hasSuperAdminRole && isAuthenticated);
+  const hasInstructorRole = user?.role === 'instructor';
+  const hasSchoolAdminRole = user?.role === 'school_admin';
+  const hasSchoolRole = user?.role === 'school';
+  const hasSuperAdminRole = user?.role === 'admin';
+  const hasStudentRole = !user?.role || (!hasInstructorRole && !hasSchoolAdminRole && !hasSchoolRole && !hasSuperAdminRole && isAuthenticated);
+
+  // Kullanıcı rollerini kontrol et ve logla
+  useEffect(() => {
+    console.log('👥 Kullanıcı Role Detaylı Bilgi:', {
+      timestamp: new Date().toISOString(),
+      role: user?.role,
+      roleType: typeof user?.role,
+      userObject: {
+        id: user?.id,
+        email: user?.email,
+        displayName: user?.displayName,
+        role: user?.role,
+      },
+      roleChecks: {
+        hasInstructorRole,
+        hasSchoolAdminRole,
+        hasSchoolRole,
+        hasSuperAdminRole,
+        hasStudentRole
+      }
+    });
+
+    // Firestore users tablosundan role bilgisini kontrol et
+    const checkFirestoreRole = async () => {
+      if (!user?.id) return;
+
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.id));
+        if (userDoc.exists()) {
+          const firestoreData = userDoc.data();
+          console.log('🔄 Firestore Users Role Detayları:', {
+            timestamp: new Date().toISOString(),
+            userId: user.id,
+            firestoreRole: firestoreData.role,
+            authRole: user.role,
+            comparison: {
+              hasRole: !!firestoreData.role,
+              roleMatch: firestoreData.role === user.role
+            }
+          });
+        } else {
+          console.warn('⚠️ Firestore\'da kullanıcı dokümanı bulunamadı:', user.id);
+        }
+      } catch (error) {
+        console.error('❌ Firestore role kontrolü hatası:', error);
+      }
+    };
+
+    checkFirestoreRole();
+  }, [user, hasInstructorRole, hasSchoolAdminRole, hasSchoolRole, hasSuperAdminRole, hasStudentRole]);
+
+  // Kullanıcı rollerini kontrol et ve logla
+  useEffect(() => {
+    console.log('🔍 Kullanıcı rol bilgileri:', {
+      rawRole: user?.role,
+      isArray: Array.isArray(user?.role),
+      user: user
+    });
+  }, [user]);
+
+  // Firebase kullanıcı bilgilerini logla
+  useEffect(() => {
+    if (user) {
+      console.log('🔥 Firebase Kullanıcı Bilgileri:', {
+        timestamp: new Date().toISOString(),
+        basicInfo: {
+          id: user.id,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+        },
+        customData: {
+          role: user.role,
+          phoneNumber: user.phoneNumber
+        },
+        authState: {
+          isAuthenticated
+        }
+      });
+
+      // Firestore'dan ek kullanıcı bilgilerini getir
+      const fetchUserDetails = async () => {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.id));
+          if (userDoc.exists()) {
+            console.log('📄 Firestore Kullanıcı Detayları:', {
+              timestamp: new Date().toISOString(),
+              exists: true,
+              data: userDoc.data(),
+              id: userDoc.id
+            });
+          } else {
+            console.log('⚠️ Firestore\'da kullanıcı dokümanı bulunamadı');
+          }
+        } catch (error) {
+          console.error('❌ Firestore kullanıcı bilgileri getirme hatası:', error);
+        }
+      };
+
+      fetchUserDetails();
+    }
+  }, [user, isAuthenticated]);
+
+  // Rol durumlarını logla
+  useEffect(() => {
+    console.log('👥 Kullanıcı rol durumları:', {
+      hasInstructorRole,
+      hasSchoolAdminRole,
+      hasSchoolRole,
+      hasSuperAdminRole,
+      hasStudentRole,
+      isAuthenticated
+    });
+  }, [hasInstructorRole, hasSchoolAdminRole, hasSchoolRole, hasSuperAdminRole, hasStudentRole, isAuthenticated]);
+
+  // Kullanıcı rolünü detaylı logla
+  useEffect(() => {
+    console.log('👤 Kullanıcı Rol Detayları:', {
+      timestamp: new Date().toISOString(),
+      userId: user?.id,
+      email: user?.email,
+      displayName: user?.displayName,
+      role: user?.role,
+      roleType: typeof user?.role,
+      parsedRoles: {
+        isInstructor: hasInstructorRole,
+        isSchoolAdmin: hasSchoolAdminRole,
+        isSchool: hasSchoolRole,
+        isSuperAdmin: hasSuperAdminRole,
+        isStudent: hasStudentRole
+      },
+      isAuthenticated
+    });
+  }, [user, hasInstructorRole, hasSchoolAdminRole, hasSchoolRole, hasSuperAdminRole, hasStudentRole, isAuthenticated]);
 
   // Profil fotoğrafını Firestore'dan getir
   useEffect(() => {
@@ -149,7 +281,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
       <nav className="bg-white shadow-md fixed w-full z-50 backdrop-blur-sm bg-white/90">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
-            <div className="flex">
+            <div className="flex items-center">
               <div className="flex-shrink-0 flex items-center">
                 <Link to="/" className="flex items-center group transition-all duration-300 ease-in-out">
                   {/* Modern gradient logo with dance icon */}
@@ -176,10 +308,8 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                   <span className="ml-3 text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 tracking-tight group-hover:tracking-wide transition-all duration-300">Dans Platformu</span>
                 </Link>
               </div>
-              <div className="hidden sm:ml-8 sm:flex sm:space-x-8">
-                {(!user?.role || (Array.isArray(user.role) ? 
-                  !user.role.includes('school') && !user.role.includes('instructor') : 
-                  user.role !== 'school' && user.role !== 'instructor')) && (
+              <div className="hidden sm:ml-8 sm:flex sm:space-x-4">
+                {!hasSchoolRole && !hasInstructorRole && (
                   <>
                     <Link 
                       to="/partners" 
@@ -209,11 +339,11 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                 )}
               </div>
             </div>
-            <div className="hidden sm:ml-6 sm:flex sm:items-center">
+            <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-2">
               {/* Kullanıcının rolüne göre butonları göster */}
-              <div className="flex space-x-3 mr-3">
-                {/* 'Eğitmen Ol' butonunu eğitmen olmayanlar ve okul sahibi olmayanlar görür */}
-                {!hasInstructorRole && !hasSchoolRole && (
+              <div className="flex space-x-2">
+                {/* 'Eğitmen Ol' butonunu eğitmen ve okul olmayanlar görür */}
+                {!hasInstructorRole && !hasSchoolRole && !hasSchoolAdminRole && (
                   <Link
                     to="/become-instructor"
                     className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
@@ -224,9 +354,9 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                     Eğitmen Ol
                   </Link>
                 )}
-                
-                {/* 'Dans Okulu Aç' butonunu okul sahibi olmayanlar görür (eğitmenler dahil) */}
-                {!hasSchoolRole && (
+
+                {/* Dans Okulu Aç butonu - okul rolü olmayanlar görebilir */}
+                {!hasSchoolRole && !hasSchoolAdminRole && (
                   <Link
                     to="/become-school"
                     className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
@@ -250,6 +380,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                       Admin Panel
                     </Link>
                   )}
+                  {/* Okul Yönetim Paneli - sadece okul rolü olanlar görebilir */}
                   {hasSchoolRole && !hasSuperAdminRole && (
                     <Link
                       to="/school-admin"
@@ -258,25 +389,6 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                       Okul Yönetim Paneli
                     </Link>
                   )}
-                  {hasSchoolAdminRole && !hasSuperAdminRole && !hasSchoolRole && (
-                    <Link
-                      to="/school-admin"
-                      className="mr-3 inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
-                    >
-                      Okul Yönetimi Paneli
-                    </Link>
-                  )}
-                  {hasInstructorRole && !hasSchoolAdminRole && !hasSchoolRole && !hasSuperAdminRole && (
-                    <Link
-                      to="/instructor"
-                      className="mr-3 inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
-                    >
-                      Eğitmen Paneli
-                    </Link>
-                  )}
-                  {/* Öğrenci Teşvik Butonları */}
-                  {/* Öğrenci Teşvik butonları kaldırıldı ve her zaman gösterilecek şekilde taşındı */}
-
                   <div className="ml-3 relative">
                     <div className="flex items-center">
                       {/* Kullanıcı Bilgileri - Masaüstü */}
@@ -381,11 +493,11 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
 
         {/* Mobil için hamburger menüsü */}
         {isMenuOpen && (
-          <div className="sm:hidden animate-fadeIn fixed top-16 left-0 right-0 z-40 bg-white shadow-lg">
-            <div className="pt-1 pb-1 border-t border-gray-200 bg-gray-50/80 backdrop-blur-sm">
+          <div className="sm:hidden animate-fadeIn fixed top-16 left-0 right-0 z-40 bg-white shadow-lg max-h-[calc(100vh-4rem)] overflow-y-auto">
+            <div className="pt-2 pb-3 border-t border-gray-200 bg-gray-50/80 backdrop-blur-sm">
               {/* Her durumda gösterilecek butonlar */}
-              <div className="px-2 py-1 space-y-1">
-                {!hasInstructorRole && !hasSchoolRole && (
+              <div className="px-4 space-y-2">
+                {!hasInstructorRole && !hasSchoolRole && !hasSchoolAdminRole && (
                   <Link 
                     to="/become-instructor"
                     className="block w-full px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500 focus:ring-offset-1 shadow-sm transition-all duration-200"
@@ -400,11 +512,27 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                   </Link>
                 )}
                 
-                {!hasSchoolRole && (
+                {/* Dans Okulu Aç butonu - Mobil */}
+                {!hasSchoolRole && !hasSchoolAdminRole && (
                   <Link 
                     to="/become-school"
+                    onClick={() => {
+                      console.log('🎯 Dans Okulu Aç butonuna tıklandı (Mobil):', {
+                        userId: user?.id,
+                        userEmail: user?.email,
+                        userRole: user?.role,
+                        roleChecks: {
+                          hasInstructorRole,
+                          hasSchoolRole,
+                          hasSchoolAdminRole,
+                          hasSuperAdminRole
+                        },
+                        timestamp: new Date().toISOString(),
+                        currentPath: location.pathname
+                      });
+                      setIsMenuOpen(false);
+                    }}
                     className="block w-full px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:ring-offset-1 shadow-sm transition-all duration-200"
-                    onClick={() => setIsMenuOpen(false)}
                   >
                     <div className="flex items-center justify-center">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -418,10 +546,10 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
 
               {isAuthenticated ? (
                 <>
-                  <div className="flex items-center px-3">
+                  <div className="flex items-center px-4 py-2">
                     <div className="flex-shrink-0">
                       <img
-                        className="h-6 w-6 rounded-full object-cover shadow-sm"
+                        className="h-8 w-8 rounded-full object-cover shadow-sm"
                         src={profilePhotoURL}
                         alt={user?.displayName || 'Profil'}
                         onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
@@ -432,15 +560,13 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                         }}
                       />
                     </div>
-                    <div className="ml-2">
+                    <div className="ml-3">
                       <div className="text-sm font-medium leading-none text-gray-800">{user?.displayName || 'Kullanıcı'}</div>
-                      <div className="text-xs font-medium leading-none text-gray-500 mt-0.5">{user?.email || ''}</div>
+                      <div className="text-xs font-medium leading-none text-gray-500 mt-1">{user?.email || ''}</div>
                     </div>
                   </div>
-                  <div className="mt-1 space-y-0 px-2">
-                    {(!user?.role || (Array.isArray(user.role) ? 
-                      !user.role.includes('school') && !user.role.includes('instructor') : 
-                      user.role !== 'school' && user.role !== 'instructor')) && (
+                  <div className="mt-3 space-y-1 px-4">
+                    {!hasSchoolRole && !hasInstructorRole && (
                       <>
                         <Link
                           to="/partners"
@@ -487,24 +613,6 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                         onClick={() => setIsMenuOpen(false)}
                       >
                         Okul Yönetim Paneli
-                      </Link>
-                    )}
-                    {hasSchoolAdminRole && !hasSuperAdminRole && !hasSchoolRole && (
-                      <Link
-                        to="/school-admin"
-                        className="block px-3 py-1 mt-2 rounded-md text-base font-medium text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 transition-colors duration-150"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        Okul Yönetimi Paneli
-                      </Link>
-                    )}
-                    {hasInstructorRole && !hasSchoolAdminRole && !hasSchoolRole && !hasSuperAdminRole && (
-                      <Link
-                        to="/instructor"
-                        className="block px-3 py-1 mt-2 rounded-md text-base font-medium text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 transition-colors duration-150"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        Eğitmen Paneli
                       </Link>
                     )}
                     

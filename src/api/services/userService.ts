@@ -87,32 +87,33 @@ export const resizeImageFromBase64 = (
 /**
  * Updates user profile information in both Firebase Auth and Firestore
  */
-export const updateUserProfile = async (
-  userId: string,
-  profileData: {
-    displayName?: string;
-    bio?: string;
-    danceStyles?: string[];
-    level?: DanceLevel;
-    phoneNumber?: string;
-  }
-): Promise<void> => {
+export const updateUserProfile = async (userId: string, userData: Partial<User>): Promise<User> => {
   try {
-    // Update Auth profile if displayName is provided
-    if (profileData.displayName && auth.currentUser) {
-      await updateProfile(auth.currentUser, {
-        displayName: profileData.displayName,
-      });
+    const userRef = doc(db, 'users', userId);
+    
+    // Add timestamps
+    const dataToUpdate = {
+      ...userData,
+      updatedAt: Timestamp.now()
+    };
+    
+    await updateDoc(userRef, dataToUpdate);
+    
+    // Get the updated user data
+    const updatedUserDoc = await getDoc(userRef);
+    if (!updatedUserDoc.exists()) {
+      throw new Error('User not found after update');
     }
-
-    // Update Firestore document with all provided fields
-    const userDocRef = doc(db, 'users', userId);
-    await updateDoc(userDocRef, {
-      ...profileData,
-      updatedAt: Timestamp.now(),
-    });
+    
+    const data = updatedUserDoc.data();
+    return {
+      id: updatedUserDoc.id,
+      ...data,
+      createdAt: data.createdAt?.toDate(),
+      updatedAt: data.updatedAt?.toDate()
+    } as User;
   } catch (error) {
-    console.error('Error updating profile:', error);
+    console.error('Error updating user profile:', error);
     throw error;
   }
 };
@@ -152,42 +153,79 @@ export const updateProfilePhotoDirectly = async (
  */
 export const fetchAllInstructors = async (): Promise<Array<Instructor & { user: UserWithProfile }>> => {
   try {
-    // Collection/path bilgisini projenizdeki yapıya göre ayarlayın
-    const { getDocs, collection, query, where } = await import('firebase/firestore');
+    const { getDocs, collection, query } = await import('firebase/firestore');
     const instructorsQuery = query(collection(db, 'instructors'));
     const instructorsSnapshot = await getDocs(instructorsQuery);
     
-    // Sonuçları işle
     const instructors: Array<Instructor & { user: UserWithProfile }> = [];
     
     for (const instructorDoc of instructorsSnapshot.docs) {
-      const instructorData = instructorDoc.data() as Instructor;
+      const rawData = instructorDoc.data();
+      console.log('Raw instructor data from Firestore:', rawData);
       
-      // Veri yapısını konsolda göster
-      console.log('Instructor data from Firebase:', instructorData);
+      // Convert Turkish field names to English and handle data type conversions
+      const instructorData: Instructor = {
+        id: instructorDoc.id,
+        userId: rawData.userId,
+        displayName: rawData.displayName || '',
+        email: rawData.email || '',
+        photoURL: rawData.photoURL,
+        phoneNumber: rawData.phoneNumber || '',
+        role: ['instructor'],
+        // Handle specialties array correctly
+        specialties: Array.isArray(rawData.specialties) ? rawData.specialties : 
+                    rawData.uzmanlık ? [rawData.uzmanlık] : [],
+        // Convert experience to number
+        experience: typeof rawData.experience === 'number' ? rawData.experience :
+                   typeof rawData.experience === 'string' ? parseInt(rawData.experience) :
+                   typeof rawData.tecrube === 'number' ? rawData.tecrube :
+                   typeof rawData.tecrube === 'string' ? parseInt(rawData.tecrube) : 0,
+        level: rawData.level || 'professional',
+        schoolId: rawData.schoolId || null,
+        schoolName: rawData.schoolName || null,
+        availability: rawData.availability || { days: [], hours: [] },
+        status: rawData.status || 'active',
+        createdAt: rawData.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+        updatedAt: rawData.updatedAt?.toDate?.()?.toISOString() || new Date().toISOString()
+      };
       
-      // Eğitmenin kullanıcı profilini çek
+      console.log('Converted instructor data:', instructorData);
+      
       try {
         const userDocRef = doc(db, 'users', instructorData.userId);
         const userSnapshot = await getDoc(userDocRef);
         
         if (userSnapshot.exists()) {
           const userData = userSnapshot.data() as UserWithProfile;
-          
-          // İki veri setini birleştir
           instructors.push({
             ...instructorData,
-            id: instructorDoc.id,
             user: userData
+          });
+        } else {
+          instructors.push({
+            ...instructorData,
+            user: {
+              id: instructorData.userId,
+              email: instructorData.email,
+              displayName: instructorData.displayName,
+              role: ['instructor'],
+              createdAt: new Date(instructorData.createdAt),
+              updatedAt: new Date(instructorData.updatedAt)
+            } as unknown as UserWithProfile
           });
         }
       } catch (userError) {
         console.error(`Error fetching user data for instructor ${instructorData.userId}:`, userError);
-        // Kullanıcı bilgisi olmadan da eğitmeni ekle
         instructors.push({
           ...instructorData,
-          id: instructorDoc.id,
-          user: {} as UserWithProfile
+          user: {
+            id: instructorData.userId,
+            email: instructorData.email,
+            displayName: instructorData.displayName,
+            role: ['instructor'],
+            createdAt: new Date(instructorData.createdAt),
+            updatedAt: new Date(instructorData.updatedAt)
+          } as unknown as UserWithProfile
         });
       }
     }

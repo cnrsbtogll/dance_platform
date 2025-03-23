@@ -11,7 +11,8 @@ import {
   orderBy, 
   serverTimestamp,
   where,
-  Timestamp
+  Timestamp,
+  writeBatch
 } from 'firebase/firestore';
 import { 
   createUserWithEmailAndPassword, 
@@ -23,10 +24,32 @@ import {
 } from 'firebase/auth';
 import { db, auth } from '../../../../api/firebase/firebase';
 import { motion } from 'framer-motion';
-import { User, UserRole, DanceLevel, DanceStyle } from '../../../../types';
+import { 
+  User, 
+  UserRole, 
+  DanceLevel, 
+  DanceStyle, 
+  FirebaseUser,
+  StudentFormData,
+  InstructorFormData,
+  SchoolFormData,
+  FormDataType,
+  isStudentForm,
+  isInstructorForm,
+  isSchoolForm,
+  InvitationData,
+  FormDataUpdate
+} from '../../../../types';
 import { useAuth } from '../../../../contexts/AuthContext';
 import CustomSelect from '../../../../common/components/ui/CustomSelect';
 import CustomPhoneInput from '../../../../common/components/ui/CustomPhoneInput';
+import { generateInitialsAvatar } from '../../../../common/utils/imageUtils';
+import ImageUploader from '../../../../common/components/ui/ImageUploader';
+import CustomInput from '../../../../common/components/ui/CustomInput';
+import { Button, TablePagination, TableSortLabel } from '@mui/material';
+import { StudentForm } from './forms/StudentForm';
+import { InstructorForm } from './forms/InstructorForm';
+import { SchoolForm } from './forms/SchoolForm';
 
 // Student interface with instructor and school
 interface Student {
@@ -52,32 +75,30 @@ interface FormData {
   phoneNumber: string;
   level: DanceLevel;
   photoURL: string;
+  role: UserRole;
   instructorId: string;
   schoolId: string;
+  // Optional fields for different user types
+  specialties?: string[];
+  experience?: number;
+  bio?: string;
+  availability?: {
+    days: string[];
+    hours: string[];
+  };
+  address?: string;
+  city?: string;
+  district?: string;
+  description?: string;
+  facilities?: string[];
+  contactPerson?: string;
+  website?: string;
 }
 
 // Form errors interface
 interface FormErrors {
   phoneNumber?: string;
   [key: string]: string | undefined;
-}
-
-// Define Firebase user type
-interface FirebaseUser {
-  id: string;
-  email: string;
-  displayName: string;
-  photoURL?: string;
-  phoneNumber: string;
-  role: UserRole | UserRole[];
-  level: DanceLevel;
-  instructorId?: string | null;
-  instructorName?: string | null;
-  schoolId?: string | null;
-  schoolName?: string | null;
-  danceStyles?: DanceStyle[];
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
 }
 
 // Instructor type
@@ -90,34 +111,65 @@ interface Instructor {
 // School type
 interface School {
   id: string;
-  name: string;
+  displayName: string;
   email: string;
 }
 
+// Add new interfaces for sorting and filtering
+interface SortConfig {
+  field: string;
+  direction: 'asc' | 'desc';
+}
+
+interface FilterConfig {
+  roles: string[];
+}
+
+// Type guard functions
+const isStudentFormData = (data: FormDataType): data is StudentFormData => {
+  return data.role === 'student';
+};
+
+const isInstructorFormData = (data: FormDataType): data is InstructorFormData => {
+  return data.role === 'instructor';
+};
+
+const isSchoolFormData = (data: FormDataType): data is SchoolFormData => {
+  return data.role === 'school';
+};
+
 export const UserManagement: React.FC = () => {
-  console.log('UserManagement component rendered');
   const { currentUser } = useAuth();
   const [students, setStudents] = useState<FirebaseUser[]>([]);
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [editMode, setEditMode] = useState<boolean>(false);
   const [selectedStudent, setSelectedStudent] = useState<FirebaseUser | null>(null);
+  const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
+  const [selectedInstructor, setSelectedInstructor] = useState<Instructor | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<FormDataType>({
     id: '',
     displayName: '',
     email: '',
     phoneNumber: '',
     level: 'beginner',
     photoURL: '',
+    role: 'student',
     instructorId: '',
     schoolId: '',
-  });
+    danceStyles: []
+  } as StudentFormData);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
+  const [page, setPage] = useState(0);
+  const [rowsPerPage] = useState(25);
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ field: '', direction: 'asc' });
+  const [filterConfig, setFilterConfig] = useState<FilterConfig>({ roles: [] });
+  const [selectedUserType, setSelectedUserType] = useState<'student' | 'instructor' | 'school' | null>(null);
 
   // Check if current user is super admin
   useEffect(() => {
@@ -141,8 +193,9 @@ export const UserManagement: React.FC = () => {
             roles = [roles];
           }
           
-          setIsSuperAdmin(roles.includes('admin'));
-          console.log('Is super admin:', roles.includes('admin'));
+          const isAdmin = roles.includes('admin');
+          console.log('Setting admin status to:', isAdmin);
+          setIsSuperAdmin(isAdmin);
         }
       } catch (err) {
         console.error('Süper admin kontrolü yapılırken hata oluştu:', err);
@@ -152,154 +205,133 @@ export const UserManagement: React.FC = () => {
     checkIfSuperAdmin();
   }, []);
 
-  // Fetch students, instructors and schools on initial load
+  // Separate effect for fetching users after admin status is determined
   useEffect(() => {
-    console.log('Initial data fetch effect triggered');
-    fetchStudents();
-    fetchInstructors();
-    fetchSchools();
-  }, []);
+    console.log('Admin status changed, fetching users...', { isSuperAdmin });
+    if (currentUser) {
+      fetchAllUsers();
+    }
+  }, [isSuperAdmin, currentUser]);
 
-  // Replace the useEffect with useMemo for filtering students
-  const filteredStudents = useMemo(() => {
-    console.log('Filtering students...');
-    if (!students.length) return [];
+  const fetchAllUsers = useCallback(async () => {
+    console.log('Fetching all users...');
+    console.log('Current user:', currentUser?.uid);
+    console.log('Is super admin:', isSuperAdmin);
     
-    const term = searchTerm.toLowerCase();
-    return searchTerm
-      ? students.filter(student => 
-          student.displayName?.toLowerCase().includes(term) || 
-          student.email?.toLowerCase().includes(term)
-        )
-      : students;
-  }, [searchTerm, students]);
-
-  // Fetch students from Firestore
-  const fetchStudents = async () => {
-    console.log('Fetching students...');
     setLoading(true);
     setError(null);
     
     try {
+      // Get all users from Firestore
       const usersRef = collection(db, 'users');
-      const q = query(
-        usersRef, 
-        orderBy('createdAt', 'desc')
-      );
+      let q;
+      
+      if (isSuperAdmin) {
+        // Admin sees all users except other admins
+        console.log('Fetching as admin - all users');
+        // Temporarily simplify the query to just orderBy
+        q = query(
+          usersRef,
+          orderBy('createdAt', 'desc')
+        );
+      } else {
+        // Instructors only see their students
+        console.log('Fetching as instructor - only assigned students');
+        q = query(
+          usersRef, 
+          where('instructorId', '==', currentUser?.uid),
+          orderBy('createdAt', 'desc')
+        );
+      }
+      
       const querySnapshot = await getDocs(q);
-      console.log('Total students found:', querySnapshot.size);
+      console.log('Query snapshot size:', querySnapshot.size);
       
-      const studentsData: FirebaseUser[] = [];
-      querySnapshot.forEach((doc) => {
-        studentsData.push({
-          id: doc.id,
-          ...doc.data()
-        } as FirebaseUser);
-      });
-      
-      console.log('Processed students data:', studentsData);
-      setStudents(studentsData);
-    } catch (err) {
-      console.error('Kullanıcılar yüklenirken hata oluştu:', err);
-      setError('Kullanıcılar yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch instructors from Firestore
-  const fetchInstructors = async () => {
-    try {
-      console.log('Fetching instructors...');
-      const usersRef = collection(db, 'users');
-      const querySnapshot = await getDocs(usersRef);
-      
-      console.log('Total users found:', querySnapshot.size);
-      
+      const usersData: FirebaseUser[] = [];
       const instructorsData: Instructor[] = [];
+      const schoolsData: School[] = [];
+      
       querySnapshot.forEach((doc) => {
-        const data = doc.data();
+        const data = { ...doc.data(), id: doc.id } as FirebaseUser;
+        console.log('Processing user:', data.email, 'with roles:', data.role);
         
-        // Check if user has instructor role (either as single role or in array)
-        const roles = Array.isArray(data.role) ? data.role : [data.role];
-        if (roles.includes('instructor')) {
-          console.log('Found instructor:', {
-            id: doc.id,
-            displayName: data.displayName,
-            email: data.email
-          });
+        // Convert role to array if it's a string
+        if (!Array.isArray(data.role)) {
+          data.role = [data.role];
+        }
 
+        // For admin, filter out admin users in memory
+        if (isSuperAdmin && data.role.includes('admin')) {
+          console.log('Skipping admin user:', data.email);
+          return;
+        }
+        
+        // Add to users list
+        usersData.push(data);
+        
+        // Add to specific role lists
+        if (data.role.includes('instructor')) {
           instructorsData.push({
             id: doc.id,
             displayName: data.displayName || 'İsimsiz Eğitmen',
             email: data.email || ''
           });
         }
+        
+        if (data.role.includes('school')) {
+          schoolsData.push({
+            id: doc.id,
+            displayName: data.displayName || 'İsimsiz Okul',
+            email: data.email || ''
+          });
+        }
       });
       
-      console.log('Total instructors processed:', instructorsData.length);
-      console.log('Instructors list:', instructorsData);
+      console.log('Setting state with:', {
+        users: usersData.length,
+        instructors: instructorsData.length,
+        schools: schoolsData.length
+      });
+      
+      setStudents(usersData);
       setInstructors(instructorsData);
-    } catch (err) {
-      console.error('Eğitmenler yüklenirken hata oluştu:', err);
-      setError('Eğitmenler yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
-    }
-  };
-
-  // Fetch schools from Firestore
-  const fetchSchools = async () => {
-    try {
-      console.log('=== SCHOOLS FETCH START ===');
-      const schoolsRef = collection(db, 'schools');
-      const q = query(schoolsRef, orderBy('name'));
-      const querySnapshot = await getDocs(q);
-      
-      console.log('Total schools found:', querySnapshot.size);
-      
-      const schoolsData: School[] = [];
-      console.log('=== RAW SCHOOLS DATA ===');
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        console.log(`School Document [${doc.id}]:`, {
-          rawData: data,
-          fields: {
-            name: data.name,
-            ad: data.ad,
-            email: data.email,
-            contactEmail: data.contactEmail
-          }
-        });
-        
-        // Hem 'name' hem de 'ad' alanlarını kontrol et
-        const schoolName = data.name || data.ad || 'İsimsiz Okul';
-        
-        const schoolEntry = {
-          id: doc.id,
-          name: schoolName,
-          email: data.email || data.contactEmail || ''
-        };
-        
-        console.log('Processed school entry:', schoolEntry);
-        schoolsData.push(schoolEntry);
-      });
-      
-      // Okul adına göre alfabetik sırala
-      schoolsData.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
-      
-      console.log('=== FINAL SCHOOLS LIST ===');
-      console.log('Processed and sorted schools:', schoolsData);
-      console.log('=== SCHOOLS FETCH END ===');
-      
       setSchools(schoolsData);
+      
+      // Show index creation message if admin
+      if (isSuperAdmin) {
+        console.log('For better performance, please create the following index:');
+        console.log('Collection: users');
+        console.log('Fields: role (Ascending), createdAt (Descending)');
+        console.log('You can create it here: https://console.firebase.google.com/project/danceplatform-7924a/firestore/indexes');
+      }
+      
     } catch (err) {
-      console.error('=== SCHOOLS FETCH ERROR ===', {
-        error: err,
-        message: err instanceof Error ? err.message : 'Bilinmeyen hata',
-        stack: err instanceof Error ? err.stack : undefined
-      });
-      setError('Okullar yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
+      console.error('Kullanıcılar yüklenirken hata oluştu:', err);
+      if (err instanceof Error && err.message.includes('requires an index')) {
+        setError(
+          'Veritabanı indeksi oluşturulana kadar veriler sıralı olmadan gösterilecektir. ' +
+          'Lütfen sistem yöneticinize başvurun.'
+        );
+      } else {
+        setError(`Kullanıcılar yüklenirken bir hata oluştu: ${err instanceof Error ? err.message : 'Bilinmeyen hata'}. Lütfen sayfayı yenileyin.`);
+      }
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [currentUser?.uid, isSuperAdmin]);
+
+  // Filter students based on search term
+  const filteredStudents = useMemo(() => {
+    if (!students.length) return [];
+    
+    if (!searchTerm) return students;
+    
+    const term = searchTerm.toLowerCase();
+    return students.filter(student => 
+      student.displayName.toLowerCase().includes(term) || 
+      student.email.toLowerCase().includes(term)
+    );
+  }, [searchTerm, students]);
 
   // CustomSelect için handleSelectChange fonksiyonu
   const handleSelectChange = (fieldName: keyof FormData) => (selectedValue: string | string[]) => {
@@ -311,20 +343,33 @@ export const UserManagement: React.FC = () => {
     }
   };
 
-  // Handle input change
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>): void => {
-    const { name, value, type } = e.target;
-    
-    if (type === 'checkbox') {
-      const checkbox = e.target as HTMLInputElement;
+  // Update handleInputChange function
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { name: string; value: string; type?: string; checked?: boolean } } | string,
+    fieldName?: string
+  ): void => {
+    if (typeof e === 'string' && fieldName) {
+      // Handle direct value changes (from CustomSelect)
       setFormData(prev => ({
         ...prev,
-        [name]: checkbox.checked
+        [fieldName]: e
       }));
-    } else {
+    } else if (typeof e === 'object' && 'target' in e) {
+      // Handle event-based changes
+      const target = e.target as { name: string; value: string; type?: string; checked?: boolean };
       setFormData(prev => ({
         ...prev,
-        [name]: value
+        [target.name]: target.type === 'checkbox' ? !!target.checked : target.value
+      }));
+    }
+  };
+
+  // Handle photo change
+  const handlePhotoChange = (base64Image: string | null) => {
+    if (base64Image) {
+      setFormData(prev => ({
+        ...prev,
+        photoURL: base64Image
       }));
     }
   };
@@ -353,61 +398,120 @@ export const UserManagement: React.FC = () => {
       phoneNumber: '',
       level: 'beginner',
       photoURL: '',
+      role: 'student',
       instructorId: '',
       schoolId: '',
-    });
+      danceStyles: []
+    } as StudentFormData);
     setFormErrors({});
   };
 
   // Edit student
   const editStudent = (student: FirebaseUser): void => {
     setSelectedStudent(student);
-    setFormData({
+    
+    // Determine user type and set form data accordingly
+    const userType = Array.isArray(student.role) ? student.role[0] : student.role;
+    setSelectedUserType(userType as 'student' | 'instructor' | 'school');
+    
+    const baseFormData = {
       id: student.id,
       displayName: student.displayName,
       email: student.email,
       phoneNumber: student.phoneNumber || '',
-      level: student.level || 'beginner',
       photoURL: student.photoURL || '',
-      instructorId: student.instructorId || '',
-      schoolId: student.schoolId || '',
-    });
+      role: userType,
+    };
+
+    switch (userType) {
+      case 'student':
+        setFormData({
+          ...baseFormData,
+          level: student.level || 'beginner',
+          instructorId: student.instructorId || '',
+          schoolId: student.schoolId || '',
+          danceStyles: student.danceStyles || []
+        } as StudentFormData);
+        break;
+      case 'instructor':
+        setFormData({
+          ...baseFormData,
+          level: student.level || 'professional',
+          specialties: student.specialties || [],
+          experience: student.experience || 0,
+          bio: student.bio || '',
+          schoolId: student.schoolId || '',
+          availability: student.availability || { days: [], hours: [] }
+        } as InstructorFormData);
+        break;
+      case 'school':
+        setFormData({
+          ...baseFormData,
+          address: student.address || '',
+          city: student.city || '',
+          district: student.district || '',
+          description: student.description || '',
+          facilities: student.facilities || [],
+          contactPerson: student.contactPerson || '',
+          website: student.website || ''
+        } as SchoolFormData);
+        break;
+    }
+
     setFormErrors({});
     setEditMode(true);
   };
 
   // Add new student
-  const addNewStudent = (): void => {
+  const handleAddNewUser = (type: 'student' | 'instructor' | 'school') => {
+    setSelectedUserType(type);
     setSelectedStudent(null);
-    resetForm();
+    setFormData({
+      id: '',
+      displayName: '',
+      email: '',
+      phoneNumber: '',
+      photoURL: generateInitialsAvatar('?', type),
+      role: type,
+      level: type === 'instructor' ? 'professional' : 'beginner',
+      instructorId: '',
+      schoolId: '',
+      // Add type-specific default values
+      ...(type === 'instructor' && {
+        specialties: [],
+        experience: 0,
+        bio: '',
+        availability: {
+          days: [],
+          hours: []
+        }
+      }),
+      ...(type === 'school' && {
+        address: '',
+        city: '',
+        district: '',
+        description: '',
+        facilities: [],
+        contactPerson: '',
+        website: ''
+      })
+    } as unknown as FormDataType);
+    setFormErrors({});
     setEditMode(true);
   };
 
-  // Davetiye e-postası gönderme fonksiyonu
-  const sendInvitationEmail = async (email: string, invitationData: {
-    displayName: string;
-    schoolId?: string;
-    schoolName?: string;
-    instructorId?: string;
-    instructorName?: string;
-    level: DanceLevel;
-  }) => {
+  // Update the sendInvitationEmail function
+  const sendInvitationEmail = async (email: string, invitationData: InvitationData) => {
     try {
-      // Benzersiz bir davet kodu oluştur
       const invitationId = `inv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // Davet bilgilerini Firestore'a kaydet
-      await setDoc(doc(db, 'pendingUsers', invitationId), {
-        email,
+      // Create the data to be stored in Firestore
+      const invitationDataWithEmail = {
         ...invitationData,
-        status: 'pending',
-        createdAt: serverTimestamp(),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 gün geçerli
-      });
+        targetEmail: email // Store email with a different field name
+      };
 
-      // E-posta gönderme fonksiyonu burada implement edilecek
-      // Firebase Cloud Functions kullanılabilir
-      
+      await setDoc(doc(db, 'pendingUsers', invitationId), invitationDataWithEmail);
       return true;
     } catch (error) {
       console.error('Davet gönderilirken hata oluştu:', error);
@@ -415,12 +519,85 @@ export const UserManagement: React.FC = () => {
     }
   };
 
-  // Form submission
+  // Update the createInvitationData function
+  const createInvitationData = (formData: FormDataType): InvitationData => {
+    const baseData: InvitationData = {
+      displayName: formData.displayName,
+      roles: [formData.role]
+    };
+
+    if (isStudentForm(formData)) {
+      // For student form, we can safely access instructorId
+      const invitationData: InvitationData = {
+        ...baseData,
+        level: formData.level,
+        schoolId: formData.schoolId,
+        instructorId: formData.instructorId
+      };
+
+      // Only add schoolName and instructorName if they exist
+      if (selectedSchool) {
+        invitationData.schoolName = selectedSchool.displayName;
+      }
+      if (selectedInstructor) {
+        invitationData.instructorName = selectedInstructor.displayName;
+      }
+
+      return invitationData;
+    } else if (isInstructorForm(formData)) {
+      // For instructor form, we only include school-related fields
+      const invitationData: InvitationData = {
+        ...baseData,
+        level: formData.level,
+        schoolId: formData.schoolId
+      };
+
+      // Only add schoolName if it exists
+      if (selectedSchool) {
+        invitationData.schoolName = selectedSchool.displayName;
+      }
+
+      return invitationData;
+    }
+
+    return baseData;
+  };
+
+  // Update the school data creation
+  const createSchoolData = (formData: FormDataType) => {
+    if (!isSchoolForm(formData)) {
+      throw new Error('Invalid form data type for school');
+    }
+
+    return {
+      email: formData.email,
+      displayName: formData.displayName,
+      photoURL: formData.photoURL || generateInitialsAvatar(formData.displayName, 'school'),
+      phoneNumber: formData.phoneNumber || '',
+      role: ['school'] as UserRole[],
+      address: formData.address,
+      city: formData.city,
+      district: formData.district,
+      description: formData.description,
+      facilities: formData.facilities,
+      contactPerson: formData.contactPerson,
+      website: formData.website,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+  };
+
+  // Update the handleSubmit function
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     
     if (Object.keys(formErrors).length > 0) {
       setError('Lütfen form hatalarını düzeltin.');
+      return;
+    }
+
+    if (!formData.role) {
+      setError('Kullanıcı rolü seçilmemiş.');
       return;
     }
     
@@ -430,57 +607,148 @@ export const UserManagement: React.FC = () => {
     
     try {
       if (selectedStudent) {
-        // Mevcut öğrenci güncelleme kodu aynı kalacak
-        const userRef = doc(db, 'users', selectedStudent.id);
+        const batch = writeBatch(db);
         
-        let instructorName = '';
-        if (formData.instructorId) {
-          const selectedInstructor = instructors.find(i => i.id === formData.instructorId);
-          instructorName = selectedInstructor?.displayName || '';
-        }
-        
-        let schoolName = '';
-        if (formData.schoolId) {
-          const selectedSchool = schools.find(s => s.id === formData.schoolId);
-          schoolName = selectedSchool?.name || '';
-        }
-        
-        await updateDoc(userRef, {
+        // Common fields to update
+        const commonFields = {
           displayName: formData.displayName,
+          email: formData.email,
           phoneNumber: formData.phoneNumber,
-          level: formData.level,
-          instructorId: formData.instructorId || null,
-          instructorName: instructorName || null,
-          schoolId: formData.schoolId || null,
-          schoolName: schoolName || null,
+          photoURL: formData.photoURL,
           updatedAt: serverTimestamp()
-        });
-        
-        const updatedStudents = students.map(student => 
-          student.id === selectedStudent.id 
-            ? { 
-                ...student, 
-                displayName: formData.displayName,
-                phoneNumber: formData.phoneNumber,
-                level: formData.level,
-                instructorId: formData.instructorId || null,
-                instructorName: instructorName || null,
-                schoolId: formData.schoolId || null,
-                schoolName: schoolName || null,
-                updatedAt: serverTimestamp() as Timestamp 
-              } 
-            : student
+        };
+
+        // Update in users collection
+        const userRef = doc(db, 'users', selectedStudent.id);
+        batch.update(userRef, commonFields);
+
+        // Update in role-specific collection
+        switch (formData.role) {
+          case 'student': {
+            const studentData = formData as StudentFormData;
+            const updateData = {
+              ...commonFields,
+              level: studentData.level,
+              instructorId: studentData.instructorId || null,
+              instructorName: instructors.find(i => i.id === studentData.instructorId)?.displayName || null,
+              schoolId: studentData.schoolId || null,
+              schoolName: schools.find(s => s.id === studentData.schoolId)?.displayName || null,
+              danceStyles: studentData.danceStyles || []
+            };
+            batch.update(userRef, updateData);
+            break;
+          }
+          case 'instructor': {
+            const instructorData = formData as InstructorFormData;
+            
+            // First update the user document
+            const userUpdateData = {
+              ...commonFields,
+              level: instructorData.level,
+              specialties: instructorData.specialties || [],
+              experience: instructorData.experience,
+              bio: instructorData.bio || '',
+              schoolId: instructorData.schoolId || null,
+              schoolName: schools.find(s => s.id === instructorData.schoolId)?.displayName || null,
+              availability: instructorData.availability || { days: [], hours: [] }
+            };
+            
+            batch.update(userRef, userUpdateData);
+            
+            try {
+              // Query for instructor document using userId
+              const instructorsRef = collection(db, 'instructors');
+              const q = query(instructorsRef, where('userId', '==', selectedStudent.id));
+              const querySnapshot = await getDocs(q);
+              
+              if (querySnapshot.empty) {
+                // If no instructor document exists, create one
+                const newInstructorRef = doc(collection(db, 'instructors'));
+                batch.set(newInstructorRef, {
+                  ...userUpdateData,
+                  userId: selectedStudent.id,
+                  createdAt: serverTimestamp(),
+                });
+              } else {
+                // Update existing instructor document
+                const instructorRef = doc(db, 'instructors', querySnapshot.docs[0].id);
+                batch.update(instructorRef, userUpdateData);
+              }
+            } catch (err) {
+              console.error('Eğitmen belgesi güncellenirken hata:', err);
+              throw new Error('Eğitmen bilgileri güncellenirken hata oluştu. Lütfen tekrar deneyin.');
+            }
+            
+            break;
+          }
+          case 'school': {
+            const schoolData = formData as SchoolFormData;
+            const schoolRef = doc(db, 'schools', selectedStudent.id);
+            const updateData = {
+              ...commonFields,
+              address: schoolData.address,
+              city: schoolData.city,
+              district: schoolData.district,
+              description: schoolData.description,
+              facilities: schoolData.facilities,
+              contactPerson: schoolData.contactPerson,
+              website: schoolData.website
+            };
+            batch.update(userRef, updateData);
+            batch.update(schoolRef, updateData);
+            break;
+          }
+        }
+
+        await batch.commit();
+
+        // Update local state
+        setStudents(prevStudents =>
+          prevStudents.map(student =>
+            student.id === selectedStudent.id
+              ? {
+                  ...student,
+                  ...commonFields,
+                  ...(formData.role === 'student' && {
+                    level: (formData as StudentFormData).level,
+                    danceStyles: (formData as StudentFormData).danceStyles,
+                    instructorId: (formData as StudentFormData).instructorId,
+                    schoolId: (formData as StudentFormData).schoolId
+                  }),
+                  ...(formData.role === 'instructor' && {
+                    level: (formData as InstructorFormData).level,
+                    specialties: (formData as InstructorFormData).specialties,
+                    experience: (formData as InstructorFormData).experience,
+                    bio: (formData as InstructorFormData).bio,
+                    availability: (formData as InstructorFormData).availability,
+                    schoolId: (formData as InstructorFormData).schoolId
+                  }),
+                  ...(formData.role === 'school' && {
+                    address: (formData as SchoolFormData).address,
+                    city: (formData as SchoolFormData).city,
+                    district: (formData as SchoolFormData).district,
+                    description: (formData as SchoolFormData).description,
+                    facilities: (formData as SchoolFormData).facilities,
+                    contactPerson: (formData as SchoolFormData).contactPerson,
+                    website: (formData as SchoolFormData).website
+                  })
+                } as FirebaseUser
+              : student
+          )
         );
-        
-        setStudents(updatedStudents);
-        setSuccess('Öğrenci bilgileri başarıyla güncellendi.');
+
+        setSuccess('Kullanıcı bilgileri başarıyla güncellendi.');
+        setEditMode(false);
+        setSelectedStudent(null);
+        setSelectedUserType(null);
+        resetForm();
       } else {
-        // Yeni öğrenci ekleme - artık hesap oluşturmak yerine davet gönderilecek
+        // Validate required fields
         if (!formData.email || !formData.displayName) {
           throw new Error('E-posta ve ad soyad alanları zorunludur.');
         }
         
-        // E-posta kontrolü
+        // Check if email is already in use
         const emailQuery = query(
           collection(db, 'users'), 
           where('email', '==', formData.email)
@@ -490,39 +758,90 @@ export const UserManagement: React.FC = () => {
         if (!emailCheckSnapshot.empty) {
           throw new Error('Bu e-posta adresi zaten kullanılıyor.');
         }
-        
-        // Seçilen eğitmen ve okul bilgilerini al
-        let instructorName = '';
-        if (formData.instructorId) {
-          const selectedInstructor = instructors.find(i => i.id === formData.instructorId);
-          instructorName = selectedInstructor?.displayName || '';
-        }
-        
-        let schoolName = '';
-        if (formData.schoolId) {
-          const selectedSchool = schools.find(s => s.id === formData.schoolId);
-          schoolName = selectedSchool?.name || '';
-        }
 
-        // Davet gönder
-        await sendInvitationEmail(formData.email, {
-          displayName: formData.displayName,
-          schoolId: formData.schoolId || undefined,
-          schoolName: schoolName || undefined,
-          instructorId: formData.instructorId || undefined,
-          instructorName: instructorName || undefined,
-          level: formData.level
-        });
-        
-        setSuccess('Davet e-postası başarıyla gönderildi.');
+        if (isSchoolForm(formData)) {
+          const schoolData = createSchoolData(formData);
+          // Batch write için
+          const batch = writeBatch(db);
+
+          // Users koleksiyonuna ekle
+          const newSchoolRef = doc(collection(db, 'users'));
+          batch.set(newSchoolRef, schoolData);
+
+          // Schools koleksiyonuna ekle
+          const schoolsRef = doc(collection(db, 'schools'), newSchoolRef.id);
+          batch.set(schoolsRef, {
+            ...schoolData,
+            userId: newSchoolRef.id, // users koleksiyonundaki ID'yi referans olarak saklıyoruz
+          });
+
+          // Batch işlemini gerçekleştir
+          await batch.commit();
+
+          // State'i güncelle
+          const newSchool: FirebaseUser = {
+            id: newSchoolRef.id,
+            ...schoolData,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now()
+          };
+
+          setSchools(prev => [...prev, {
+            id: newSchoolRef.id,
+            displayName: formData.displayName,
+            email: formData.email
+          }]);
+
+          setStudents(prev => [...prev, newSchool]);
+          
+          setSuccess('Dans okulu başarıyla eklendi.');
+        } else {
+          const invitationData = createInvitationData(formData);
+          await sendInvitationEmail(formData.email, invitationData);
+          
+          // Create new user object based on form data type
+          const newUser: FirebaseUser = {
+            id: `pending_${Date.now()}`,
+            email: formData.email,
+            displayName: formData.displayName,
+            photoURL: formData.photoURL,
+            phoneNumber: formData.phoneNumber,
+            role: [formData.role],
+            ...(isStudentForm(formData) && {
+              level: formData.level,
+              instructorId: formData.instructorId,
+              schoolId: formData.schoolId,
+              ...(selectedSchool && { schoolName: selectedSchool.displayName }),
+              ...(selectedInstructor && { instructorName: selectedInstructor.displayName })
+            }),
+            ...(isInstructorForm(formData) && {
+              level: formData.level,
+              schoolId: formData.schoolId,
+              specialties: formData.specialties,
+              experience: formData.experience,
+              bio: formData.bio,
+              availability: formData.availability,
+              ...(selectedSchool && { schoolName: selectedSchool.displayName })
+            }),
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now()
+          };
+
+          setStudents(prev => [...prev, newUser]);
+          setSuccess('Davet e-postası başarıyla gönderildi.');
+        }
       }
       
       setEditMode(false);
       setSelectedStudent(null);
+      setSelectedUserType(null);
       
-    } catch (err: any) {
+      // Formu sıfırla
+      resetForm();
+      
+    } catch (err) {
       console.error('İşlem sırasında hata oluştu:', err);
-      setError('İşlem sırasında bir hata oluştu: ' + (err.message || 'Bilinmeyen hata'));
+      setError('İşlem sırasında bir hata oluştu: ' + (err instanceof Error ? err.message : 'Bilinmeyen hata'));
     } finally {
       setLoading(false);
     }
@@ -593,6 +912,23 @@ export const UserManagement: React.FC = () => {
     );
   };
 
+  // Get avatar type based on user role
+  const getAvatarType = (role: UserRole | UserRole[]): "student" | "instructor" | "school" => {
+    const roleToCheck = Array.isArray(role) ? role[0] : role;
+    
+    switch (roleToCheck) {
+      case 'instructor':
+        return 'instructor';
+      case 'school':
+      case 'school_admin':
+        return 'school';
+      case 'admin':
+      case 'student':
+      default:
+        return 'student';
+    }
+  };
+
   // Render student row
   const renderStudent = (student: FirebaseUser) => {
     return (
@@ -605,15 +941,26 @@ export const UserManagement: React.FC = () => {
       >
         <td className="px-6 py-4 whitespace-nowrap">
           <div className="flex items-center">
-            <div className="flex-shrink-0 h-10 w-10">
-              <img
-                className="h-10 w-10 rounded-full object-cover"
-                src={student.photoURL || '/assets/default-avatar.svg'}
-                alt={student.displayName}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = "/assets/default-avatar.svg";
-                }}
-              />
+            <div className="flex-shrink-0 h-10 w-10 relative bg-green-100 rounded-full overflow-hidden">
+              {student.photoURL ? (
+                <img 
+                  className="h-10 w-10 rounded-full object-cover absolute inset-0" 
+                  src={student.photoURL}
+                  alt={student.displayName}
+                  onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                    const target = e.currentTarget;
+                    target.onerror = null;
+                    // Hata durumunda baş harf avatarını göster
+                    target.src = generateInitialsAvatar(student.displayName, getAvatarType(student.role));
+                  }}
+                />
+              ) : (
+                <img 
+                  className="h-10 w-10 rounded-full object-cover" 
+                  src={generateInitialsAvatar(student.displayName, getAvatarType(student.role))}
+                  alt={student.displayName}
+                />
+              )}
             </div>
             <div className="ml-4">
               <div className="text-sm font-medium text-gray-900">{student.displayName}</div>
@@ -666,6 +1013,169 @@ export const UserManagement: React.FC = () => {
     );
   };
 
+  // Get unique roles from all users
+  const availableRoles = useMemo(() => {
+    const roleSet = new Set<string>();
+    students.forEach(student => {
+      const roles = Array.isArray(student.role) ? student.role : [student.role];
+      roles.forEach(role => {
+        if (role !== 'admin') {
+          roleSet.add(role);
+        }
+      });
+    });
+    return Array.from(roleSet);
+  }, [students]);
+
+  // Handle sort change
+  const handleSort = (field: string) => {
+    setSortConfig(prev => ({
+      field,
+      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  // Handle role filter change
+  const handleRoleFilter = (role: string) => {
+    setFilterConfig(prev => ({
+      ...prev,
+      roles: prev.roles.includes(role)
+        ? prev.roles.filter(r => r !== role)
+        : [...prev.roles, role]
+    }));
+    setPage(0); // Reset to first page when filter changes
+  };
+
+  // Filter and sort students
+  const filteredAndSortedStudents = useMemo(() => {
+    let result = [...students];
+
+    // Apply search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(student =>
+        student.displayName.toLowerCase().includes(term) ||
+        student.email.toLowerCase().includes(term)
+      );
+    }
+
+    // Apply role filter
+    if (filterConfig.roles.length > 0) {
+      result = result.filter(student => {
+        const studentRoles = Array.isArray(student.role) ? student.role : [student.role];
+        return studentRoles.some(role => filterConfig.roles.includes(role));
+      });
+    }
+
+    // Apply sorting
+    if (sortConfig.field) {
+      result.sort((a: any, b: any) => {
+        let aValue = a[sortConfig.field];
+        let bValue = b[sortConfig.field];
+
+        // Special handling for roles array
+        if (sortConfig.field === 'role') {
+          aValue = Array.isArray(aValue) ? aValue.join(', ') : aValue;
+          bValue = Array.isArray(bValue) ? bValue.join(', ') : bValue;
+        }
+
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [students, searchTerm, sortConfig, filterConfig]);
+
+  // Get current page data
+  const paginatedStudents = useMemo(() => {
+    const startIndex = page * rowsPerPage;
+    return filteredAndSortedStudents.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredAndSortedStudents, page, rowsPerPage]);
+
+  // Handle page change
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  // Add available roles for selection (excluding admin)
+  const availableRolesForSelect = [
+    { value: 'student', label: 'Öğrenci' },
+    { value: 'instructor', label: 'Eğitmen' },
+    { value: 'school', label: 'Dans Okulu' }
+  ];
+
+  // Render form based on user type
+  const renderForm = () => {
+    if (!editMode) return null;
+
+    const commonProps = {
+      formErrors,
+      isEdit: !!selectedStudent,
+      onInputChange: handleInputChange,
+      onPhotoChange: handlePhotoChange
+    };
+
+    switch (selectedUserType) {
+      case 'student':
+        return (
+          <StudentForm
+            formData={formData as StudentFormData}
+            instructors={instructors}
+            schools={schools}
+            {...commonProps}
+          />
+        );
+      case 'instructor':
+        return (
+          <InstructorForm
+            formData={formData as InstructorFormData}
+            schools={schools}
+            {...commonProps}
+          />
+        );
+      case 'school':
+        return (
+          <SchoolForm
+            formData={formData as SchoolFormData}
+            {...commonProps}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
+  // Add handlers for school and instructor selection
+  const handleSchoolChange = useCallback((schoolId: string) => {
+    const school = schools.find((s: School) => s.id === schoolId);
+    setSelectedSchool(school || null);
+
+    // Update form data based on the current form type
+    setFormData((prev: FormDataType) => {
+      if (isStudentForm(prev) || isInstructorForm(prev)) {
+        const update: FormDataUpdate<typeof prev> = { schoolId };
+        return { ...prev, ...update };
+      }
+      return prev;
+    });
+  }, [schools]);
+
+  const handleInstructorChange = useCallback((instructorId: string) => {
+    const instructor = instructors.find((i: Instructor) => i.id === instructorId);
+    setSelectedInstructor(instructor || null);
+
+    // Update form data based on the current form type
+    setFormData((prev: FormDataType) => {
+      if (isStudentForm(prev)) {
+        const update: FormDataUpdate<typeof prev> = { instructorId };
+        return { ...prev, ...update };
+      }
+      return prev;
+    });
+  }, [instructors]);
+
   if (loading && students.length === 0) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -693,136 +1203,72 @@ export const UserManagement: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Kullanıcı Yönetimi</h2>
         {!editMode && (
-          <button 
-            onClick={addNewStudent}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-            disabled={loading}
-          >
-            {loading ? 'Yükleniyor...' : 'Yeni Kullanıcı Ekle'}
-          </button>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => handleAddNewUser('student')}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+              disabled={loading}
+            >
+              {loading ? 'Yükleniyor...' : 'Yeni Öğrenci'}
+            </button>
+            <button 
+              onClick={() => handleAddNewUser('instructor')}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              disabled={loading}
+            >
+              {loading ? 'Yükleniyor...' : 'Yeni Eğitmen'}
+            </button>
+            <button 
+              onClick={() => handleAddNewUser('school')}
+              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+              disabled={loading}
+            >
+              {loading ? 'Yükleniyor...' : 'Yeni Dans Okulu'}
+            </button>
+          </div>
         )}
       </div>
       
       {editMode ? (
         <div className="bg-gray-50 p-6 rounded-lg relative">
           <h3 className="text-lg font-semibold mb-4">
-            {selectedStudent ? 'Kullanıcı Düzenle' : 'Yeni Kullanıcı Ekle'}
+            {selectedStudent ? 'Kullanıcı Düzenle' : `Yeni ${
+              selectedUserType === 'student' ? 'Öğrenci' :
+              selectedUserType === 'instructor' ? 'Eğitmen' :
+              'Dans Okulu'
+            } Ekle`}
           </h3>
           
           <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-1">
-                  Ad Soyad*
-                </label>
-                <input
-                  type="text"
-                  id="displayName"
-                  name="displayName"
-                  required
-                  value={formData.displayName}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                  E-posta*
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  required
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                  disabled={!!selectedStudent} // Cannot change email for existing students
-                />
-                {selectedStudent && (
-                  <p className="text-xs text-gray-500 mt-1">Mevcut öğrencilerin e-posta adresleri değiştirilemez.</p>
-                )}
-              </div>
-              
-              <div>
-                <CustomSelect
-                  label="Okul"
-                  value={formData.schoolId}
-                  onChange={handleSelectChange('schoolId')}
-                  options={schools.map(school => ({
-                    value: school.id,
-                    label: school.name
-                  }))}
-                  placeholder="Okul Seç..."
-                />
-              </div>
-              
-              <div>
-                <CustomSelect
-                  label="Eğitmen"
-                  value={formData.instructorId}
-                  onChange={handleSelectChange('instructorId')}
-                  options={instructors.map(instructor => ({
-                    value: instructor.id,
-                    label: instructor.displayName
-                  }))}
-                  placeholder="Eğitmen Seç..."
-                />
-              </div>
-              
-              <div>
-                <CustomSelect
-                  label="Dans Seviyesi"
-                  value={formData.level}
-                  onChange={handleSelectChange('level')}
-                  options={[
-                    { value: 'beginner', label: 'Başlangıç' },
-                    { value: 'intermediate', label: 'Orta' },
-                    { value: 'advanced', label: 'İleri' },
-                    { value: 'professional', label: 'Profesyonel' }
-                  ]}
-                  placeholder="Seviye Seçin"
-                />
-              </div>
-              
-              <div>
-                <CustomPhoneInput
-                  id="phoneNumber"
-                  name="phoneNumber"
-                  value={formData.phoneNumber}
-                  onChange={handleInputChange}
-                  onValidation={handlePhoneValidation}
-                  error={formErrors.phoneNumber}
-                  label="Telefon"
-                  required
-                />
-              </div>
-            </div>
+            {renderForm()}
             
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setEditMode(false)}
-                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
+            <div className="flex justify-end space-x-3 mt-4">
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={() => {
+                  setEditMode(false);
+                  setSelectedUserType(null);
+                }}
                 disabled={loading}
               >
                 İptal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+                variant="contained"
+                color="primary"
                 disabled={loading}
               >
                 {loading ? 'Kaydediliyor...' : (selectedStudent ? 'Güncelle' : 'Ekle')}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
       ) : (
         <>
-          <div className="mb-4 flex flex-col md:flex-row md:items-center gap-4">
-            <div className="md:flex-1">
+          <div className="mb-4 flex flex-wrap gap-4 items-center">
+            <div className="flex-1">
               <input
                 type="text"
                 placeholder="Ad veya e-posta ile ara..."
@@ -830,6 +1276,21 @@ export const UserManagement: React.FC = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full p-2 border border-gray-300 rounded-md"
               />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {availableRoles.map(role => (
+                <button
+                  key={role}
+                  onClick={() => handleRoleFilter(role)}
+                  className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    filterConfig.roles.includes(role)
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  {role}
+                </button>
+              ))}
             </div>
           </div>
           
@@ -844,22 +1305,58 @@ export const UserManagement: React.FC = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Kullanıcı
+                    <TableSortLabel
+                      active={sortConfig.field === 'displayName'}
+                      direction={sortConfig.field === 'displayName' ? sortConfig.direction : 'asc'}
+                      onClick={() => handleSort('displayName')}
+                    >
+                      Kullanıcı
+                    </TableSortLabel>
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    E-posta
+                    <TableSortLabel
+                      active={sortConfig.field === 'email'}
+                      direction={sortConfig.field === 'email' ? sortConfig.direction : 'asc'}
+                      onClick={() => handleSort('email')}
+                    >
+                      E-posta
+                    </TableSortLabel>
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Roller
+                    <TableSortLabel
+                      active={sortConfig.field === 'role'}
+                      direction={sortConfig.field === 'role' ? sortConfig.direction : 'asc'}
+                      onClick={() => handleSort('role')}
+                    >
+                      Roller
+                    </TableSortLabel>
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Dans Seviyesi
+                    <TableSortLabel
+                      active={sortConfig.field === 'level'}
+                      direction={sortConfig.field === 'level' ? sortConfig.direction : 'asc'}
+                      onClick={() => handleSort('level')}
+                    >
+                      Dans Seviyesi
+                    </TableSortLabel>
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Eğitmen
+                    <TableSortLabel
+                      active={sortConfig.field === 'instructorName'}
+                      direction={sortConfig.field === 'instructorName' ? sortConfig.direction : 'asc'}
+                      onClick={() => handleSort('instructorName')}
+                    >
+                      Eğitmen
+                    </TableSortLabel>
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Okul
+                    <TableSortLabel
+                      active={sortConfig.field === 'schoolName'}
+                      direction={sortConfig.field === 'schoolName' ? sortConfig.direction : 'asc'}
+                      onClick={() => handleSort('schoolName')}
+                    >
+                      Okul
+                    </TableSortLabel>
                   </th>
                   <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     İşlemler
@@ -867,17 +1364,34 @@ export const UserManagement: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredStudents.length > 0 ? (
-                  filteredStudents.map((student) => renderStudent(student))
+                {paginatedStudents.length > 0 ? (
+                  paginatedStudents.map((student) => renderStudent(student))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
-                      {searchTerm ? 'Aramanıza uygun öğrenci bulunamadı.' : 'Henüz hiç öğrenci kaydı bulunmuyor.'}
+                    <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">
+                      {searchTerm || filterConfig.roles.length > 0
+                        ? 'Aramanıza veya seçtiğiniz filtrelere uygun kullanıcı bulunamadı.'
+                        : 'Henüz hiç kullanıcı kaydı bulunmuyor.'}
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div className="mt-4">
+            <TablePagination
+              component="div"
+              count={filteredAndSortedStudents.length}
+              page={page}
+              onPageChange={handleChangePage}
+              rowsPerPage={rowsPerPage}
+              rowsPerPageOptions={[25]}
+              labelDisplayedRows={({ from, to, count }) =>
+                `${from}-${to} / ${count}`
+              }
+              labelRowsPerPage="Sayfa başına satır:"
+            />
           </div>
         </>
       )}

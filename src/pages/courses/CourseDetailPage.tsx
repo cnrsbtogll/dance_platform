@@ -4,6 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../api/firebase/firebase';
 import { DanceClass } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
+import ContactButton from '../../common/components/ui/ContactButton';
 
 const CourseDetailPage: React.FC = () => {
   const { id } = useParams<Record<string, string | undefined>>();
@@ -231,21 +232,17 @@ const CourseDetailPage: React.FC = () => {
                     <div className="text-2xl font-bold text-indigo-600">
                       {course.price.toLocaleString('tr-TR')} {course.currency === 'TRY' ? '₺' : course.currency === 'USD' ? '$' : '€'}
                     </div>
-                    <button
-                      onClick={handleEnroll}
+                    <ContactButton
+                      course={course}
+                      variant="primary"
+                      fullWidth
                       disabled={course.currentParticipants >= course.maxParticipants}
-                      className={`mt-4 w-full inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white ${
-                        course.currentParticipants >= course.maxParticipants
-                          ? 'bg-gray-400 cursor-not-allowed'
-                          : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
-                      }`}
-                    >
+                      className="mt-4"
+                    />
+                    <div className="mt-2 text-sm text-gray-500 text-center">
                       {course.currentParticipants >= course.maxParticipants
                         ? 'Kontenjan Dolu'
-                        : 'Kursa Kaydol'}
-                    </button>
-                    <div className="mt-2 text-sm text-gray-500 text-center">
-                      {course.maxParticipants - course.currentParticipants} kişilik kontenjan kaldı
+                        : `${course.maxParticipants - course.currentParticipants} kişilik kontenjan kaldı`}
                     </div>
                   </div>
                 </div>

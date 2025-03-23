@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { 
+  collection, 
+  getDocs, 
+  query, 
+  orderBy 
+} from 'firebase/firestore';
+import { db } from '../../api/firebase/firebase';
 import { fetchAllInstructors } from '../../api/services/userService';
 import { Instructor, UserWithProfile } from '../../types';
 import InstructorCard from '../../common/components/instructors/InstructorCard';
+import CustomSelect from '../../common/components/ui/CustomSelect';
 
 // Eğitmen ve kullanıcı bilgisini birleştiren tip tanımı
 interface InstructorWithUser extends Instructor {
@@ -15,53 +23,137 @@ const InstructorsListPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStyle, setSelectedStyle] = useState('');
+  const [danceStyles, setDanceStyles] = useState<{ label: string; value: string; }[]>([]);
+  const [loadingStyles, setLoadingStyles] = useState<boolean>(true);
+
+  const loadInstructors = async () => {
+    try {
+      const fetchedInstructors = await fetchAllInstructors();
+      
+      console.log('Raw Fetched Instructors Data:', JSON.stringify(fetchedInstructors, null, 2));
+      
+      console.log('Instructor Details:', fetchedInstructors.map(instructor => ({
+        id: instructor.id,
+        name: instructor.user?.displayName || 'İsimsiz',
+        email: instructor.user?.email,
+        specialties: instructor.specialties || [],
+        experience: instructor.experience,
+        level: instructor.level,
+        schoolId: instructor.schoolId,
+        schoolName: instructor.schoolName,
+        userId: instructor.userId,
+        photoURL: instructor.user?.photoURL,
+        availability: instructor.availability
+      })));
+      
+      // Eğitmenleri tecrübeye göre sıralayalım (yüksekten düşüğe)
+      const sortedInstructors = [...fetchedInstructors].sort((a, b) => {
+        const experienceA = Number(a.experience) || 0;
+        const experienceB = Number(b.experience) || 0;
+        return experienceB - experienceA;
+      });
+      
+      setInstructors(sortedInstructors);
+    } catch (err) {
+      console.error('Eğitmenler yüklenirken hata oluştu:', err);
+      throw err;
+    }
+  };
+
+  // Dans stillerini getir
+  const fetchDanceStyles = async () => {
+    try {
+      const stylesRef = collection(db, 'danceStyles');
+      const q = query(stylesRef, orderBy('label'));
+      const querySnapshot = await getDocs(q);
+      
+      const styles = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          label: data.label || data.name || '',
+          value: data.value || doc.id
+        };
+      });
+      
+      console.log('Fetched Dance Styles:', styles);
+      setDanceStyles(styles);
+    } catch (error) {
+      console.error('Dans stilleri yüklenirken hata:', error);
+      // Hata durumunda varsayılan stiller
+      const defaultStyles = [
+        { label: 'Salsa', value: 'salsa' },
+        { label: 'Bachata', value: 'bachata' },
+        { label: 'Kizomba', value: 'kizomba' },
+        { label: 'Tango', value: 'tango' },
+        { label: 'Vals', value: 'vals' }
+      ];
+      console.log('Using default styles:', defaultStyles);
+      setDanceStyles(defaultStyles);
+    } finally {
+      setLoadingStyles(false);
+    }
+  };
 
   useEffect(() => {
-    const loadInstructors = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
-        const fetchedInstructors = await fetchAllInstructors();
-        
-        // Eğitmenleri tecrübeye göre sıralayalım (yüksekten düşüğe)
-        const sortedInstructors = [...fetchedInstructors].sort((a, b) => {
-          const experienceA = a.experience || a.tecrube || 0;
-          const experienceB = b.experience || b.tecrube || 0;
-          return experienceB - experienceA;
-        });
-        
-        setInstructors(sortedInstructors);
+        await Promise.all([
+          loadInstructors(),
+          fetchDanceStyles()
+        ]);
       } catch (err) {
-        console.error('Eğitmenler yüklenirken hata oluştu:', err);
-        setError('Eğitmen bilgileri yüklenemedi. Lütfen daha sonra tekrar deneyin.');
+        console.error('Veriler yüklenirken hata:', err);
+        setError('Veriler yüklenemedi. Lütfen daha sonra tekrar deneyin.');
       } finally {
         setLoading(false);
       }
     };
 
-    loadInstructors();
+    loadData();
   }, []);
 
   // Search ve filtreleme işlemleri
   const filteredInstructors = instructors.filter(instructor => {
+    // İsme göre filtreleme
     const matchesSearch = searchTerm === '' || 
       (instructor.user.displayName && instructor.user.displayName.toLowerCase().includes(searchTerm.toLowerCase()));
-    
+
+    // Dans stiline göre filtreleme
     const matchesStyle = selectedStyle === '' || 
-      (instructor.uzmanlık && instructor.uzmanlık.includes(selectedStyle as any)) ||
-      (instructor.specialties && instructor.specialties.includes(selectedStyle as any)) ||
-      (instructor.user.danceStyles && instructor.user.danceStyles.includes(selectedStyle as any));
+      (instructor.specialties && instructor.specialties.some(specialty => 
+        specialty.toLowerCase() === selectedStyle.toLowerCase()
+      ));
+
+    // Log filtreleme detayları
+    if (selectedStyle) {
+      console.log('Filtering details for instructor:', {
+        instructorId: instructor.id,
+        name: instructor.user.displayName,
+        specialties: instructor.specialties,
+        selectedStyle,
+        matchesStyle
+      });
+    }
     
     return matchesSearch && matchesStyle;
   });
 
-  // Tüm dans stilleri
-  const allDanceStyles = Array.from(new Set(
-    instructors.flatMap(instructor => [
-      ...(Array.isArray(instructor.uzmanlık) ? instructor.uzmanlık : (instructor.uzmanlık ? [instructor.uzmanlık] : [])),
-      ...(Array.isArray(instructor.specialties) ? instructor.specialties : (instructor.specialties ? [instructor.specialties] : [])),
-      ...(Array.isArray(instructor.user.danceStyles) ? instructor.user.danceStyles : [])
-    ])
-  ));
+  // Log filtered results
+  useEffect(() => {
+    if (selectedStyle) {
+      console.log('Current filter state:', {
+        selectedStyle,
+        totalInstructors: instructors.length,
+        filteredCount: filteredInstructors.length,
+        allInstructors: instructors.map(instructor => ({
+          id: instructor.id,
+          name: instructor.user.displayName,
+          specialties: instructor.specialties
+        }))
+      });
+    }
+  }, [selectedStyle, filteredInstructors.length, instructors]);
 
   if (loading) {
     return (
@@ -117,18 +209,22 @@ const InstructorsListPage: React.FC = () => {
           </div>
           
           <div className="md:w-1/3">
-            <label htmlFor="danceStyle" className="block text-gray-700 text-sm font-medium mb-2">Dans Stiline Göre Filtrele</label>
-            <select
-              id="danceStyle"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              value={selectedStyle}
-              onChange={(e) => setSelectedStyle(e.target.value)}
-            >
-              <option value="">Tüm Dans Stilleri</option>
-              {allDanceStyles.map(style => (
-                <option key={style} value={style}>{style}</option>
-              ))}
-            </select>
+            {loadingStyles ? (
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500"></div>
+                <span className="text-sm text-gray-500">Dans stilleri yükleniyor...</span>
+              </div>
+            ) : (
+              <CustomSelect
+                name="danceStyle"
+                label="Dans Stiline Göre Filtrele"
+                value={selectedStyle}
+                onChange={(value) => setSelectedStyle(value as string)}
+                options={danceStyles}
+                placeholder="Tüm Dans Stilleri"
+                allowEmpty={true}
+              />
+            )}
           </div>
         </div>
       </div>

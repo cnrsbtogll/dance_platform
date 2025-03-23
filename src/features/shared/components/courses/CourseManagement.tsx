@@ -13,13 +13,15 @@ import {
   QueryDocumentSnapshot,
   QuerySnapshot,
   limit,
-  where
+  where,
+  getDoc
 } from 'firebase/firestore';
 import { db } from '../../../../api/firebase/firebase';
 import { auth } from '../../../../api/firebase/firebase';
 import { motion } from 'framer-motion';
 import Button from '../../../../common/components/ui/Button';
 import CustomSelect from '../../../../common/components/ui/CustomSelect';
+import CustomInput from '../../../../common/components/ui/CustomInput';
 
 // Dans stilleri için interface
 interface DanceStyle {
@@ -94,19 +96,23 @@ interface Course {
   level: string;
   maxParticipants: number;
   currentParticipants: number;
-  schedule: Schedule[];
   duration: number;
-  date: any;
   price: number;
   currency: string;
   status: 'active' | 'inactive';
-  createdAt?: any;
-  updatedAt?: any;
   recurring: boolean;
+  schedule: Schedule[];
+  date: any;
+  time: string;
   location: Location;
   imageUrl: string;
   highlights: string[];
   tags: string[];
+  instructorPhone: string;
+  schoolPhone: string;
+  schoolAddress: string;
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 interface FormData {
@@ -120,13 +126,14 @@ interface FormData {
   level: string;
   maxParticipants: number;
   currentParticipants: number;
-  schedule: Schedule[];
   duration: number;
-  date: any;
   price: number;
   currency: string;
   status: 'active' | 'inactive';
   recurring: boolean;
+  schedule: Schedule[];
+  date: any;
+  time: string;
   location: Location;
   imageUrl: string;
   highlights: string[];
@@ -138,6 +145,101 @@ interface CourseManagementProps {
   schoolId?: string;
   isAdmin?: boolean;
 }
+
+// İletişim Modal bileşeni
+interface ContactModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  course: Course;
+}
+
+const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose, course }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold">İletişim Bilgileri</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Eğitmen Bilgileri */}
+        <div className="mb-6">
+          <h4 className="text-md font-medium text-gray-900 mb-2">Eğitmen</h4>
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <p className="text-sm text-gray-600 mb-1">
+              <span className="font-medium">İsim:</span> {course.instructorName}
+            </p>
+            {course.instructorPhone && (
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Telefon:</span>{' '}
+                <a href={`tel:${course.instructorPhone}`} className="text-blue-600 hover:underline">
+                  {course.instructorPhone}
+                </a>
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Okul Bilgileri */}
+        <div className="mb-6">
+          <h4 className="text-md font-medium text-gray-900 mb-2">Dans Okulu</h4>
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <p className="text-sm text-gray-600 mb-1">
+              <span className="font-medium">İsim:</span> {course.schoolName}
+            </p>
+            {course.schoolPhone && (
+              <p className="text-sm text-gray-600 mb-1">
+                <span className="font-medium">Telefon:</span>{' '}
+                <a href={`tel:${course.schoolPhone}`} className="text-blue-600 hover:underline">
+                  {course.schoolPhone}
+                </a>
+              </p>
+            )}
+            {course.schoolAddress && (
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Adres:</span> {course.schoolAddress}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <Button onClick={onClose} variant="secondary">
+            Kapat
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Timestamp'i tarihe çeviren yardımcı fonksiyon ekle
+const timestampToDate = (timestamp: any): string => {
+  if (!timestamp) return '';
+  
+  try {
+    // Firebase timestamp kontrolü
+    if (timestamp?.seconds) {
+      return new Date(timestamp.seconds * 1000).toISOString().split('T')[0];
+    }
+    
+    // Normal Date objesi kontrolü
+    if (timestamp instanceof Date) {
+      return timestamp.toISOString().split('T')[0];
+    }
+    
+    return '';
+  } catch (error) {
+    console.error('Tarih dönüştürme hatası:', error);
+    return '';
+  }
+};
 
 function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseManagementProps): JSX.Element {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -157,13 +259,14 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
     level: 'beginner',
     maxParticipants: 10,
     currentParticipants: 0,
-    schedule: [],
     duration: 90,
     date: null,
+    time: '18:00',
     price: 0,
     currency: 'TRY',
     status: 'active',
     recurring: true,
+    schedule: [],
     location: {
       address: '',
       city: '',
@@ -172,13 +275,18 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
       latitude: 0,
       longitude: 0
     },
-    imageUrl: '',
+    imageUrl: '/placeholders/default-course-image.png',
     highlights: [],
     tags: []
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [instructors, setInstructors] = useState<Array<{ label: string; value: string }>>([]);
+  const [schools, setSchools] = useState<Array<{ label: string; value: string }>>([]);
+  const [loadingInstructors, setLoadingInstructors] = useState<boolean>(true);
+  const [loadingSchools, setLoadingSchools] = useState<boolean>(true);
+  const [selectedContactCourse, setSelectedContactCourse] = useState<Course | null>(null);
 
   // Dans stillerini getir
   const fetchDanceStyles = async () => {
@@ -225,16 +333,13 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
         level: 'beginner',
         maxParticipants: 15,
         currentParticipants: 0,
-        schedule: [
-          { day: 'Pazartesi', time: '19:00' },
-          { day: 'Çarşamba', time: '19:00' }
-        ],
         duration: 90,
         date: serverTimestamp(),
         price: 350,
         currency: 'TRY',
         status: 'active',
         recurring: true,
+        schedule: [{ day: 'Pazartesi', time: '19:00' }],
         location: {
           address: '',
           city: 'İstanbul',
@@ -375,6 +480,111 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
     }
   };
 
+  // Eğitmenleri getir
+  const fetchInstructors = async () => {
+    if (!isAdmin) return;
+    
+    try {
+      console.log('Eğitmenler getiriliyor...');
+      const instructorsRef = collection(db, 'instructors');
+      
+      const q = query(instructorsRef);
+      const querySnapshot = await getDocs(q);
+      
+      const instructorsData = querySnapshot.docs
+        .map(doc => {
+          const data = doc.data();
+          if (data.status === 'active') {
+            return {
+              label: data.displayName || data.email || 'İsimsiz Eğitmen',
+              value: doc.id
+            };
+          }
+          return null;
+        })
+        .filter((instructor): instructor is { label: string; value: string } => instructor !== null)
+        .sort((a, b) => a.label.localeCompare(b.label));
+      
+      setInstructors(instructorsData);
+    } catch (error) {
+      console.error('Eğitmenler yüklenirken hata:', error);
+      setInstructors([
+        { label: 'Test Eğitmen 1', value: 'test-instructor-1' },
+        { label: 'Test Eğitmen 2', value: 'test-instructor-2' }
+      ]);
+    } finally {
+      setLoadingInstructors(false);
+    }
+  };
+
+  // Okulları getir
+  const fetchSchools = async () => {
+    if (!isAdmin) return;
+    
+    try {
+      console.log('Okullar getiriliyor...');
+      const schoolsRef = collection(db, 'schools');
+      console.log('Schools koleksiyonu referansı:', schoolsRef);
+
+      const q = query(schoolsRef);
+      console.log('Oluşturulan query:', q);
+
+      const querySnapshot = await getDocs(q);
+      console.log('Query sonuçları:', {
+        empty: querySnapshot.empty,
+        size: querySnapshot.size,
+        docs: querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          data: doc.data()
+        }))
+      });
+      
+      const schoolsList = querySnapshot.docs
+        .map(doc => {
+          const data = doc.data();
+          console.log('Okul verisi işleniyor:', {
+            id: doc.id,
+            data: data,
+            displayName: data.displayName,
+            name: data.name,
+            ad: data.ad,
+            status: data.status,
+            userId: data.userId,
+            email: data.email
+          });
+
+          // Sadece aktif okulları al
+          if (data.status === 'active') {
+            return {
+              label: data.displayName || data.name || data.ad || data.email || 'İsimsiz Okul',
+              value: doc.id
+            };
+          }
+          return null;
+        })
+        .filter((school): school is { label: string; value: string } => school !== null)
+        .sort((a, b) => a.label.localeCompare(b.label));
+      
+      console.log('İşlenmiş okul listesi:', schoolsList);
+      setSchools(schoolsList);
+    } catch (error) {
+      console.error('Okullar yüklenirken hata detayı:', {
+        error,
+        message: error instanceof Error ? error.message : 'Bilinmeyen hata',
+        code: error instanceof Error ? (error as any).code : undefined,
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
+      // Varsayılan okul listesi
+      setSchools([
+        { label: 'Test Okul 1', value: 'test-school-1' },
+        { label: 'Test Okul 2', value: 'test-school-2' }
+      ]);
+    } finally {
+      setLoadingSchools(false);
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -382,7 +592,9 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
       try {
         await Promise.all([
           fetchCourses(),
-          fetchDanceStyles()
+          fetchDanceStyles(),
+          isAdmin && fetchInstructors(),
+          isAdmin && fetchSchools()
         ]);
       } catch (err) {
         if (isMounted) {
@@ -397,33 +609,16 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isAdmin]);
 
   // Kurs düzenleme
   const editCourse = (course: Course) => {
     setSelectedCourse(course);
     setFormData({
-      name: course.name,
-      description: course.description,
-      instructorId: course.instructorId,
-      instructorName: course.instructorName,
-      schoolId: course.schoolId,
-      schoolName: course.schoolName,
-      danceStyle: course.danceStyle,
-      level: course.level,
-      maxParticipants: course.maxParticipants,
-      currentParticipants: course.currentParticipants,
-      schedule: course.schedule,
-      duration: course.duration,
+      ...course,
+      schedule: course.schedule || [],
       date: course.date,
-      price: course.price,
-      currency: course.currency,
-      status: course.status,
-      recurring: course.recurring,
-      location: course.location,
-      imageUrl: course.imageUrl,
-      highlights: course.highlights,
-      tags: course.tags
+      time: course.time || '18:00'
     });
     setEditMode(true);
   };
@@ -442,13 +637,14 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
       level: 'beginner',
       maxParticipants: 10,
       currentParticipants: 0,
-      schedule: [],
       duration: 90,
       date: null,
+      time: '18:00',
       price: 0,
       currency: 'TRY',
       status: 'active',
       recurring: true,
+      schedule: [],
       location: {
         address: '',
         city: '',
@@ -465,11 +661,11 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
   };
 
   // Form alanı değişikliği
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement> | { target: { name: string; value: any } }) => {
+    const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'number' ? Number(value) : value
+      [name]: value
     }));
   };
 
@@ -495,6 +691,48 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
     return restData;
   };
 
+  // Veri işleme fonksiyonunu güncelle
+  const processQueryData = (doc: QueryDocumentSnapshot<DocumentData>): Course => {
+    const courseData = doc.data();
+    return {
+      id: doc.id,
+      name: courseData.name || '',
+      description: courseData.description || '',
+      instructorId: courseData.instructorId || '',
+      instructorName: courseData.instructorName || 'Bilinmeyen Eğitmen',
+      instructorPhone: courseData.instructorPhone || '',
+      schoolId: courseData.schoolId || '',
+      schoolName: courseData.schoolName || 'Bilinmeyen Okul',
+      schoolPhone: courseData.schoolPhone || '',
+      schoolAddress: courseData.schoolAddress || '',
+      danceStyle: courseData.danceStyle || '',
+      level: courseData.level || 'beginner',
+      maxParticipants: courseData.maxParticipants || 0,
+      currentParticipants: courseData.currentParticipants || 0,
+      duration: courseData.duration || 90,
+      date: courseData.date,
+      time: courseData.time || '18:00',
+      price: courseData.price || 0,
+      currency: courseData.currency || 'TRY',
+      status: courseData.status || 'inactive',
+      recurring: courseData.recurring || false,
+      schedule: courseData.schedule || [],
+      location: courseData.location || {
+        address: '',
+        city: '',
+        state: '',
+        zipCode: '',
+        latitude: 0,
+        longitude: 0
+      },
+      imageUrl: courseData.imageUrl || '/placeholders/default-course-image.png',
+      highlights: courseData.highlights || [],
+      tags: courseData.tags || [],
+      createdAt: courseData.createdAt,
+      updatedAt: courseData.updatedAt
+    };
+  };
+
   // Form gönderimi
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -503,29 +741,31 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
     setSuccess(null);
 
     try {
-      const courseData = {
+      const courseDataToSave = {
         ...formData,
-        instructorId: instructorId || formData.instructorId,
-        schoolId: schoolId || formData.schoolId,
-        recurring: formData.recurring || false, // Varsayılan olarak false
-        currentParticipants: formData.currentParticipants || 0, // Varsayılan olarak 0
-        status: formData.status || 'active' // Varsayılan olarak active
+        recurring: formData.recurring,
+        schedule: formData.recurring ? formData.schedule : [],
+        date: formData.recurring ? null : formData.date,
+        time: formData.time,
+        instructorPhone: '',
+        schoolPhone: '',
+        schoolAddress: '',
+        updatedAt: serverTimestamp()
       };
-
-      // Firebase için veriyi temizle
-      const cleanedData = cleanDataForFirebase(courseData);
 
       if (selectedCourse) {
         // Mevcut kursu güncelle
         const courseRef = doc(db, 'courses', selectedCourse.id);
-        await updateDoc(courseRef, {
-          ...cleanedData,
-          updatedAt: serverTimestamp()
-        });
+        await updateDoc(courseRef, courseDataToSave);
+        
+        const updatedCourse: Course = {
+          ...selectedCourse,
+          ...courseDataToSave,
+        };
         
         setCourses(prev => prev.map(course => 
           course.id === selectedCourse.id 
-            ? { ...course, ...courseData }
+            ? updatedCourse
             : course
         ));
         
@@ -533,16 +773,14 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
       } else {
         // Yeni kurs ekle
         const docRef = await addDoc(collection(db, 'courses'), {
-          ...cleanedData,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
+          ...courseDataToSave,
+          createdAt: serverTimestamp()
         });
         
         const newCourse: Course = {
+          ...courseDataToSave,
           id: docRef.id,
-          ...courseData,
           createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
         };
         
         setCourses(prev => [newCourse, ...prev]);
@@ -577,463 +815,444 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
     }
   };
 
-  // Filtrelenmiş kurslar
-  const filteredCourses = courses.filter(course =>
-    course.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    course.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Veri işleme fonksiyonunu güncelle
-  const processQueryData = (doc: QueryDocumentSnapshot<DocumentData>): Course => {
-    const courseData = doc.data();
-    return {
-      id: doc.id,
-      name: courseData.name || '',
-      description: courseData.description || '',
-      instructorId: courseData.instructorId || '',
-      instructorName: courseData.instructorName || 'Bilinmeyen Eğitmen',
-      schoolId: courseData.schoolId || '',
-      schoolName: courseData.schoolName || 'Bilinmeyen Okul',
-      danceStyle: courseData.danceStyle || '',
-      level: courseData.level || 'beginner',
-      maxParticipants: courseData.maxParticipants || 0,
-      currentParticipants: courseData.currentParticipants || 0,
-      schedule: courseData.schedule || [],
-      duration: courseData.duration || 90,
-      date: courseData.date,
-      price: courseData.price || 0,
-      currency: courseData.currency || 'TRY',
-      status: courseData.status || 'inactive',
-      recurring: courseData.recurring || false,
-      location: courseData.location || {
-        address: '',
-        city: '',
-        state: '',
-        zipCode: '',
-        latitude: 0,
-        longitude: 0
-      },
-      imageUrl: courseData.imageUrl || '/placeholders/default-course-image.png',
-      highlights: courseData.highlights || [],
-      tags: courseData.tags || [],
-      createdAt: courseData.createdAt,
-      updatedAt: courseData.updatedAt
-    };
-  };
-
   return (
-    <div>
-      {/* Başlık ve Yeni Ekle butonu */}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Kurs Yönetimi</h2>
-        {!editMode && (
+    <div className="space-y-6">
+      {/* Üst Başlık ve Arama Bölümü */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">Kurs Yönetimi</h2>
+          <p className="text-sm text-gray-600 mt-1">Kurslarınızı ekleyin, düzenleyin ve yönetin</p>
+        </div>
+        <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-grow sm:max-w-[200px]">
+            <input
+              type="text"
+              placeholder="Kurs ara..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+            <span className="absolute right-3 top-2.5 text-gray-400">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </span>
+          </div>
           <Button
             onClick={addNewCourse}
-            variant="primary"
-            disabled={loading}
+            type="button"
           >
-            {loading ? 'Yükleniyor...' : 'Yeni Kurs Ekle'}
+            Yeni Kurs Ekle
           </Button>
-        )}
+        </div>
       </div>
 
-      {/* Hata ve Başarı Mesajları */}
-      {error && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4">
-          <p>{error}</p>
-        </div>
-      )}
-      
-      {success && (
-        <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4">
-          <p>{success}</p>
-        </div>
-      )}
-
-      {editMode ? (
-        <div className="bg-gray-50 p-6 rounded-lg">
-          <h3 className="text-lg font-semibold mb-4">
-            {selectedCourse ? 'Kurs Düzenle' : 'Yeni Kurs Ekle'}
-          </h3>
-
+      {/* Form Bölümü */}
+      {(editMode || selectedCourse) && (
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Form Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
               {/* Temel Bilgiler */}
-              <div className="col-span-2 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                <h4 className="text-lg font-medium text-gray-900 mb-4">Temel Bilgiler</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-4 md:col-span-2">
+                <h3 className="text-lg font-medium text-gray-900">Temel Bilgiler</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                      Kurs Adı*
-                    </label>
-                    <input
+                    <CustomInput
                       type="text"
-                      id="name"
                       name="name"
-                      required
+                      label="Kurs Adı"
                       value={formData.name}
                       onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                      placeholder="Kurs adını girin"
+                      required
                     />
                   </div>
-
-                  <div>
-                    {loadingStyles ? (
-                      <div className="p-2 flex items-center">
-                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500 mr-2"></div>
-                        <span className="text-sm text-gray-600">Dans stilleri yükleniyor...</span>
-                      </div>
-                    ) : (
-                      <CustomSelect
-                        label="Dans Stili*"
-                        value={formData.danceStyle}
-                        onChange={(value) => setFormData(prev => ({ ...prev, danceStyle: value as string }))}
-                        options={danceStyles}
-                        placeholder="Dans Stili Seçin"
-                      />
-                    )}
-                  </div>
-
                   <div>
                     <CustomSelect
-                      label="Seviye*"
-                      value={formData.level}
-                      onChange={(value) => setFormData(prev => ({ ...prev, level: value as string }))}
+                      name="danceStyle"
+                      label="Dans Stili"
+                      options={danceStyles}
+                      value={formData.danceStyle}
+                      onChange={(value) => setFormData({ ...formData, danceStyle: value as string })}
+                      placeholder="Dans Stili Seçin"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Program ve Kapasite */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900">Program ve Kapasite</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <CustomSelect
+                      name="level"
+                      label="Seviye"
                       options={levelOptions}
+                      value={formData.level}
+                      onChange={(value) => setFormData({ ...formData, level: value as string })}
                       placeholder="Seviye Seçin"
+                      required
                     />
                   </div>
+                  <div>
+                    <CustomInput
+                      type="text"
+                      name="maxParticipants"
+                      label="Maksimum Katılımcı"
+                      value={formData.maxParticipants.toString()}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        maxParticipants: parseInt(e.target.value) || 0
+                      })}
+                    />
+                  </div>
+                </div>
+              </div>
 
+              {/* Fiyat ve Süre */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900">Fiyat ve Süre</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <div className="flex items-stretch max-w-[200px]">
+                      <CustomInput
+                        type="text"
+                        name="price"
+                        label="Fiyat"
+                        value={formData.price.toString()}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          price: parseFloat(e.target.value) || 0
+                        })}
+                        className="w-24 !rounded-r-none"
+                        required
+                      />
+                      <div className="flex items-center h-[45px] px-3 border border-l-0 border-gray-300 rounded-r-md bg-gray-50">
+                        <span className="text-gray-500 text-sm">₺</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <CustomInput
+                      type="text"
+                      name="duration"
+                      label="Süre (dakika)"
+                      value={formData.duration.toString()}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        duration: parseInt(e.target.value) || 0
+                      })}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Durum ve Tekrar */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900">Durum</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <CustomSelect
+                      name="status"
                       label="Durum"
-                      value={formData.status}
-                      onChange={(value) => setFormData(prev => ({ ...prev, status: value as 'active' | 'inactive' }))}
                       options={statusOptions}
+                      value={formData.status}
+                      onChange={(value) => setFormData({ 
+                        ...formData, 
+                        status: value as 'active' | 'inactive'
+                      })}
                       placeholder="Durum Seçin"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Program Detayları */}
-              <div className="col-span-2 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                <h4 className="text-lg font-medium text-gray-900 mb-4">Program Detayları</h4>
-                <div className="space-y-4">
-                  {/* Mevcut program listesi */}
-                  {formData.schedule.map((item, index) => (
-                    <div key={index} className="flex items-center gap-4 p-3 bg-gray-50 rounded-md">
-                      <div className="flex-1">
-                        <CustomSelect
-                          label="Gün"
-                          value={item.day}
-                          onChange={(value) => {
-                            const newSchedule = [...formData.schedule];
-                            newSchedule[index].day = value as string;
-                            setFormData(prev => ({ ...prev, schedule: newSchedule }));
-                          }}
-                          options={dayOptions}
-                          placeholder="Gün Seçin"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Saat
-                        </label>
-                        <input
-                          type="time"
-                          value={item.time}
-                          onChange={(e) => {
-                            const newSchedule = [...formData.schedule];
-                            newSchedule[index].time = e.target.value;
-                            setFormData(prev => ({ ...prev, schedule: newSchedule }));
-                          }}
-                          className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                        />
-                      </div>
-                      <div className="flex items-end">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newSchedule = formData.schedule.filter((_, i) => i !== index);
-                            setFormData(prev => ({ ...prev, schedule: newSchedule }));
-                          }}
-                          className="p-2 text-red-600 hover:text-red-800"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Yeni gün/saat ekle butonu */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData(prev => ({
-                        ...prev,
-                        schedule: [...prev.schedule, { day: '', time: '' }]
-                      }));
-                    }}
-                    className="w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    + Yeni Gün/Saat Ekle
-                  </button>
-
-                  <div>
-                    <label htmlFor="duration" className="block text-sm font-medium text-gray-700 mb-1">
-                      Süre (Dakika)*
-                    </label>
-                    <input
-                      type="number"
-                      id="duration"
-                      name="duration"
                       required
-                      min="30"
-                      max="180"
-                      step="15"
-                      value={formData.duration}
-                      onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                     />
-                  </div>
-
-                  <div>
-                    <label htmlFor="maxParticipants" className="block text-sm font-medium text-gray-700 mb-1">
-                      Maksimum Katılımcı*
-                    </label>
-                    <input
-                      type="number"
-                      id="maxParticipants"
-                      name="maxParticipants"
-                      required
-                      min="1"
-                      max="50"
-                      value={formData.maxParticipants}
-                      onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Fiyatlandırma */}
-              <div className="col-span-2 md:col-span-1 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                <h4 className="text-lg font-medium text-gray-900 mb-4">Fiyatlandırma</h4>
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1">
-                      Fiyat*
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        id="price"
-                        name="price"
-                        required
-                        min="0"
-                        value={formData.price}
-                        onChange={handleInputChange}
-                        className="flex-1 p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                      />
-                      <CustomSelect
-                        label=""
-                        value={formData.currency}
-                        onChange={(value) => setFormData(prev => ({ ...prev, currency: value as string }))}
-                        options={currencyOptions}
-                        placeholder="Para Birimi"
-                        className="w-32"
-                      />
-                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Lokasyon */}
-              <div className="col-span-2 md:col-span-1 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                <h4 className="text-lg font-medium text-gray-900 mb-4">Lokasyon</h4>
-                <div className="space-y-4">
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900">Lokasyon</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
-                      Şehir*
-                    </label>
-                    <input
-                      type="text"
-                      id="city"
+                    <CustomSelect
                       name="city"
-                      required
+                      label="Şehir"
+                      options={cityOptions}
                       value={formData.location.city}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        location: { ...prev.location, city: e.target.value }
-                      }))}
-                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                      placeholder="Şehir girin"
+                      onChange={(value) => setFormData({
+                        ...formData,
+                        location: { ...formData.location, city: value as string }
+                      })}
+                      placeholder="Şehir Seçin"
+                      required
                     />
                   </div>
                   <div>
-                    <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
-                      Adres
-                    </label>
-                    <textarea
-                      id="address"
+                    <CustomInput
+                      type="text"
                       name="address"
+                      label="Adres"
                       value={formData.location.address}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        location: { ...prev.location, address: e.target.value }
-                      }))}
-                      rows={3}
-                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        location: { ...formData.location, address: e.target.value }
+                      })}
+                      required
                     />
                   </div>
                 </div>
               </div>
 
               {/* Açıklama */}
-              <div className="col-span-2 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                <h4 className="text-lg font-medium text-gray-900 mb-4">Açıklama</h4>
-                <div>
-                  <textarea
-                    id="description"
-                    name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
-                    rows={4}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Kurs açıklamasını girin"
-                  />
+              <div className="md:col-span-2">
+                <CustomInput
+                  type="text"
+                  name="description"
+                  label="Açıklama"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  multiline
+                  rows={4}
+                />
+              </div>
+
+              {/* Program Seçimi */}
+              <div className="md:col-span-2 space-y-4">
+                <h3 className="text-lg font-medium text-gray-900">Program</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Kurs Tipi</label>
+                    <div className="mt-2">
+                      <label className="inline-flex items-center mr-4">
+                        <input
+                          type="radio"
+                          name="recurring"
+                          checked={formData.recurring}
+                          onChange={(e) => setFormData({ ...formData, recurring: true })}
+                          className="form-radio h-4 w-4 text-indigo-600"
+                        />
+                        <span className="ml-2">Periyodik Kurs</span>
+                      </label>
+                      <label className="inline-flex items-center">
+                        <input
+                          type="radio"
+                          name="recurring"
+                          checked={!formData.recurring}
+                          onChange={(e) => setFormData({ ...formData, recurring: false })}
+                          className="form-radio h-4 w-4 text-indigo-600"
+                        />
+                        <span className="ml-2">Tek Seferlik Kurs</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {formData.recurring ? (
+                    <div className="space-y-4">
+                      {formData.schedule.map((scheduleItem, index) => (
+                        <div key={index} className="flex items-center gap-4">
+                          <div className="flex-1">
+                            <CustomSelect
+                              name={`schedule-day-${index}`}
+                              label="Gün"
+                              options={dayOptions}
+                              value={scheduleItem.day}
+                              onChange={(value) => {
+                                const newSchedule = [...formData.schedule];
+                                newSchedule[index].day = value as string;
+                                setFormData({ ...formData, schedule: newSchedule });
+                              }}
+                              placeholder="Gün Seçin"
+                              required
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Saat</label>
+                            <input
+                              type="time"
+                              value={scheduleItem.time}
+                              onChange={(e) => {
+                                const newSchedule = [...formData.schedule];
+                                newSchedule[index].time = e.target.value;
+                                setFormData({ ...formData, schedule: newSchedule });
+                              }}
+                              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                              required
+                            />
+                          </div>
+                          <div className="flex items-end pb-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newSchedule = formData.schedule.filter((_, i) => i !== index);
+                                setFormData({ ...formData, schedule: newSchedule });
+                              }}
+                              className="p-2 text-red-600 hover:text-red-800"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            schedule: [...formData.schedule, { day: 'Pazartesi', time: '18:00' }]
+                          });
+                        }}
+                        className="flex items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-500 hover:text-indigo-500 w-full"
+                      >
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        Program Ekle
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Kurs Tarihi</label>
+                        <input
+                          type="date"
+                          name="date"
+                          value={timestampToDate(formData.date)}
+                          onChange={(e) => {
+                            const selectedDate = e.target.value ? new Date(e.target.value) : null;
+                            setFormData({ ...formData, date: selectedDate });
+                          }}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Kurs Saati</label>
+                        <input
+                          type="time"
+                          name="time"
+                          value={formData.time}
+                          onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-3">
+            {/* Form Butonları */}
+            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
               <Button
-                onClick={() => setEditMode(false)}
+                type="button"
                 variant="secondary"
-                disabled={loading}
+                onClick={() => {
+                  setEditMode(false);
+                  setSelectedCourse(null);
+                }}
               >
                 İptal
               </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={loading}
-              >
-                {loading ? 'Kaydediliyor...' : (selectedCourse ? 'Güncelle' : 'Ekle')}
+              <Button type="submit">
+                {selectedCourse ? 'Güncelle' : 'Kaydet'}
               </Button>
             </div>
           </form>
         </div>
-      ) : (
-        <>
-          <div className="mb-4">
-            <input
-              type="text"
-              placeholder="Kurs adı veya açıklama ara..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-md"
-            />
-          </div>
+      )}
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Kurs Adı
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Dans Stili
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Seviye
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Program
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Durum
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    İşlemler
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredCourses.length > 0 ? (
-                  filteredCourses.map((course) => (
-                    <motion.tr 
-                      key={course.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.3 }}
-                      className="hover:bg-gray-50"
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap">
+      {/* Kurs Listesi */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kurs</th>
+                <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Program</th>
+                <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kapasite</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Durum</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">İşlemler</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {courses.filter(course => 
+                course.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                course.danceStyle.toLowerCase().includes(searchTerm.toLowerCase())
+              ).map((course) => (
+                <tr key={course.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div>
                         <div className="text-sm font-medium text-gray-900">{course.name}</div>
-                        <div className="text-sm text-gray-500">{course.price} {course.currency}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{course.danceStyle}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {course.level === 'beginner' ? 'Başlangıç' :
-                           course.level === 'intermediate' ? 'Orta' : 'İleri'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {course.schedule.map((item, index) => (
-                            <div key={index}>
-                              {item.day}: {item.time}
-                            </div>
+                        <div className="text-sm text-gray-500">{course.danceStyle}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="hidden sm:table-cell px-4 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">
+                      {course.recurring ? (
+                        <div className="space-y-1">
+                          {course.schedule.map((s, index) => (
+                            <div key={index}>{s.day} {s.time}</div>
                           ))}
                         </div>
-                        <div className="text-sm text-gray-500">{course.duration} dakika</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          course.status === 'active' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {course.status === 'active' ? 'Aktif' : 'Pasif'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                        <button
-                          onClick={() => editCourse(course)}
-                          className="text-indigo-600 hover:text-indigo-800"
-                        >
-                          Düzenle
-                        </button>
-                        <button
-                          onClick={() => deleteCourse(course.id)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          Sil
-                        </button>
-                      </td>
-                    </motion.tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
-                      {searchTerm ? 'Aramanıza uygun kurs bulunamadı.' : 'Henüz hiç kurs kaydı bulunmuyor.'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+                      ) : (
+                        <div>
+                          {timestampToDate(course.date)} {course.time}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="hidden md:table-cell px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {course.currentParticipants}/{course.maxParticipants}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      course.status === 'active' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {course.status === 'active' ? 'Aktif' : 'Pasif'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => editCourse(course)}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        <span className="sr-only">Düzenle</span>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm('Bu kursu silmek istediğinizden emin misiniz?')) {
+                            deleteCourse(course.id);
+                          }
+                        }}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        <span className="sr-only">Sil</span>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

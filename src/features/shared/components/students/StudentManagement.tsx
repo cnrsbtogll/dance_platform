@@ -28,6 +28,9 @@ import { useAuth } from '../../../../contexts/AuthContext';
 import { resizeImageFromBase64 } from '../../../../api/services/userService';
 import { generateInitialsAvatar } from '../../../../common/utils/imageUtils';
 import ImageUploader from '../../../../common/components/ui/ImageUploader';
+import CustomInput from '../../../../common/components/ui/CustomInput';
+import CustomSelect from '../../../../common/components/ui/CustomSelect';
+import CustomPhoneInput from '../../../../common/components/ui/CustomPhoneInput';
 import { Button, Card, CardContent, Dialog, DialogActions, DialogContent, DialogTitle, Grid, IconButton, TextField } from '@mui/material';
 
 // Default placeholder image for students
@@ -51,16 +54,13 @@ interface Student {
 
 // Form data interface
 interface FormData {
-  id: string;
   displayName: string;
   email: string;
-  phoneNumber: string;
+  phone: string;
   level: DanceLevel;
   photoURL: string;
   instructorId: string;
   schoolId: string;
-  password: string;
-  createAccount: boolean;
 }
 
 // Define Firebase user type
@@ -336,16 +336,13 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
   const [photoModalOpen, setPhotoModalOpen] = useState<boolean>(false);
   const [selectedPhoto, setSelectedPhoto] = useState<{url: string, name: string} | null>(null);
   const [formData, setFormData] = useState<FormData>({
-    id: '',
     displayName: '',
     email: '',
-    phoneNumber: '',
+    phone: '',
     level: 'beginner',
     photoURL: '',
     instructorId: '',
-    schoolId: '',
-    password: '',
-    createAccount: true
+    schoolId: ''
   });
 
   // Check if current user is super admin
@@ -381,83 +378,69 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
     setError(null);
     
     try {
-      // Get all users from Firestore
+      // Get students
       const usersRef = collection(db, 'users');
-      let q;
+      let studentsQuery;
       
       if (isAdmin) {
-        // Admin sees all students
-        q = query(usersRef, orderBy('createdAt', 'desc'));
+        console.log('Admin mode: fetching all students');
+        studentsQuery = query(
+          usersRef, 
+          where('role', 'array-contains', 'student'),
+          orderBy('createdAt', 'desc')
+        );
       } else {
-        // Instructors only see their students
-        q = query(
+        console.log('Instructor mode: fetching students for instructor', currentUser?.uid);
+        studentsQuery = query(
           usersRef, 
           where('instructorId', '==', currentUser?.uid),
           orderBy('createdAt', 'desc')
         );
       }
       
-      const querySnapshot = await getDocs(q);
-      
-      const studentsData: FirebaseUser[] = [];
-      const instructorsData: Instructor[] = [];
-      const schoolsData: School[] = [];
-      
-      querySnapshot.forEach((doc) => {
+      const studentsSnapshot = await getDocs(studentsQuery);
+      const studentsData: FirebaseUser[] = studentsSnapshot.docs.map(doc => {
         const data = doc.data();
-        const id = doc.id;
-        
-        // Role değerini kontrol et - string veya array olabilir
-        let role = data.role;
-        
-        // Test için her rolü 
-        if (Array.isArray(role)) {
-          // Role bir array ise her role türüne göre işlem yap
-          if (role.includes('student')) {
-            studentsData.push({ id, ...data } as FirebaseUser);
-          }
-          if (role.includes('instructor')) {
-            instructorsData.push({
-              id,
-              displayName: data.displayName || 'İsimsiz Eğitmen',
-              email: data.email || ''
-            });
-          }
-          if (role.includes('school')) {
-            schoolsData.push({
-              id,
-              displayName: data.displayName || 'İsimsiz Okul',
-              email: data.email || ''
-            });
-          }
-        } else {
-          // Role bir string ise
-          if (role === 'student') {
-            studentsData.push({ id, ...data } as FirebaseUser);
-          } else if (role === 'instructor') {
-            instructorsData.push({
-              id,
-              displayName: data.displayName || 'İsimsiz Eğitmen',
-              email: data.email || ''
-            });
-          } else if (role === 'school') {
-            schoolsData.push({
-              id,
-              displayName: data.displayName || 'İsimsiz Okul',
-              email: data.email || ''
-            });
-          }
+        // Verify if the document has role field and it includes 'student'
+        const roles = Array.isArray(data.role) ? data.role : [data.role];
+        if (!roles.includes('student')) {
+          return null;
         }
-      });
+        console.log('Student data:', { id: doc.id, ...data });
+        return {
+          id: doc.id,
+          ...data
+        } as FirebaseUser;
+      }).filter(Boolean) as FirebaseUser[]; // Remove null values
+
+      // Get instructors
+      const instructorsQuery = query(
+        usersRef,
+        where('role', 'array-contains', 'instructor'),
+        orderBy('displayName', 'asc')
+      );
+      const instructorsSnapshot = await getDocs(instructorsQuery);
+      const instructorsData: Instructor[] = instructorsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        displayName: doc.data().displayName || 'İsimsiz Eğitmen',
+        email: doc.data().email || ''
+      }));
+
+      // Get schools
+      const schoolsQuery = query(
+        usersRef,
+        where('role', 'array-contains', 'school'),
+        orderBy('displayName', 'asc')
+      );
+      const schoolsSnapshot = await getDocs(schoolsQuery);
+      const schoolsData: School[] = schoolsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        displayName: doc.data().displayName || 'İsimsiz Okul',
+        email: doc.data().email || ''
+      }));
       
-      console.log(`${studentsData.length} öğrenci bulundu`);
-      if (!isAdmin) {
-        console.log('Instructor ID:', currentUser?.uid);
-        console.log('Found students:', studentsData.map(s => ({
-          name: s.displayName,
-          instructorId: s.instructorId
-        })));
-      }
+      console.log(`Found: ${studentsData.length} students, ${instructorsData.length} instructors, ${schoolsData.length} schools`);
+      console.log('Students:', studentsData.map(s => ({ id: s.id, name: s.displayName, instructorId: s.instructorId })));
       
       setStudents(studentsData);
       setFilteredStudents(studentsData);
@@ -473,8 +456,11 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
 
   // Fetch students, instructors and schools on initial load
   useEffect(() => {
-    fetchAllUsers();
-  }, []);
+    if (currentUser?.uid) {
+      console.log('Fetching users with currentUser:', currentUser.uid);
+      fetchAllUsers();
+    }
+  }, [currentUser]);
 
   // Update filtered students when search term changes
   useEffect(() => {
@@ -501,16 +487,13 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
   const editStudent = (student: FirebaseUser): void => {
     setSelectedStudent(student);
     setFormData({
-      id: student.id,
       displayName: student.displayName,
       email: student.email,
-      phoneNumber: student.phoneNumber || '',
+      phone: student.phoneNumber || '',
       level: student.level || 'beginner',
       photoURL: student.photoURL || '',
       instructorId: student.instructorId || '',
       schoolId: student.schoolId || '',
-      password: '',
-      createAccount: false
     });
     setEditMode(true);
   };
@@ -519,34 +502,34 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
   const addNewStudent = (): void => {
     setSelectedStudent(null);
     setFormData({
-      id: '',
       displayName: '',
       email: '',
-      phoneNumber: '',
+      phone: '',
       level: 'beginner',
-      photoURL: '/assets/placeholders/default-student.jpg',
-      instructorId: '',
-      schoolId: '',
-      password: '',
-      createAccount: true
+      photoURL: generateInitialsAvatar('?', 'student'),
+      instructorId: isAdmin ? '' : currentUser?.uid || '',
+      schoolId: ''
     });
     setEditMode(true);
   };
 
-  // Handle input change
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>): void => {
-    const { name, value, type } = e.target;
-    
-    if (type === 'checkbox') {
-      const checkbox = e.target as HTMLInputElement;
+  // Update handleInputChange function
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { name: string; value: any } } | string,
+    fieldName?: string
+  ): void => {
+    if (typeof e === 'string' && fieldName) {
+      // Handle direct value changes (from CustomSelect)
       setFormData(prev => ({
         ...prev,
-        [name]: checkbox.checked
+        [fieldName]: e
       }));
-    } else {
+    } else if (typeof e === 'object' && 'target' in e) {
+      // Handle event-based changes
+      const target = e.target as { name: string; value: any; type?: string; checked?: boolean };
       setFormData(prev => ({
         ...prev,
-        [name]: value
+        [target.name]: target.type === 'checkbox' ? !!target.checked : target.value
       }));
     }
   };
@@ -685,7 +668,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
         // Öğrenci güncellenirken role değeri korunur (değiştirilmez)
         const updateData = {
           displayName: formData.displayName,
-          phoneNumber: formData.phoneNumber,
+          phone: formData.phone,
           level: formData.level,
           instructorId: formData.instructorId || null,
           instructorName: instructorName || null,
@@ -705,7 +688,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
               ? { 
                   ...student, 
                   displayName: formData.displayName,
-                  phoneNumber: formData.phoneNumber,
+                  phone: formData.phone,
                   level: formData.level,
                   instructorId: formData.instructorId || null,
                   instructorName: instructorName || null,
@@ -759,7 +742,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
         await sendInvitationEmail(formData.email, {
           displayName: formData.displayName,
           level: formData.level,
-          phoneNumber: formData.phoneNumber,
+          phoneNumber: formData.phone,
           instructorId: formData.instructorId,
           instructorName: instructorName,
           schoolId: formData.schoolId,
@@ -852,7 +835,9 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
           </div>
         </td>
         <td className="px-6 py-4 whitespace-nowrap">
-          <div className="text-sm text-gray-900">{student.email}</div>
+          <div className="text-sm text-gray-900 max-w-[200px] truncate" title={student.email}>
+            {student.email}
+          </div>
         </td>
         <td className="px-6 py-4 whitespace-nowrap">
           <div className="text-sm text-gray-900">
@@ -873,22 +858,31 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
             {student.schoolName || '-'}
           </div>
         </td>
-        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-          <button
-            onClick={() => editStudent(student)}
-            className="text-indigo-600 hover:text-indigo-900 mr-2"
-          >
-            Düzenle
-          </button>
-          <button
-            onClick={() => deleteStudentHandler(student.id)}
-            className="text-red-600 hover:text-red-900"
-          >
-            Sil
-          </button>
+        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium min-w-[140px]">
+          <div className="flex justify-end space-x-2">
+            <button
+              onClick={() => editStudent(student)}
+              className="text-indigo-600 hover:text-indigo-900"
+            >
+              Düzenle
+            </button>
+            <button
+              onClick={() => deleteStudentHandler(student.id)}
+              className="text-red-600 hover:text-red-900"
+            >
+              Sil
+            </button>
+          </div>
         </td>
       </motion.tr>
     );
+  };
+
+  const handleSelectChange = (value: string, fieldName: string): void => {
+    setFormData(prev => ({
+      ...prev,
+      [fieldName]: value
+    }));
   };
 
   if (loading && students.length === 0) {
@@ -915,6 +909,42 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
         </div>
       )}
       
+      {/* Üst Başlık ve Arama Bölümü */}
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">Öğrenci Yönetimi</h2>
+          <p className="text-sm text-gray-600 mt-1">Öğrencilerinizi ekleyin, düzenleyin ve yönetin</p>
+        </div>
+        <div className="flex flex-col gap-2 w-full sm:w-64">
+          <div className="relative w-full">
+            <input
+              type="text"
+              placeholder="Ad veya e-posta ile ara..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+            <span className="absolute right-3 top-2.5 text-gray-400">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </span>
+          </div>
+          {!editMode && (
+            <button 
+              onClick={addNewStudent}
+              className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+              disabled={loading}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              {loading ? 'Yükleniyor...' : 'Yeni Öğrenci'}
+            </button>
+          )}
+        </div>
+      </div>
+      
       {/* Photo Modal */}
       {selectedPhoto && (
         <PhotoModal 
@@ -926,226 +956,165 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
         />
       )}
       
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Öğrenci Yönetimi</h2>
-        {!editMode && (
-          <button 
-            onClick={addNewStudent}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-            disabled={loading}
-          >
-            {loading ? 'Yükleniyor...' : 'Yeni Öğrenci Ekle'}
-          </button>
-        )}
-      </div>
-      
       {editMode ? (
-        <div className="bg-gray-50 p-6 rounded-lg">
+        <div className="bg-gray-50 p-4 sm:p-6 rounded-lg">
           <h3 className="text-lg font-semibold mb-4">
             {selectedStudent ? 'Öğrenci Düzenle' : 'Yeni Öğrenci Ekle'}
           </h3>
           
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              {/* Profil Fotoğrafı */}
+              <div className="md:col-span-2">
+                <ImageUploader 
+                  currentPhotoURL={formData.photoURL}
+                  onImageChange={handlePhotoChange}
+                  displayName={formData.displayName || '?'}
+                  userType="student"
+                  shape="circle"
+                  width={96}
+                  height={96}
+                  maxSizeKB={5120}
+                />
+              </div>
+              
               <div>
-                <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-1">
-                  Ad Soyad*
-                </label>
-                <input
-                  type="text"
-                  id="displayName"
+                <CustomInput
                   name="displayName"
+                  label="Ad Soyad"
+                  type="text"
                   required
                   value={formData.displayName}
                   onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  fullWidth
                 />
               </div>
               
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                  E-posta*
-                </label>
-                <input
+                <CustomInput
                   type="email"
-                  id="email"
                   name="email"
+                  label="E-posta"
                   required
                   value={formData.email}
                   onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                  disabled={!!selectedStudent} // Cannot change email for existing students
-                />
-                {selectedStudent && (
-                  <p className="text-xs text-gray-500 mt-1">Mevcut öğrencilerin e-posta adresleri değiştirilemez.</p>
-                )}
-              </div>
-              
-              <div>
-                <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
-                  Telefon
-                </label>
-                <input
-                  type="text"
-                  id="phoneNumber"
-                  name="phoneNumber"
-                  value={formData.phoneNumber}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  error={false}
+                  fullWidth
+                  helperText={selectedStudent ? "Mevcut öğrencilerin e-posta adresleri değiştirilemez." : ""}
+                  disabled={!!selectedStudent}
                 />
               </div>
               
               <div>
-                <label htmlFor="level" className="block text-sm font-medium text-gray-700 mb-1">
-                  Dans Seviyesi*
-                </label>
-                <select
-                  id="level"
-                  name="level"
+                <CustomPhoneInput
+                  name="phone"
+                  label="Telefon"
                   required
-                  value={formData.level}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="beginner">Başlangıç</option>
-                  <option value="intermediate">Orta</option>
-                  <option value="advanced">İleri</option>
-                  <option value="professional">Profesyonel</option>
-                </select>
-              </div>
-              
-              <div>
-                <StudentPhotoUploader 
-                  currentPhotoURL={formData.photoURL || DEFAULT_STUDENT_IMAGE}
-                  onImageChange={handlePhotoChange}
+                  countryCode="+90"
+                  phoneNumber={formData.phone}
+                  onCountryCodeChange={() => {}}
+                  onPhoneNumberChange={(value: string) => setFormData(prev => ({ ...prev, phone: value }))}
+                  fullWidth
                 />
               </div>
               
               <div>
-                <label htmlFor="instructorId" className="block text-sm font-medium text-gray-700 mb-1">
-                  Eğitmen
-                </label>
-                <select
-                  id="instructorId"
-                  name="instructorId"
-                  value={formData.instructorId}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="">Eğitmen Seç...</option>
-                  {instructors.map(instructor => (
-                    <option key={instructor.id} value={instructor.id}>
-                      {instructor.displayName}
-                    </option>
-                  ))}
-                </select>
+                <CustomSelect
+                  name="level"
+                  label="Dans Seviyesi"
+                  value={formData.level}
+                  onChange={(value: string | string[]) => {
+                    if (typeof value === 'string') {
+                      handleSelectChange(value, 'level');
+                    }
+                  }}
+                  options={[
+                    { value: 'beginner', label: 'Başlangıç' },
+                    { value: 'intermediate', label: 'Orta' },
+                    { value: 'advanced', label: 'İleri' },
+                    { value: 'professional', label: 'Profesyonel' }
+                  ]}
+                  fullWidth
+                  required
+                />
               </div>
+              
+              {isAdmin && (
+                <div>
+                  <CustomSelect
+                    name="instructorId"
+                    label="Eğitmen"
+                    value={formData.instructorId}
+                    onChange={(value: string | string[]) => {
+                      if (typeof value === 'string') {
+                        handleSelectChange(value, 'instructorId');
+                      }
+                    }}
+                    options={[
+                      { value: '', label: 'Eğitmen Seç...' },
+                      ...instructors.map(instructor => ({
+                        value: instructor.id,
+                        label: instructor.displayName
+                      }))
+                    ]}
+                    fullWidth
+                    required
+                  />
+                </div>
+              )}
               
               <div>
-                <label htmlFor="schoolId" className="block text-sm font-medium text-gray-700 mb-1">
-                  Okul
-                </label>
-                <select
-                  id="schoolId"
+                <CustomSelect
                   name="schoolId"
+                  label="Okul"
                   value={formData.schoolId}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="">Okul Seç...</option>
-                  {schools.map(school => (
-                    <option key={school.id} value={school.id}>
-                      {school.displayName}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value: string | string[]) => {
+                    if (typeof value === 'string') {
+                      handleSelectChange(value, 'schoolId');
+                    }
+                  }}
+                  options={[
+                    ...schools.map(school => ({
+                      value: school.id,
+                      label: school.displayName
+                    }))
+                  ]}
+                  fullWidth
+                  required
+                />
               </div>
-              
-              {!selectedStudent && (
-                <>
-                  <div className="md:col-span-2">
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id="createAccount"
-                        name="createAccount"
-                        checked={formData.createAccount}
-                        onChange={handleInputChange}
-                        className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
-                      />
-                      <label htmlFor="createAccount" className="ml-2 block text-sm text-gray-700">
-                        Giriş yapabilen kullanıcı hesabı oluştur
-                      </label>
-                    </div>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Bu seçeneği işaretlerseniz, öğrenci için giriş yapabileceği bir hesap oluşturulacak ve e-posta doğrulama gönderilecektir.
-                    </p>
-                  </div>
-                  
-                  {formData.createAccount && (
-                    <div className="md:col-span-2">
-                      <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                        Şifre*
-                      </label>
-                      <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        required={formData.createAccount}
-                        value={formData.password}
-                        onChange={handleInputChange}
-                        className="w-full p-2 border border-gray-300 rounded-md"
-                        minLength={6}
-                      />
-                      <p className="mt-1 text-xs text-gray-500">
-                        Şifre en az 6 karakter uzunluğunda olmalıdır.
-                      </p>
-                    </div>
-                  )}
-                </>
-              )}
             </div>
             
             <div className="flex justify-end space-x-3">
-              <button
-                type="button"
+              <Button
+                variant="outlined"
+                color="secondary"
                 onClick={() => setEditMode(false)}
-                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
                 disabled={loading}
               >
                 İptal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+                variant="contained"
+                color="primary"
                 disabled={loading}
               >
                 {loading ? 'Kaydediliyor...' : (selectedStudent ? 'Güncelle' : 'Ekle')}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
       ) : (
         <>
-          <div className="mb-4 flex flex-col md:flex-row md:items-center gap-4">
-            <div className="md:flex-1">
-              <input
-                type="text"
-                placeholder="Ad veya e-posta ile ara..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-md"
-              />
-            </div>
-          </div>
-          
           {loading && (
             <div className="flex justify-center my-4">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
             </div>
           )}
           
-          <div className="overflow-x-auto">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -1181,6 +1150,84 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-4">
+            {filteredStudents.length > 0 ? (
+              filteredStudents.map((student) => (
+                <div key={student.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center max-w-[60%]">
+                      <div className="flex-shrink-0 h-10 w-10 relative bg-green-100 rounded-full overflow-hidden">
+                        <img 
+                          className="h-10 w-10 rounded-full object-cover absolute inset-0" 
+                          src={student.photoURL || generateInitialsAvatar(student.displayName, 'student')}
+                          alt={student.displayName}
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            target.onerror = null;
+                            target.src = generateInitialsAvatar(student.displayName, 'student');
+                          }}
+                        />
+                      </div>
+                      <div className="ml-3 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">{student.displayName}</div>
+                        <div className="text-sm text-gray-500 truncate" title={student.email}>{student.email}</div>
+                      </div>
+                    </div>
+                    <div className="flex space-x-2 flex-shrink-0">
+                      <button
+                        onClick={() => editStudent(student)}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => deleteStudentHandler(student.id)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-gray-500">Dans Seviyesi:</span>
+                      <p className="font-medium">
+                        {student.level === 'beginner' && 'Başlangıç'}
+                        {student.level === 'intermediate' && 'Orta'}
+                        {student.level === 'advanced' && 'İleri'}
+                        {student.level === 'professional' && 'Profesyonel'}
+                        {!student.level && '-'}
+                      </p>
+                    </div>
+                    {student.phoneNumber && (
+                      <div>
+                        <span className="text-gray-500">Telefon:</span>
+                        <p className="font-medium">{student.phoneNumber}</p>
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-gray-500">Eğitmen:</span>
+                      <p className="font-medium">{student.instructorName || '-'}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Okul:</span>
+                      <p className="font-medium">{student.schoolName || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-4 text-sm text-gray-500">
+                {searchTerm ? 'Aramanıza uygun öğrenci bulunamadı.' : 'Henüz hiç öğrenci kaydı bulunmuyor.'}
+              </div>
+            )}
           </div>
         </>
       )}

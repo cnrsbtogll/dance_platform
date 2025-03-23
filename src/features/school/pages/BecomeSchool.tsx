@@ -15,8 +15,13 @@ import { createUserWithEmailAndPassword, updateProfile, AuthError } from 'fireba
 import { db, auth } from '../../../api/firebase/firebase';
 import { useAuth } from '../../../contexts/AuthContext';
 import CustomSelect from '../../../common/components/ui/CustomSelect';
+import CustomInput from '../../../common/components/ui/CustomInput';
+import CustomPhoneInput from '../../../common/components/ui/CustomPhoneInput';
+import Button from '../../../common/components/ui/Button';
+import ImageUploader from '../../../common/components/ui/ImageUploader';
 import { motion } from 'framer-motion';
 import { getAuthErrorMessage } from '../../../pages/auth/services/authService';
+import { generateInitialsAvatar } from '../../../common/utils/imageUtils';
 
 interface DanceStyle {
   id: string;
@@ -32,18 +37,34 @@ interface FormData {
   contactPhone: string;
   address: string;
   city: string;
+  district: string;
   zipCode: string;
   country: string;
   website: string;
   danceStyles: string[];
   establishedYear: string;
-  password?: string; // Şifre alanı opsiyonel
+  password: string;
+  facilities: string[];
+  photoURL: string;
 }
 
-function BecomeSchool() {
+interface BecomeSchoolProps {
+  onMount?: () => void;
+}
+
+function BecomeSchool({ onMount }: BecomeSchoolProps) {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  // Form ve validation state'leri
+  
+  console.log('🏫 BecomeSchool bileşeni başlatıldı:', {
+    currentUser: {
+      uid: currentUser?.uid,
+      email: currentUser?.email,
+      displayName: currentUser?.displayName
+    },
+    timestamp: new Date().toISOString()
+  });
+
   const [formData, setFormData] = useState<FormData>({
     schoolName: '',
     schoolDescription: '',
@@ -52,15 +73,17 @@ function BecomeSchool() {
     contactPhone: '',
     address: '',
     city: '',
+    district: '',
     zipCode: '',
     country: 'Türkiye',
     website: '',
     danceStyles: [],
     establishedYear: '',
-    password: ''
+    password: '',
+    facilities: [],
+    photoURL: ''
   });
   
-  const [selectedDanceStyles, setSelectedDanceStyles] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof FormData, string>>>({});
@@ -70,6 +93,10 @@ function BecomeSchool() {
   const [isLoading, setIsLoading] = useState(true);
   const [danceStyles, setDanceStyles] = useState<DanceStyle[]>([]);
   const [loadingStyles, setLoadingStyles] = useState(true);
+
+  useEffect(() => {
+    onMount?.();
+  }, [onMount]);
 
   // Fetch dance styles from Firestore
   useEffect(() => {
@@ -118,28 +145,38 @@ function BecomeSchool() {
   }, []);
 
   useEffect(() => {
-    // Kullanıcı bilgilerini kontrol et
     const checkUserStatus = async () => {
+      console.log('🔍 Kullanıcı durumu kontrolü başladı:', {
+        currentUser: currentUser?.uid,
+        timestamp: new Date().toISOString()
+      });
+
       try {
         if (currentUser) {
-          // Kullanıcı giriş yapmışsa kontrolleri yap
+          console.log('👤 Giriş yapmış kullanıcı kontrolü:', {
+            uid: currentUser.uid,
+            email: currentUser.email
+          });
           
-          // Check if user is already a school admin
           const userDocRef = doc(db, 'users', currentUser.uid);
           const userDoc = await getDoc(userDocRef);
 
           if (userDoc.exists()) {
             const userData = userDoc.data();
+            console.log('📄 Kullanıcı dokümanı bulundu:', {
+              userData: userData,
+              roles: userData.role
+            });
+            
             const roles = userData.role || [];
             
-            // If user already has school role, redirect to school admin panel
             if (Array.isArray(roles) && roles.includes('school')) {
+              console.log('⚠️ Kullanıcı zaten okul sahibi');
               setIsAlreadySchool(true);
               setIsLoading(false);
               return;
             }
 
-            // Pre-fill form with user data if available
             if (userData.displayName) {
               setFormData(prev => ({
                 ...prev,
@@ -154,7 +191,6 @@ function BecomeSchool() {
             }
           }
 
-          // Check if user already has a pending application
           const requestsRef = collection(db, 'schoolRequests');
           const q = query(
             requestsRef,
@@ -165,35 +201,36 @@ function BecomeSchool() {
           const querySnapshot = await getDocs(q);
           
           if (!querySnapshot.empty) {
+            console.log('⏳ Kullanıcının bekleyen başvurusu var');
             setHasExistingApplication(true);
           }
           
-          // Email alanını currentUser'dan al
           setFormData(prev => ({
             ...prev,
             contactEmail: currentUser.email || ''
           }));
+        } else {
+          console.log('⚠️ Giriş yapmamış kullanıcı');
         }
         
         setIsLoading(false);
       } catch (err) {
-        console.error('Error checking user status:', err);
+        console.error('❌ Kullanıcı durumu kontrol hatası:', err);
         setError('Kullanıcı durumu kontrol edilirken bir hata oluştu. Lütfen tekrar deneyin.');
         setIsLoading(false);
       }
     };
 
     checkUserStatus();
-  }, [currentUser, navigate]);
+  }, [currentUser]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement> | { target: { name: string; value: any } }) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
     
-    // Alanın hata mesajını temizle
     if (formErrors[name as keyof FormData]) {
       setFormErrors(prev => {
         const updated = {...prev};
@@ -204,21 +241,14 @@ function BecomeSchool() {
   };
 
   const handleDanceStyleChange = (value: string | string[]) => {
-    // value bir array olarak geldiğinde (multiple seçim) doğrudan kullan
-    // string olarak geldiğinde bir array'e dönüştür
     const danceStylesArray = Array.isArray(value) ? value : [value];
-    
-    // Boş seçim durumunda boş array ile güncelle
-    // Tümü seçeneği seçildiğinde boş array dönücek
     const filteredStyles = value === '' ? [] : danceStylesArray.filter(style => style !== '');
     
-    setSelectedDanceStyles(filteredStyles);
     setFormData(prev => ({
       ...prev,
       danceStyles: filteredStyles
     }));
     
-    // Dans stili seçildiğinde ilgili hatayı temizle
     if (formErrors.danceStyles) {
       setFormErrors(prev => {
         const updated = {...prev};
@@ -228,6 +258,23 @@ function BecomeSchool() {
     }
   };
 
+  const handleFacilitiesChange = (value: string | string[]) => {
+    const facilitiesArray = Array.isArray(value) ? value : [value];
+    const filteredFacilities = value === '' ? [] : facilitiesArray.filter(facility => facility !== '');
+    
+    setFormData(prev => ({
+      ...prev,
+      facilities: filteredFacilities
+    }));
+  };
+
+  const handleImageChange = (base64Image: string | null) => {
+    setFormData(prev => ({
+      ...prev,
+      photoURL: base64Image || ''
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -235,7 +282,6 @@ function BecomeSchool() {
     setFormErrors({});
     
     try {
-      // Validate form data
       const errors: Partial<Record<keyof FormData, string>> = {};
       
       if (!formData.schoolName.trim()) {
@@ -252,7 +298,6 @@ function BecomeSchool() {
         errors.contactEmail = 'Geçerli bir email adresi girin';
       }
       
-      // Telefon numarasının kontrolü - boşlukları kaldır ve doğrula
       const cleanPhone = formData.contactPhone.replace(/\s/g, '');
       
       if (!cleanPhone) {
@@ -265,7 +310,6 @@ function BecomeSchool() {
         errors.danceStyles = 'En az bir dans stili seçmelisiniz';
       }
       
-      // Kullanıcı giriş yapmamışsa şifre kontrolü
       if (!currentUser) {
         if (!formData.password) {
           errors.password = 'Bu alan zorunlu';
@@ -274,52 +318,43 @@ function BecomeSchool() {
         }
       }
       
-      // Hata varsa, formu göndermeyi durdur
       if (Object.keys(errors).length > 0) {
         setFormErrors(errors);
         setIsSubmitting(false);
         return;
       }
       
-      // Kullanıcı hesabı ve okul başvurusu oluşturma işlemi
       let userId = currentUser?.uid;
       let userEmail = currentUser?.email || formData.contactEmail;
       
-      // Kullanıcı giriş yapmamışsa yeni hesap oluştur
       if (!currentUser) {
         try {
-          // Firebase Authentication ile kullanıcı oluştur
           const userCredential = await createUserWithEmailAndPassword(
             auth, 
             formData.contactEmail, 
             formData.password as string
           );
           
-          // Kullanıcı profiline displayName ekle
           await updateProfile(userCredential.user, { displayName: formData.contactPerson });
           
-          // User ID'sini güncelle
           userId = userCredential.user.uid;
           
-          // Firestore'a kullanıcı bilgilerini kaydet
           await setDoc(doc(db, 'users', userId), {
             id: userId,
             email: formData.contactEmail,
             displayName: formData.contactPerson,
-            photoURL: '',
+            photoURL: formData.photoURL || generateInitialsAvatar(formData.contactPerson, 'school'),
             phoneNumber: formData.contactPhone,
-            role: ['school_applicant'], // Başlangıçta başvuru rolü
+            role: ['school_applicant'],
             createdAt: serverTimestamp()
           });
           
         } catch (authError) {
-          // Kimlik doğrulama hatasını işle
           const error = authError as AuthError;
           throw new Error(getAuthErrorMessage(error));
         }
       }
       
-      // Okul başvurusu oluştur
       await addDoc(collection(db, 'schoolRequests'), {
         schoolName: formData.schoolName,
         schoolDescription: formData.schoolDescription,
@@ -328,11 +363,14 @@ function BecomeSchool() {
         contactPhone: formData.contactPhone,
         address: formData.address,
         city: formData.city,
+        district: formData.district,
         zipCode: formData.zipCode,
         country: formData.country,
         website: formData.website,
         danceStyles: formData.danceStyles,
         establishedYear: formData.establishedYear,
+        facilities: formData.facilities,
+        photoURL: formData.photoURL,
         userId: userId,
         userEmail: userEmail,
         status: 'pending',
@@ -341,7 +379,6 @@ function BecomeSchool() {
       
       setSuccess(true);
       
-      // Formu sıfırla
       setFormData({
         schoolName: '',
         schoolDescription: '',
@@ -350,14 +387,16 @@ function BecomeSchool() {
         contactPhone: '',
         address: '',
         city: '',
+        district: '',
         zipCode: '',
         country: 'Türkiye',
         website: '',
         danceStyles: [],
         establishedYear: '',
-        password: ''
+        password: '',
+        facilities: [],
+        photoURL: ''
       });
-      setSelectedDanceStyles([]);
       
     } catch (err) {
       console.error('Error submitting school application:', err);
@@ -387,12 +426,12 @@ function BecomeSchool() {
           </div>
           <h2 className="text-2xl font-semibold text-gray-800 mb-2">Zaten bir dans okulu yöneticisisiniz!</h2>
           <p className="text-gray-600 mb-6">Dans okulu panelinize giderek okulunuzu yönetebilirsiniz.</p>
-          <button 
+          <Button 
             onClick={() => navigate('/school-admin')}
-            className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+            variant="primary"
           >
             Dans Okulu Paneline Git
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -409,12 +448,12 @@ function BecomeSchool() {
           </div>
           <h2 className="text-2xl font-semibold text-gray-800 mb-2">Başvurunuz İnceleniyor</h2>
           <p className="text-gray-600 mb-6">Dans okulu başvurunuz halihazırda inceleniyor. Başvurunuz onaylandığında size e-posta ile bilgilendirme yapılacaktır.</p>
-          <button 
+          <Button 
             onClick={() => navigate('/')}
-            className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+            variant="primary"
           >
             Ana Sayfaya Dön
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -434,22 +473,30 @@ function BecomeSchool() {
             {!currentUser ? "Hesabınız oluşturuldu ve " : ""}
             Dans okulu başvurunuz başarıyla alındı. Başvurunuz incelendikten sonra size e-posta ile bilgilendirme yapılacaktır.
           </p>
-          <button 
+          <Button 
             onClick={() => navigate('/')}
-            className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+            variant="primary"
           >
             Ana Sayfaya Dön
-          </button>
+          </Button>
         </div>
       </div>
     );
   }
 
-  // Get dance style options for the dropdown
   const danceStyleOptions = danceStyles.map(style => ({
-    label: style.label,
-    value: style.value
+    value: style.value,
+    label: style.label
   }));
+
+  const facilitiesOptions = [
+    { value: 'parking', label: 'Otopark' },
+    { value: 'shower', label: 'Duş' },
+    { value: 'locker', label: 'Soyunma Odası' },
+    { value: 'cafe', label: 'Kafeterya' },
+    { value: 'airCondition', label: 'Klima' },
+    { value: 'wifi', label: 'Wifi' }
+  ];
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
@@ -478,285 +525,218 @@ function BecomeSchool() {
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-700 mb-4 border-b pb-2">Okul Bilgileri</h3>
             
-            <div className="mb-4">
-              <label htmlFor="schoolName" className="block text-sm font-medium text-gray-700 mb-1">
-                Dans Okulu Adı*
-              </label>
-              <input
-                type="text"
-                id="schoolName"
-                name="schoolName"
-                value={formData.schoolName}
-                onChange={handleChange}
-                placeholder="Okul adını giriniz"
-                className={`w-full p-2 border ${formErrors.schoolName ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-indigo-500`}
-              />
-              {formErrors.schoolName && (
-                <p className="text-red-500 text-xs mt-1">{formErrors.schoolName}</p>
-              )}
-            </div>
-            
-            <div className="mb-4">
-              <label htmlFor="schoolDescription" className="block text-sm font-medium text-gray-700 mb-1">
-                Okul Tanımı
-              </label>
-              <textarea
-                id="schoolDescription"
-                name="schoolDescription"
-                rows={4}
-                value={formData.schoolDescription}
-                onChange={handleChange}
-                placeholder="Okulunuz hakkında kısa bir tanım..."
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
-              ></textarea>
-            </div>
-            
-            <div className="mb-4">
-              <label htmlFor="establishedYear" className="block text-sm font-medium text-gray-700 mb-1">
-                Kuruluş Yılı
-              </label>
-              <input
-                type="number"
-                id="establishedYear"
-                name="establishedYear"
-                min="1900"
-                max={new Date().getFullYear()}
-                value={formData.establishedYear}
-                onChange={handleChange}
-                placeholder="Örn: 2015"
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Dans Stilleri*
-              </label>
-              {loadingStyles ? (
-                <div className="bg-gray-100 p-2 rounded-md flex items-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500 mr-2"></div>
-                  <span className="text-gray-600">Dans stilleri yükleniyor...</span>
-                </div>
-              ) : (
-                <CustomSelect
-                  label=""
-                  options={danceStyleOptions}
-                  value={selectedDanceStyles}
-                  onChange={handleDanceStyleChange}
-                  placeholder="Dans stillerinizi seçin"
-                  className="w-full"
-                  error={formErrors.danceStyles}
-                  multiple={true}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <CustomInput
+                  label="Dans Okulu Adı"
+                  name="schoolName"
+                  value={formData.schoolName}
+                  onChange={handleInputChange}
+                  error={!!formErrors.schoolName}
+                  helperText={formErrors.schoolName}
+                  required
                 />
-              )}
+              </div>
+              
+              <div className="col-span-2">
+                <CustomInput
+                  label="Okul Tanımı"
+                  name="schoolDescription"
+                  value={formData.schoolDescription}
+                  onChange={handleInputChange}
+                  multiline
+                  rows={4}
+                />
+              </div>
+              
+              <div>
+                <CustomInput
+                  label="Kuruluş Yılı"
+                  name="establishedYear"
+                  type="text"
+                  value={formData.establishedYear}
+                  onChange={handleInputChange}
+                  helperText={`${1900} - ${new Date().getFullYear()} arası bir yıl girin`}
+                />
+              </div>
+              
+              <div className="col-span-2">
+                <CustomSelect
+                  label="Dans Stilleri"
+                  name="danceStyles"
+                  value={formData.danceStyles}
+                  options={danceStyleOptions}
+                  onChange={handleDanceStyleChange}
+                  error={formErrors.danceStyles}
+                  multiple
+                  required
+                />
+              </div>
+
+              <div className="col-span-2">
+                <CustomSelect
+                  label="Olanaklar"
+                  name="facilities"
+                  value={formData.facilities}
+                  options={facilitiesOptions}
+                  onChange={handleFacilitiesChange}
+                  multiple
+                />
+              </div>
             </div>
           </div>
           
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-700 mb-4 border-b pb-2">İletişim Bilgileri</h3>
             
-            <div className="mb-4">
-              <label htmlFor="contactPerson" className="block text-sm font-medium text-gray-700 mb-1">
-                Yetkili Kişi Adı*
-              </label>
-              <input
-                type="text"
-                id="contactPerson"
-                name="contactPerson"
-                value={formData.contactPerson}
-                onChange={handleChange}
-                placeholder="Yetkili kişi adını giriniz"
-                className={`w-full p-2 border ${formErrors.contactPerson ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-indigo-500`}
-              />
-              {formErrors.contactPerson && (
-                <p className="text-red-500 text-xs mt-1">{formErrors.contactPerson}</p>
-              )}
-            </div>
-            
-            <div className="mb-4">
-              <label htmlFor="contactEmail" className="block text-sm font-medium text-gray-700 mb-1">
-                İletişim E-posta*
-              </label>
-              <input
-                type="email"
-                id="contactEmail"
-                name="contactEmail"
-                value={formData.contactEmail}
-                onChange={handleChange}
-                placeholder="E-posta adresinizi giriniz"
-                className={`w-full p-2 border ${formErrors.contactEmail ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-indigo-500`}
-              />
-              {formErrors.contactEmail && (
-                <p className="text-red-500 text-xs mt-1">{formErrors.contactEmail}</p>
-              )}
-            </div>
-            
-            <div className="mb-4">
-              <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700 mb-1">
-                İletişim Telefonu*
-              </label>
-              <div className="flex items-center">
-                <div className={`bg-gray-100 p-2 border ${formErrors.contactPhone ? 'border-red-500' : 'border-gray-300'} border-r-0 rounded-l-md`}>
-                  +90
-                </div>
-                <input
-                  type="tel"
-                  pattern="[0-9]*"
-                  inputMode="numeric"
-                  id="contactPhone"
-                  name="contactPhone"
-                  value={formData.contactPhone}
-                  onChange={(e) => {
-                    // Sadece rakam girişine izin ver
-                    const rawValue = e.target.value.replace(/[^0-9]/g, '');
-                    
-                    // 10 karakterden uzun olmasını engelleyin (Türkiye formatında)
-                    const trimmedValue = rawValue.slice(0, 10);
-                    
-                    // Telefon numarasına maske uygula (5XX XXX XX XX formatında)
-                    let formattedValue = trimmedValue;
-                    
-                    if (trimmedValue.length > 3) {
-                      formattedValue = `${trimmedValue.slice(0, 3)} ${trimmedValue.slice(3)}`;
-                    }
-                    if (trimmedValue.length > 6) {
-                      formattedValue = `${formattedValue.slice(0, 7)} ${formattedValue.slice(7)}`;
-                    }
-                    if (trimmedValue.length > 8) {
-                      formattedValue = `${formattedValue.slice(0, 10)} ${formattedValue.slice(10)}`;
-                    }
-                    
-                    setFormData(prev => ({
-                      ...prev,
-                      contactPhone: formattedValue
-                    }));
-                    
-                    // Hata mesajını temizle
-                    if (formErrors.contactPhone) {
-                      setFormErrors(prev => {
-                        const updated = {...prev};
-                        delete updated.contactPhone;
-                        return updated;
-                      });
-                    }
-                  }}
-                  placeholder="5XX XXX XX XX"
-                  className={`w-full p-2 border ${formErrors.contactPhone ? 'border-red-500' : 'border-gray-300'} rounded-r-md focus:ring-2 focus:ring-indigo-500`}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <CustomInput
+                  label="Yetkili Kişi Adı"
+                  name="contactPerson"
+                  value={formData.contactPerson}
+                  onChange={handleInputChange}
+                  error={!!formErrors.contactPerson}
+                  helperText={formErrors.contactPerson}
+                  required
                 />
               </div>
-              {formErrors.contactPhone && (
-                <p className="text-red-500 text-xs mt-1">{formErrors.contactPhone}</p>
-              )}
-            </div>
-            
-            <div className="mb-4">
-            <label htmlFor="website" className="block text-sm font-medium text-gray-700 mb-1">
-            Web Sitesi
-            </label>
-            <input
-            type="url"
-            id="website"
-            name="website"
-            value={formData.website}
-            onChange={handleChange}
-            placeholder="Örn: https://www.dansokulum.com"
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
-            />
-            </div>
+              
+              <div className="col-span-2">
+                <CustomInput
+                  label="İletişim E-posta"
+                  name="contactEmail"
+                  type="email"
+                  value={formData.contactEmail}
+                  onChange={handleInputChange}
+                  error={!!formErrors.contactEmail}
+                  helperText={formErrors.contactEmail}
+                  required
+                  disabled={!!currentUser}
+                />
+              </div>
+              
+              <div className="col-span-2">
+                <CustomPhoneInput
+                  label="İletişim Telefonu"
+                  name="contactPhone"
+                  countryCode="+90"
+                  phoneNumber={formData.contactPhone}
+                  onPhoneNumberChange={(value: string) => handleInputChange({ target: { name: 'contactPhone', value } })}
+                  onCountryCodeChange={() => {}}
+                  error={!!formErrors.contactPhone}
+                  helperText={formErrors.contactPhone}
+                  required
+                />
+              </div>
+              
+              <div className="col-span-2">
+                <CustomInput
+                  label="Web Sitesi"
+                  name="website"
+                  type="text"
+                  value={formData.website || ''}
+                  onChange={handleInputChange}
+                  placeholder="https://www.dansokulum.com"
+                />
+              </div>
 
-              {/* Giriş yapmamış kullanıcı için şifre alanı */}
               {!currentUser && (
-                <div className="mb-4">
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                    Şifre*
-                  </label>
-                  <input
-                    type="password"
-                    id="password"
+                <div className="col-span-2">
+                  <CustomInput
+                    label="Şifre"
                     name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    placeholder="En az 6 karakter şifre giriniz"
-                    className={`w-full p-2 border ${formErrors.password ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-indigo-500`}
+                    type="password"
+                    value={formData.password || ''}
+                    onChange={handleInputChange}
+                    error={!!formErrors.password}
+                    helperText={formErrors.password}
+                    required
                   />
-                  {formErrors.password && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.password}</p>
-                  )}
                 </div>
               )}
+            </div>
           </div>
           
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-700 mb-4 border-b pb-2">Adres Bilgileri</h3>
             
-            <div className="mb-4">
-              <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
-                Adres
-              </label>
-              <input
-                type="text"
-                id="address"
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-                placeholder="Sokak, mahalle, cadde..."
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="mb-4">
-                <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
-                  Şehir
-                </label>
-                <input
-                  type="text"
-                  id="city"
-                  name="city"
-                  value={formData.city}
-                  onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <CustomInput
+                  label="Adres"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  multiline
+                  rows={3}
                 />
               </div>
               
-              <div className="mb-4">
-                <label htmlFor="zipCode" className="block text-sm font-medium text-gray-700 mb-1">
-                  Posta Kodu
-                </label>
-                <input
-                  type="text"
-                  id="zipCode"
-                  name="zipCode"
-                  value={formData.zipCode}
-                  onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
-                />
+              <div className="grid grid-cols-2 gap-4 col-span-2">
+                <div>
+                  <CustomInput
+                    label="Şehir"
+                    name="city"
+                    value={formData.city}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                
+                <div>
+                  <CustomInput
+                    label="İlçe"
+                    name="district"
+                    value={formData.district}
+                    onChange={handleInputChange}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 col-span-2">
+                <div>
+                  <CustomInput
+                    label="Posta Kodu"
+                    name="zipCode"
+                    value={formData.zipCode}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                
+                <div>
+                  <CustomInput
+                    label="Ülke"
+                    name="country"
+                    value={formData.country || ''}
+                    onChange={handleInputChange}
+                  />
+                </div>
               </div>
             </div>
-            
-            <div className="mb-4">
-              <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-1">
-                Ülke
-              </label>
-              <input
-                type="text"
-                id="country"
-                name="country"
-                value={formData.country}
-                onChange={handleChange}
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
+          </div>
+
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4 border-b pb-2">Okul Fotoğrafı</h3>
+            <ImageUploader
+              currentPhotoURL={formData.photoURL}
+              onImageChange={handleImageChange}
+              displayName={formData.schoolName || '?'}
+              userType="school"
+              shape="square"
+              width={300}
+              height={200}
+            />
           </div>
           
           <div className="flex justify-end">
-            <button
+            <Button
               type="submit"
+              variant="primary"
               disabled={isSubmitting}
-              className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors disabled:bg-indigo-400"
+              loading={isSubmitting}
             >
               {isSubmitting ? 'Gönderiliyor...' : 'Başvuruyu Gönder'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

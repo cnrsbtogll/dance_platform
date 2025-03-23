@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { DanceClass } from '../../../types';
 import { Link } from 'react-router-dom';
+import { Dialog, Transition } from '@headlessui/react';
+import { Fragment } from 'react';
 
 interface CourseCardProps {
   course: DanceClass;
@@ -9,6 +11,7 @@ interface CourseCardProps {
 
 const CourseCard: React.FC<CourseCardProps> = ({ course, onEnroll }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
 
   // Dans stiline göre renk
   const getDanceStyleColor = (style: string) => {
@@ -136,21 +139,135 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEnroll }) => {
     return `${course.price.toLocaleString('tr-TR')} ${currencySymbol}`;
   };
 
+  const ContactModal = () => (
+    <Transition appear show={isContactModalOpen} as={Fragment}>
+      <Dialog as="div" className="relative z-50" onClose={() => setIsContactModalOpen(false)}>
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black bg-opacity-25" />
+        </Transition.Child>
+
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4 text-center">
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
+            >
+              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                <Dialog.Title
+                  as="h3"
+                  className="text-lg font-medium leading-6 text-gray-900 mb-4"
+                >
+                  {course.name} - İletişim Bilgileri
+                </Dialog.Title>
+                
+                <div className="mt-2 space-y-4">
+                  {course.schoolName && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-500">Dans Okulu</h4>
+                      <p className="text-base text-gray-900">{course.schoolName}</p>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500">Eğitmen</h4>
+                    <p className="text-base text-gray-900">{course.instructorName}</p>
+                  </div>
+
+                  {course.phoneNumber && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-500">Telefon</h4>
+                      <a 
+                        href={`tel:${course.phoneNumber}`}
+                        className="text-base text-indigo-600 hover:text-indigo-800"
+                      >
+                        {course.phoneNumber}
+                      </a>
+                    </div>
+                  )}
+
+                  {course.email && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-500">E-posta</h4>
+                      <a 
+                        href={`mailto:${course.email}`}
+                        className="text-base text-indigo-600 hover:text-indigo-800"
+                      >
+                        {course.email}
+                      </a>
+                    </div>
+                  )}
+
+                  {course.location?.address && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-500">Adres</h4>
+                      <p className="text-base text-gray-900">{course.location.address}</p>
+                    </div>
+                  )}
+
+                  <div className="mt-6">
+                    <p className="text-sm text-gray-500">
+                      * Lütfen iletişime geçerken bu kursun adını belirtmeyi unutmayın.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    className="inline-flex justify-center rounded-md border border-transparent bg-indigo-100 px-4 py-2 text-sm font-medium text-indigo-900 hover:bg-indigo-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                    onClick={() => setIsContactModalOpen(false)}
+                  >
+                    Kapat
+                  </button>
+                  {course.phoneNumber && (
+                    <a
+                      href={`tel:${course.phoneNumber}`}
+                      className="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                    >
+                      Hemen Ara
+                    </a>
+                  )}
+                </div>
+              </Dialog.Panel>
+            </Transition.Child>
+          </div>
+        </div>
+      </Dialog>
+    </Transition>
+  );
+
   return (
-    <Link
-      to={`/courses/${course.id}`}
-      className="bg-white rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300 overflow-hidden"
-    >
-      <div className="relative">
-        {/* Resim Konteyner ve Overlay */}
-        <div className="relative h-56 overflow-hidden group">
-          <img 
-            src={course.imageUrl || `https://via.placeholder.com/400x250?text=${encodeURIComponent(getDanceStyleName(course.danceStyle))}`} 
-            alt={course.name} 
-            className={`w-full h-full object-cover object-center transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'}`}
-            style={{ objectPosition: 'center center' }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80"></div>
+    <>
+      <Link
+        to={`/courses/${course.id}`}
+        className="bg-white rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col h-full"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {/* Resim Konteyner - Sabit yükseklik */}
+        <div className="relative h-48">
+          <div className="absolute inset-0">
+            <img 
+              src={course.imageUrl || `https://via.placeholder.com/400x250?text=${encodeURIComponent(getDanceStyleName(course.danceStyle))}`} 
+              alt={course.name} 
+              className={`w-full h-full object-cover object-center transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'}`}
+              style={{ objectPosition: 'center center' }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80"></div>
+          </div>
           
           {/* Seviye rozeti */}
           <div className={`absolute top-4 right-4 ${getLevelColor(course.level)} text-white px-3 py-1 text-sm font-medium rounded-full shadow-lg`}>
@@ -165,87 +282,96 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEnroll }) => {
             {formatSchedule()}
           </div>
         </div>
-      </div>
 
-      {/* Kurs Bilgileri */}
-      <div className="p-5">
-        <div className="flex justify-between items-start">
-          <div>
-            <div className="flex space-x-2 mb-2">
-              <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getDanceStyleColor(course.danceStyle)} text-white`}>
-                {getDanceStyleName(course.danceStyle)}
-              </span>
-              {course.recurring && (
-                <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
-                  Periyodik
+        {/* Kurs Bilgileri - flex-grow ile kalan alanı doldur */}
+        <div className="p-5 flex flex-col flex-grow">
+          {/* Üst Kısım */}
+          <div className="flex-grow">
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex space-x-2">
+                <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getDanceStyleColor(course.danceStyle)} text-white`}>
+                  {getDanceStyleName(course.danceStyle)}
                 </span>
-              )}
+                {course.recurring && (
+                  <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                    Periyodik
+                  </span>
+                )}
+              </div>
+              <div className="text-lg font-bold text-indigo-600">
+                {formatPrice()}
+              </div>
             </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-1">{course.name}</h3>
+
+            <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2">{course.name}</h3>
+            
             <p className="text-sm text-gray-500 mb-3">
               {course.instructorName} 
               {course.schoolName && ` • ${course.schoolName}`}
             </p>
+            
+            <p className="text-sm text-gray-600 line-clamp-2 mb-4">
+              {course.description}
+            </p>
           </div>
-          <div className="text-lg font-bold text-indigo-600">
-            {formatPrice()}
-          </div>
-        </div>
-        
-        <p className="text-sm text-gray-600 line-clamp-2 mb-4">
-          {course.description}
-        </p>
-        
-        {/* Katılımcı durumu */}
-        <div className="mb-4">
-          <div className="flex items-center mb-1">
-            <div className="h-2 w-full bg-gray-200 rounded-full">
-              <div 
-                className={`h-2 rounded-full ${
-                  course.currentParticipants / course.maxParticipants > 0.8
-                    ? 'bg-red-500'
-                    : course.currentParticipants / course.maxParticipants > 0.5
-                    ? 'bg-yellow-500'
-                    : 'bg-green-500'
-                }`}
-                style={{ width: `${(course.currentParticipants / course.maxParticipants) * 100}%` }}
-              ></div>
+
+          {/* Alt Kısım - Katılımcı Durumu ve Butonlar */}
+          <div>
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex-1 mr-3">
+                  <div className="h-2 w-full bg-gray-200 rounded-full">
+                    <div 
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        course.currentParticipants / course.maxParticipants > 0.8
+                          ? 'bg-red-500'
+                          : course.currentParticipants / course.maxParticipants > 0.5
+                          ? 'bg-yellow-500'
+                          : 'bg-green-500'
+                      }`}
+                      style={{ width: `${(course.currentParticipants / course.maxParticipants) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-center min-w-[60px] text-sm font-medium text-gray-700 tabular-nums">
+                  {course.currentParticipants}/{course.maxParticipants}
+                </div>
+              </div>
+              <p className="text-xs text-gray-500">
+                {course.currentParticipants === course.maxParticipants 
+                  ? 'Kontenjan dolu' 
+                  : `${course.maxParticipants - course.currentParticipants} kişilik kontenjan kaldı`}
+              </p>
             </div>
-            <span className="ml-2 text-xs text-gray-700">
-              {course.currentParticipants} / {course.maxParticipants}
-            </span>
+            
+            {/* Butonlar */}
+            <div className="flex space-x-2">
+              <Link 
+                to={`/courses/${course.id}`} 
+                className="flex-1 py-2 px-4 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 text-center"
+              >
+                Detaylar
+              </Link>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  setIsContactModalOpen(true);
+                }}
+                disabled={course.currentParticipants >= course.maxParticipants}
+                className={`flex-1 py-2 px-4 text-sm font-medium rounded-md ${
+                  course.currentParticipants >= course.maxParticipants
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'
+                }`}
+              >
+                İletişime Geç
+              </button>
+            </div>
           </div>
-          <p className="text-xs text-gray-500">
-            {course.currentParticipants === course.maxParticipants 
-              ? 'Kontenjan dolu' 
-              : `${course.maxParticipants - course.currentParticipants} kişilik kontenjan kaldı`}
-          </p>
         </div>
-        
-        {/* Butonlar */}
-        <div className="flex space-x-2">
-          <Link 
-            to={`/courses/${course.id}`} 
-            className="flex-1 py-2 px-4 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 text-center"
-          >
-            Detaylar
-          </Link>
-          {onEnroll && (
-            <button
-              onClick={() => onEnroll(course.id)}
-              disabled={course.currentParticipants >= course.maxParticipants}
-              className={`flex-1 py-2 px-4 text-sm font-medium rounded-md ${
-                course.currentParticipants >= course.maxParticipants
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'
-              }`}
-            >
-              Katıl
-            </button>
-          )}
-        </div>
-      </div>
-    </Link>
+      </Link>
+      <ContactModal />
+    </>
   );
 };
 

@@ -10,6 +10,7 @@ import CustomSelect from '../../../common/components/ui/CustomSelect';
 import CustomPhoneInput from '../../../common/components/ui/CustomPhoneInput';
 import { useNavigate } from 'react-router-dom';
 import { updateProfile } from 'firebase/auth';
+import CustomInput from '../../../common/components/ui/CustomInput';
 
 interface InstructorProfileFormProps {
   user: User;
@@ -21,6 +22,7 @@ interface InstructorProfileFormData {
   specialties: string[];
   experience: string;
   phoneNumber: string;
+  countryCode: string;
   location: string;
   photoURL: string;
 }
@@ -36,7 +38,18 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [resetImageUploader, setResetImageUploader] = useState(false);
-  const { register, handleSubmit, setValue, watch, reset, getValues } = useForm<InstructorProfileFormData>();
+  const { register, handleSubmit, setValue, watch, reset, getValues } = useForm<InstructorProfileFormData>({
+    defaultValues: {
+      displayName: '',
+      bio: '',
+      specialties: [],
+      experience: '',
+      phoneNumber: '',
+      countryCode: '+90',
+      location: '',
+      photoURL: ''
+    }
+  });
 
   // Kullanıcı kontrolü
   useEffect(() => {
@@ -105,6 +118,7 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
             specialties: data.specialties || [],
             experience: data.experience || '',
             phoneNumber: data.phoneNumber || '',
+            countryCode: data.countryCode || '+90',
             location: data.location || '',
             photoURL: data.photoURL || user.photoURL || ''
           };
@@ -125,6 +139,7 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
             specialties: [],
             experience: '',
             phoneNumber: '',
+            countryCode: '+90',
             location: '',
             photoURL: user.photoURL || '',
             createdAt: new Date().toISOString(),
@@ -189,6 +204,7 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
         specialties: selectedSpecialties,
         experience: data.experience.trim(),
         phoneNumber: data.phoneNumber.replace(/\s/g, ''),
+        countryCode: data.countryCode,
         location: data.location.trim(),
         updatedAt: updateTimestamp
       };
@@ -359,145 +375,168 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-2xl mx-auto">
-      <div className="bg-white shadow-sm rounded-lg p-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Profil Bilgileri</h2>
-        
-        {/* Profil Fotoğrafı */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Profil Fotoğrafı
-          </label>
-          <div className="flex items-center">
-            <ImageUploader
-              currentPhotoURL={profilePhotoURL}
-              onImageChange={handleImageUploadComplete}
-              shape="circle"
-              width={96}
-              height={96}
-              resetState={resetImageUploader}
-            />
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        {/* Header Section */}
+        <div className="border-b border-gray-200 bg-gray-50/50 px-6 py-4">
+          <h2 className="text-xl font-semibold text-gray-900">Profil Bilgileri</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            Profilinizi güncelleyerek öğrencilerinize kendinizi daha iyi tanıtın
+          </p>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Profil Fotoğrafı */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 pb-6 border-b border-gray-200">
+            <div className="shrink-0">
+              <ImageUploader
+                currentPhotoURL={profilePhotoURL}
+                onImageChange={handleImageUploadComplete}
+                shape="circle"
+                width={96}
+                height={96}
+              />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-base font-medium text-gray-900">Profil Fotoğrafı</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                JPG veya PNG formatında, yüksek kaliteli bir fotoğraf yükleyin
+              </p>
+            </div>
+          </div>
+
+          {/* Kişisel Bilgiler */}
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-6">
+              {/* İsim */}
+              <div>
+                <CustomInput
+                  name="displayName"
+                  label="İsim Soyisim"
+                  value={watch('displayName')}
+                  onChange={(e) => setValue('displayName', e.target.value)}
+                  placeholder="Adınız ve soyadınız"
+                  required
+                />
+              </div>
+
+              {/* Biyografi */}
+              <div>
+                <CustomInput
+                  name="bio"
+                  label="Biyografi"
+                  value={watch('bio')}
+                  onChange={(e) => setValue('bio', e.target.value)}
+                  placeholder="Kendinizden, dans geçmişinizden ve öğretim yaklaşımınızdan bahsedin..."
+                  multiline
+                  rows={4}
+                />
+                <p className="mt-2 text-sm text-gray-500">
+                  Öğrencilerinizin sizi daha iyi tanımasını sağlayacak bilgiler ekleyin
+                </p>
+              </div>
+
+              {/* Uzmanlık Alanları */}
+              <div>
+                <CustomSelect
+                  name="specialties"
+                  label="Uzmanlık Alanları"
+                  options={specialtyOptions}
+                  value={selectedSpecialties}
+                  onChange={handleSpecialtiesChange}
+                  placeholder="Dans stillerinizi seçin"
+                  multiple={true}
+                />
+                <p className="mt-2 text-sm text-gray-500">
+                  Uzman olduğunuz dans stillerini seçin
+                </p>
+              </div>
+
+              {/* Deneyim */}
+              <div>
+                <CustomInput
+                  name="experience"
+                  label="Deneyim"
+                  value={watch('experience')}
+                  onChange={(e) => setValue('experience', e.target.value)}
+                  placeholder="Örn: 5 yıl profesyonel dans eğitmenliği"
+                />
+              </div>
+
+              {/* İletişim Bilgileri */}
+              <div>
+                <h3 className="text-base font-medium text-gray-900 mb-4">İletişim Bilgileri</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <CustomPhoneInput
+                      name="phoneNumber"
+                      label="Telefon"
+                      countryCode={watch('countryCode')}
+                      phoneNumber={watch('phoneNumber')}
+                      onCountryCodeChange={(value) => setValue('countryCode', value)}
+                      onPhoneNumberChange={(value) => setValue('phoneNumber', value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <CustomInput
+                      name="location"
+                      label="Konum"
+                      value={watch('location')}
+                      onChange={(e) => setValue('location', e.target.value)}
+                      placeholder="Şehir, İlçe"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* İsim */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            İsim Soyisim
-          </label>
-          <input
-            type="text"
-            {...register('displayName')}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-          />
-        </div>
-
-        {/* Biyografi */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Biyografi
-          </label>
-          <textarea
-            {...register('bio')}
-            rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-            placeholder="Kendinizden bahsedin..."
-          />
-        </div>
-
-        {/* Uzmanlık Alanları */}
-        <div className="mb-4">
-          <CustomSelect
-            label="Uzmanlık Alanları"
-            options={specialtyOptions}
-            value={selectedSpecialties}
-            onChange={handleSpecialtiesChange}
-            placeholder="Dans stillerinizi seçin"
-            className="w-full"
-            multiple={true}
-          />
-        </div>
-
-        {/* Deneyim */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Deneyim
-          </label>
-          <input
-            type="text"
-            {...register('experience')}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-            placeholder="Örn: 5 yıl"
-          />
-        </div>
-
-        {/* İletişim Bilgileri */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <CustomPhoneInput
-              id="phoneNumber"
-              name="phoneNumber"
-              value={watch('phoneNumber') || ''}
-              onChange={(e) => setValue('phoneNumber', e.target.value)}
-              label="Telefon"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Konum
-            </label>
-            <input
-              type="text"
-              {...register('location')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Şehir, İlçe"
-            />
+        {/* Footer - Kaydet Butonu */}
+        <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+          <div className="flex justify-end items-center gap-3">
+            {saveSuccess && (
+              <div className="flex items-center text-green-600">
+                <svg className="w-5 h-5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="text-sm font-medium">Değişiklikler kaydedildi</span>
+              </div>
+            )}
+            <button
+              type="submit"
+              disabled={loading || saveSuccess}
+              className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white
+                ${saveSuccess 
+                  ? 'bg-green-600 hover:bg-green-700' 
+                  : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500'
+                }
+                focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 
+                shadow-sm transition-all duration-200 
+                disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              {loading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Kaydediliyor...
+                </>
+              ) : saveSuccess ? (
+                <>
+                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Kaydedildi!
+                </>
+              ) : (
+                'Değişiklikleri Kaydet'
+              )}
+            </button>
           </div>
         </div>
-      </div>
-
-      {/* Kaydet Butonu */}
-      <div className="flex justify-end items-center gap-3">
-        {saveSuccess && (
-          <div className="flex items-center text-green-600">
-            <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            <span className="text-sm font-medium">Değişiklikler kaydedildi</span>
-          </div>
-        )}
-        <button
-          type="submit"
-          disabled={loading || saveSuccess}
-          className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white
-            ${saveSuccess 
-              ? 'bg-green-600 hover:bg-green-700' 
-              : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500'
-            }
-            focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 
-            shadow-sm transition-all duration-200 
-            disabled:opacity-50 disabled:cursor-not-allowed`}
-        >
-          {loading ? (
-            <>
-              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Kaydediliyor...
-            </>
-          ) : saveSuccess ? (
-            <>
-              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Kaydedildi!
-            </>
-          ) : (
-            'Değişiklikleri Kaydet'
-          )}
-        </button>
       </div>
     </form>
   );

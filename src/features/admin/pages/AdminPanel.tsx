@@ -20,7 +20,7 @@ import { User } from '../../../types';
 import { motion } from 'framer-motion';
 import CustomSelect from '../../../common/components/ui/CustomSelect';
 
-type TabType = 'okullar' | 'egitmenler' | 'kurslar' | 'ogrenciler' | 'ornek-veri' | 'talepler' | 'kullanicilar';
+type TabType = 'kullanicilar' | 'kurslar' | 'ornek-veri' | 'talepler';
 type RequestType = 'egitmen-talepleri' | 'okul-basvurulari' | 'iletisim-talepleri';
 
 const requestTypeOptions = [
@@ -34,7 +34,7 @@ interface AdminPanelProps {
 }
 
 function AdminPanel({ user }: AdminPanelProps): JSX.Element {
-  const [activeTab, setActiveTab] = useState<TabType>('okullar');
+  const [activeTab, setActiveTab] = useState<TabType>('kullanicilar');
   const [activeRequestType, setActiveRequestType] = useState<RequestType>('egitmen-talepleri');
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   
@@ -103,36 +103,6 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
               Tüm Kullanıcılar
             </button>
             <button
-              onClick={() => setActiveTab('okullar')}
-              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
-                activeTab === 'okullar'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Dans Okulları
-            </button>
-            <button
-              onClick={() => setActiveTab('egitmenler')}
-              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
-                activeTab === 'egitmenler'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Eğitmenler
-            </button>
-            <button
-              onClick={() => setActiveTab('ogrenciler')}
-              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
-                activeTab === 'ogrenciler'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Öğrenciler
-            </button>
-            <button
               onClick={() => setActiveTab('kurslar')}
               className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
                 activeTab === 'kurslar'
@@ -169,15 +139,13 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
         
         <div className="p-6">
           {activeTab === 'kullanicilar' && <UserManagement />}
-          {activeTab === 'okullar' && <SchoolManagement />}
-          {activeTab === 'egitmenler' && <InstructorManagement />}
-          {activeTab === 'ogrenciler' && <StudentManagement isAdmin={true} />}
           {activeTab === 'kurslar' && <CourseManagement isAdmin={true} />}
           {activeTab === 'talepler' && (
             <div>
               <div className="mb-6">
                 <CustomSelect
                   label="Talep Türü"
+                  name="requestType"
                   options={requestTypeOptions}
                   value={activeRequestType}
                   onChange={(value) => setActiveRequestType(value as RequestType)}

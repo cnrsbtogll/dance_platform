@@ -9,6 +9,7 @@ import { useAuth } from '../../common/hooks/useAuth';
 import { User, DanceStyle as DanceStyleType, DanceLevel } from '../../types';
 import { motion } from 'framer-motion';
 import { fetchSignInMethodsForEmail } from 'firebase/auth';
+import { Pagination } from '@mui/material';
 
 // Placeholder görüntü yolları - 404 hatasını önlemek için var olan bir görsele yönlendirelim
 const PLACEHOLDER_PARTNER_IMAGE = '/assets/images/dance/egitmen1.jpg';
@@ -53,6 +54,12 @@ interface DanceStyle {
   value: string;
 }
 
+// Option interface for CustomSelect
+interface Option {
+  value: string;
+  label: string;
+}
+
 // Firestore User interface
 interface FirestoreUser {
   id: string;
@@ -66,7 +73,7 @@ interface FirestoreUser {
   age?: number;
   rating?: number;
   createdAt?: any;
-  role?: string;
+  role?: string | string[];  // Updated to accept both string and string[]
   height?: number;
   weight?: number;
 }
@@ -315,7 +322,7 @@ function PartnerSearchPage(): JSX.Element {
         availableTimes: extendedCurrentUser.availableTimes || [],
         gender: extendedCurrentUser.gender || '',
         age: extendedCurrentUser.age || 0,
-        role: extendedCurrentUser.role,
+        role: Array.isArray(extendedCurrentUser.role) ? extendedCurrentUser.role : extendedCurrentUser.role ? [extendedCurrentUser.role] : undefined,
         height: extendedCurrentUser.height,
         weight: extendedCurrentUser.weight,
       } : null;
@@ -383,7 +390,7 @@ function PartnerSearchPage(): JSX.Element {
         : [...partners].sort(() => Math.random() - 0.5); // Shuffle for anonymous users
       
       setAllPartnerler(sortedPartners);
-      setPartnerler(sortedPartners.slice(0, 12)); // Show top 12 initially
+      setPartnerler(sortedPartners); // Tüm partnerleri göster, kısıtlama yok
       setAramaTamamlandi(true);
       
     } catch (err) {
@@ -512,6 +519,8 @@ function PartnerSearchPage(): JSX.Element {
   // Dans partneri arama fonksiyonu
   const partnerAra = (e: FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
+    // Sayfanın en üstüne yumuşak scroll
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     applyFilters();
   };
 
@@ -742,7 +751,8 @@ function PartnerSearchPage(): JSX.Element {
         allPartnerler.forEach(p => console.log(`- ${p.ad}: ${p.konum}`));
       }
       
-      setPartnerler(filteredResults);
+      setPartnerler(filteredResults); // Tüm filtrelenmiş sonuçları göster, kısıtlama yok
+      setCurrentPage(1); // Filtreleme sonrası ilk sayfaya dön
       setLoading(false);
       setAramaTamamlandi(true);
     } catch (error) {
@@ -767,11 +777,12 @@ function PartnerSearchPage(): JSX.Element {
   };
 
   // Dans türü değiştiğinde filtreleri uygula
-  const handleDansTuruChange = (value: string): void => {
-    console.log("Dans türü değişti, yeni değer:", value);
+  const handleDansTuruChange = (value: string | string[]): void => {
+    const newValue = Array.isArray(value) ? value[0] : value;
+    console.log("Dans türü değişti, yeni değer:", newValue);
     
     // Mevcut değer ile aynıysa ve boş değilse, filtreyi temizle
-    if (value === dansTuru && value !== '') {
+    if (newValue === dansTuru && newValue !== '') {
       console.log("Aynı dans türü tekrar seçildi, filtre sıfırlanıyor.");
       setDansTuru('');
       // Burada doğrudan boş değerle filtreleme yapalım
@@ -779,23 +790,25 @@ function PartnerSearchPage(): JSX.Element {
       return;
     }
     
-    setDansTuru(value);
+    setDansTuru(newValue);
     // Güncel değerle hemen filtreleme yapalım
-    applyFiltersWithValues(value, cinsiyet, seviye, konum, uygunSaatler);
+    applyFiltersWithValues(newValue, cinsiyet, seviye, konum, uygunSaatler);
   };
 
   // Cinsiyet değiştiğinde filtreleri uygula
-  const handleCinsiyetChange = (value: string): void => {
-    setCinsiyet(value);
+  const handleCinsiyetChange = (value: string | string[]): void => {
+    const newValue = Array.isArray(value) ? value[0] : value;
+    setCinsiyet(newValue);
     // Güncel değerle hemen filtreleme yapalım
-    applyFiltersWithValues(dansTuru, value, seviye, konum, uygunSaatler);
+    applyFiltersWithValues(dansTuru, newValue, seviye, konum, uygunSaatler);
   };
 
   // Seviye değiştiğinde filtreleri uygula
-  const handleSeviyeChange = (value: string): void => {
-    setSeviye(value);
+  const handleSeviyeChange = (value: string | string[]): void => {
+    const newValue = Array.isArray(value) ? value[0] : value;
+    setSeviye(newValue);
     // Güncel değerle hemen filtreleme yapalım
-    applyFiltersWithValues(dansTuru, cinsiyet, value, konum, uygunSaatler);
+    applyFiltersWithValues(dansTuru, cinsiyet, newValue, konum, uygunSaatler);
   };
 
   // Konum değiştiğinde filtreleri uygula
@@ -816,8 +829,10 @@ function PartnerSearchPage(): JSX.Element {
     setSeviye('');
     setKonum('');
     setUygunSaatler([]);
-    setPartnerler(allPartnerler.slice(0, 12)); // Show top 12 again after reset
-    setAramaTamamlandi(true);
+    setPartnerler(allPartnerler); // Tüm partnerleri göster
+    setCurrentPage(1); // İlk sayfaya dön
+    // Sayfanın en üstüne yumuşak scroll
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Kullanıcının partnere iletişim isteği göndermesini yönetir
@@ -1274,6 +1289,37 @@ function PartnerSearchPage(): JSX.Element {
     );
   };
 
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const partnersPerPage = 15;
+
+  // Sayfa değişikliğini handle eden fonksiyon
+  const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
+    setCurrentPage(value);
+    // Sayfanın en üstüne scroll
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Mevcut sayfada gösterilecek partnerleri hesapla
+  const getCurrentPagePartners = () => {
+    const startIndex = (currentPage - 1) * partnersPerPage;
+    const endIndex = startIndex + partnersPerPage;
+    return partnerler.slice(startIndex, endIndex);
+  };
+
+  // Toplam sayfa sayısını hesapla
+  const totalPages = Math.ceil(partnerler.length / partnersPerPage);
+
+  // Convert arrays to Option[] format
+  const cinsiyetOptions: Option[] = cinsiyetler.map(cinsiyet => ({
+    value: cinsiyet,
+    label: cinsiyet
+  }));
+
+  const seviyeOptions: Option[] = seviyeler.map(seviye => ({
+    value: seviye,
+    label: seviye
+  }));
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Render the login prompt modal */}
@@ -1337,6 +1383,7 @@ function PartnerSearchPage(): JSX.Element {
                 ) : (
                   <CustomSelect 
                     label="Dans Türü"
+                    name="dansTuru"
                     options={danceStyles}
                     value={dansTuru}
                     onChange={handleDansTuruChange}
@@ -1346,7 +1393,8 @@ function PartnerSearchPage(): JSX.Element {
                 
                 <CustomSelect 
                   label="Cinsiyet"
-                  options={cinsiyetler}
+                  name="cinsiyet"
+                  options={cinsiyetOptions}
                   value={cinsiyet}
                   onChange={handleCinsiyetChange}
                   placeholder="Hepsi"
@@ -1354,7 +1402,8 @@ function PartnerSearchPage(): JSX.Element {
                 
                 <CustomSelect 
                   label="Seviye"
-                  options={seviyeler}
+                  name="seviye"
+                  options={seviyeOptions}
                   value={seviye}
                   onChange={handleSeviyeChange}
                   placeholder="Tüm seviyeler"
@@ -1404,7 +1453,7 @@ function PartnerSearchPage(): JSX.Element {
                 
                 <button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 shadow-md flex items-center justify-center font-medium"
+                  className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 shadow-md flex items-center justify-center font-medium transition-all duration-300"
                   disabled={loading}
                 >
                   {loading ? (
@@ -1456,10 +1505,38 @@ function PartnerSearchPage(): JSX.Element {
                 )}
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {partnerler.map(partner => (
+                  {getCurrentPagePartners().map(partner => (
                     <PartnerKarti key={partner.id} partner={partner} />
                   ))}
                 </div>
+
+                {/* Pagination */}
+                {partnerler.length > partnersPerPage && (
+                  <div className="mt-8 flex justify-center">
+                    <Pagination 
+                      count={totalPages}
+                      page={currentPage}
+                      onChange={handlePageChange}
+                      color="primary"
+                      size="large"
+                      sx={{
+                        '& .MuiPaginationItem-root': {
+                          color: '#4F46E5',
+                          '&.Mui-selected': {
+                            backgroundColor: '#4F46E5',
+                            color: 'white',
+                            '&:hover': {
+                              backgroundColor: '#4338CA',
+                            },
+                          },
+                          '&:hover': {
+                            backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                          },
+                        },
+                      }}
+                    />
+                  </div>
+                )}
                 
                 {/* Empty state */}
                 {aramaTamamlandi && partnerler.length === 0 && (
