@@ -44,6 +44,11 @@ function App(): JSX.Element {
   const InstructorRedirect: React.FC = () => {
     const location = useLocation();
     
+    // /become-school sayfasına gidildiğinde yönlendirme yapma
+    if (location.pathname === '/become-school') {
+      return null;
+    }
+    
     if (user?.role?.includes('instructor') && location.pathname !== '/instructor') {
       return <Navigate to="/instructor" replace />;
     }
@@ -279,8 +284,7 @@ function App(): JSX.Element {
             )}
             
             <Navbar isAuthenticated={isAuthenticated} user={user} />
-            
-            <main className={`pt-20 pb-10 ${(isOffline || (error && !isOffline)) ? 'mt-8' : ''}`}>
+            <div className="pt-16">
               <Routes>
                 <Route path="/" element={<HomePage isAuthenticated={isAuthenticated} user={user} />} />
                 <Route path="/courses/:id" element={<CourseDetailPage />} />
@@ -318,7 +322,21 @@ function App(): JSX.Element {
                 />
                 <Route
                   path="/become-school"
-                  element={<BecomeSchool />}
+                  element={
+                    <BecomeSchool 
+                      onMount={() => {
+                        console.log('🎯 /become-school route render:', {
+                          isAuthenticated,
+                          user: {
+                            id: user?.id,
+                            email: user?.email,
+                            role: user?.role
+                          },
+                          timestamp: new Date().toISOString()
+                        });
+                      }}
+                    />
+                  }
                 />
                 <Route 
                   path="/profile" 
@@ -330,7 +348,7 @@ function App(): JSX.Element {
                 <Route path="/signup" element={isAuthenticated ? <Navigate to="/" /> : <SignUp />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>
-            </main>
+            </div>
             
             <footer className="bg-gray-800 text-white py-8">
               <div className="container mx-auto px-4">

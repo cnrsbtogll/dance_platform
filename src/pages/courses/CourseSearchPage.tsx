@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { collection, getDocs, query, where, orderBy, limit, Timestamp } from 'firebase/firestore';
 import { db } from '../../api/firebase/firebase';
 import { DanceClass } from '../../types';
@@ -21,8 +21,24 @@ const CourseSearchPage: React.FC = () => {
   const navigate = useNavigate();
   const [courses, setCourses] = useState<DanceClass[]>([]);
   const [filteredCourses, setFilteredCourses] = useState<DanceClass[]>([]);
+  const [displayedCourses, setDisplayedCourses] = useState<DanceClass[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [page, setPage] = useState<number>(1);
+  const coursesPerPage = 15;
+  const observer = useRef<IntersectionObserver | null>(null);
+  const lastCourseElementRef = useCallback((node: HTMLDivElement) => {
+    if (loading || loadingMore) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        loadMoreCourses();
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [loading, loadingMore, hasMore]);
   const [activeFilters, setActiveFilters] = useState<FilterValues>({
     seviye: '',
     fiyatAralik: '',
@@ -51,6 +67,8 @@ const CourseSearchPage: React.FC = () => {
         
         setCourses(fetchedCourses);
         setFilteredCourses(fetchedCourses);
+        setDisplayedCourses(fetchedCourses.slice(0, coursesPerPage));
+        setHasMore(fetchedCourses.length > coursesPerPage);
       } catch (error) {
         console.error('Kursları getirirken hata oluştu:', error);
         setError('Kurslar yüklenirken bir hata oluştu');
@@ -131,6 +149,10 @@ const CourseSearchPage: React.FC = () => {
     }
 
     setFilteredCourses(result);
+    // Filtreleme sonrası ilk sayfayı göster
+    setDisplayedCourses(result.slice(0, coursesPerPage));
+    setPage(1);
+    setHasMore(result.length > coursesPerPage);
   };
 
   // Tekil filtre temizleme
@@ -176,6 +198,27 @@ const CourseSearchPage: React.FC = () => {
     
     return null;
   }, [filteredCourses.length, hasActiveFilters, loading]);
+
+  // Daha fazla kurs yükleme fonksiyonu
+  const loadMoreCourses = () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    
+    const nextPage = page + 1;
+    const startIndex = (nextPage - 1) * coursesPerPage;
+    const endIndex = startIndex + coursesPerPage;
+    const newCourses = filteredCourses.slice(startIndex, endIndex);
+    
+    if (newCourses.length > 0) {
+      setDisplayedCourses(prev => [...prev, ...newCourses]);
+      setPage(nextPage);
+      setHasMore(endIndex < filteredCourses.length);
+    } else {
+      setHasMore(false);
+    }
+    
+    setLoadingMore(false);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -328,16 +371,37 @@ const CourseSearchPage: React.FC = () => {
           </div>
         )}
 
-        {/* Kurslar Grid */}
-        {!loading && filteredCourses.length > 0 && (
+        {/* Kurslar Grid - güncellendi */}
+        {!loading && displayedCourses.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCourses.map((course) => (
-              <CourseCard
-                key={course.id}
-                course={course}
-                onEnroll={handleEnroll}
-              />
-            ))}
+            {displayedCourses.map((course, index) => {
+              if (displayedCourses.length === index + 1) {
+                return (
+                  <div ref={lastCourseElementRef} key={course.id}>
+                    <CourseCard
+                      course={course}
+                      onEnroll={handleEnroll}
+                    />
+                  </div>
+                );
+              } else {
+                return (
+                  <CourseCard
+                    key={course.id}
+                    course={course}
+                    onEnroll={handleEnroll}
+                  />
+                );
+              }
+            })}
+          </div>
+        )}
+
+        {/* Yükleniyor göstergesi */}
+        {loadingMore && (
+          <div className="flex justify-center items-center py-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
+            <span className="ml-3 text-gray-600">Daha fazla kurs yükleniyor...</span>
           </div>
         )}
 
