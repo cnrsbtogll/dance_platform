@@ -482,36 +482,106 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
 
   // Eğitmenleri getir
   const fetchInstructors = async () => {
-    if (!isAdmin) return;
+    console.log('fetchInstructors başlatılıyor:', {
+      instructorId,
+      schoolId,
+      isAdmin,
+      currentUserId: auth.currentUser?.uid,
+      loadingInstructors
+    });
+
+    if (instructorId) {
+      console.log('Instructor ID mevcut, eğitmenler getirilmeyecek');
+      return;
+    }
+
+    if (!auth.currentUser?.uid) {
+      console.error('Oturum açmış kullanıcı bilgisi bulunamadı');
+      return;
+    }
     
     try {
       console.log('Eğitmenler getiriliyor...');
       const instructorsRef = collection(db, 'instructors');
       
-      const q = query(instructorsRef);
-      const querySnapshot = await getDocs(q);
+      let q;
+      // Okul yöneticisi için kendi ID'sine bağlı eğitmenleri getir
+      if (!isAdmin) {
+        console.log('Okul yöneticisi için eğitmen sorgusu oluşturuluyor:', auth.currentUser.uid);
+        q = query(
+          instructorsRef,
+          where('schoolId', '==', auth.currentUser.uid),
+          where('status', '==', 'active')
+        );
+      } else {
+        console.log('Admin için tüm eğitmenler sorgusu oluşturuluyor');
+        q = query(
+          instructorsRef,
+          where('status', '==', 'active')
+        );
+      }
+
+      console.log('Eğitmenler için query oluşturuldu, çalıştırılıyor...', {
+        currentUserId: auth.currentUser.uid,
+        isAdmin,
+        queryConditions: q
+      });
       
-      const instructorsData = querySnapshot.docs
-        .map(doc => {
-          const data = doc.data();
-          if (data.status === 'active') {
+      try {
+        const querySnapshot = await Promise.race([
+          getDocs(q),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Eğitmen verisi çekme zaman aşımına uğradı')), 10000)
+          )
+        ]) as QuerySnapshot<DocumentData>;
+        
+        console.log('Query sonuçları:', {
+          empty: querySnapshot.empty,
+          size: querySnapshot.size,
+          docs: querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            data: {
+              displayName: doc.data().displayName,
+              email: doc.data().email,
+              schoolId: doc.data().schoolId,
+              status: doc.data().status
+            }
+          }))
+        });
+
+        const instructorsData = querySnapshot.docs
+          .map(doc => {
+            const data = doc.data();
             return {
               label: data.displayName || data.email || 'İsimsiz Eğitmen',
               value: doc.id
             };
-          }
-          return null;
-        })
-        .filter((instructor): instructor is { label: string; value: string } => instructor !== null)
-        .sort((a, b) => a.label.localeCompare(b.label));
-      
-      setInstructors(instructorsData);
+          })
+          .sort((a, b) => a.label.localeCompare(b.label));
+        
+        console.log('İşlenmiş eğitmen listesi:', instructorsData);
+        setInstructors(instructorsData);
+      } catch (queryError: any) {
+        console.error('Query işlemi sırasında hata:', {
+          code: queryError.code,
+          message: queryError.message,
+          name: queryError.name,
+          stack: queryError.stack
+        });
+        
+        if (queryError.code === 'permission-denied') {
+          throw new Error('Eğitmen verilerine erişim izniniz yok. Yönetici ile iletişime geçin.');
+        }
+        throw queryError;
+      }
     } catch (error) {
-      console.error('Eğitmenler yüklenirken hata:', error);
-      setInstructors([
-        { label: 'Test Eğitmen 1', value: 'test-instructor-1' },
-        { label: 'Test Eğitmen 2', value: 'test-instructor-2' }
-      ]);
+      console.error('Eğitmenler yüklenirken hata detayı:', {
+        error,
+        message: error instanceof Error ? error.message : 'Bilinmeyen hata',
+        code: error instanceof Error ? (error as any).code : undefined,
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      setInstructors([]);
     } finally {
       setLoadingInstructors(false);
     }
@@ -590,15 +660,48 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
 
     const loadInitialData = async () => {
       try {
-        await Promise.all([
-          fetchCourses(),
-          fetchDanceStyles(),
-          isAdmin && fetchInstructors(),
-          isAdmin && fetchSchools()
-        ]);
+        console.log('loadInitialData başlatılıyor:', {
+          isAdmin,
+          schoolId,
+          instructorId
+        });
+
+        // Her fonksiyonu ayrı ayrı çağıralım ki hata yerini bulalım
+        try {
+          await fetchCourses();
+        } catch (e) {
+          console.error('Kurslar yüklenirken hata:', e);
+        }
+
+        try {
+          await fetchDanceStyles();
+        } catch (e) {
+          console.error('Dans stilleri yüklenirken hata:', e);
+        }
+
+        try {
+          // isAdmin kontrolünü kaldıralım, schoolId varsa da çağıralım
+          if (schoolId || isAdmin) {
+            console.log('Eğitmenler yüklenecek çünkü:', { schoolId, isAdmin });
+            await fetchInstructors();
+          } else {
+            console.log('Eğitmenler yüklenmeyecek çünkü:', { schoolId, isAdmin });
+          }
+        } catch (e) {
+          console.error('Eğitmenler yüklenirken hata:', e);
+        }
+
+        try {
+          if (isAdmin) {
+            await fetchSchools();
+          }
+        } catch (e) {
+          console.error('Okullar yüklenirken hata:', e);
+        }
+
       } catch (err) {
         if (isMounted) {
-          console.error('Veriler yüklenirken hata:', err);
+          console.error('Veriler yüklenirken genel hata:', err);
           setError('Veriler yüklenemedi. Lütfen daha sonra tekrar deneyin.');
         }
       }
@@ -609,7 +712,7 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
     return () => {
       isMounted = false;
     };
-  }, [isAdmin]);
+  }, [isAdmin, schoolId, instructorId]); // Dependency array'e schoolId ve instructorId ekleyelim
 
   // Kurs düzenleme
   const editCourse = (course: Course) => {
@@ -629,9 +732,9 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
     setFormData({
       name: '',
       description: '',
-      instructorId: '',
-      instructorName: 'Bilinmeyen Eğitmen',
-      schoolId: '',
+      instructorId: instructorId || '',
+      instructorName: instructorId ? auth.currentUser?.displayName || 'Bilinmeyen Eğitmen' : '',
+      schoolId: schoolId || '',
       schoolName: 'Bilinmeyen Okul',
       danceStyle: '',
       level: 'beginner',
@@ -878,6 +981,36 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
                       required
                     />
                   </div>
+                </div>
+                {/* Eğitmen Seçimi */}
+                <div>
+                  {instructorId ? (
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700">Eğitmen</label>
+                      <div className="mt-1 p-3 bg-gray-50 border border-gray-200 rounded-md">
+                        <p className="text-sm text-gray-700">{formData.instructorName}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-4">
+                      <CustomSelect
+                        name="instructorId"
+                        label="Eğitmen"
+                        options={instructors}
+                        value={formData.instructorId}
+                        onChange={(value) => {
+                          const selectedInstructor = instructors.find(i => i.value === value);
+                          setFormData({
+                            ...formData,
+                            instructorId: value as string,
+                            instructorName: selectedInstructor?.label || ''
+                          });
+                        }}
+                        placeholder="Eğitmen Seçin"
+                        required
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 

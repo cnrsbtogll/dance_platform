@@ -376,7 +376,7 @@ const SchoolAdmin: React.FC = () => {
           {activeTab === 'courses' && schoolInfo && (
             <CourseManagement 
               schoolId={schoolInfo.id}
-              isAdmin={true}
+              isAdmin={false}
             />
           )}
 
