@@ -148,26 +148,40 @@ function PartnerSearchPage(): JSX.Element {
       userId: user.id,
       userName: user.displayName,
       photoURL: user.photoURL,
-      role: user.role
+      role: user.role,
+      gender: user.gender,
+      age: user.age,
+      level: user.level
     });
+
+    // Cinsiyet değerini dönüştür
+    const convertGender = (gender: string | undefined): string => {
+      if (!gender) return 'Belirtilmemiş';
+      switch (gender.toLowerCase()) {
+        case 'male': return 'Erkek';
+        case 'female': return 'Kadın';
+        case 'other': return 'Diğer';
+        default: return gender;
+      }
+    };
 
     return {
       id: user.id,
       ad: user.displayName || 'İsimsiz Kullanıcı',
-      yas: user.age || 0,
-      cinsiyet: user.gender || 'Belirtilmemiş',
+      yas: typeof user.age === 'number' ? user.age : 0,
+      cinsiyet: convertGender(user.gender),
       seviye: user.level === 'beginner' ? 'Başlangıç' : 
               user.level === 'intermediate' ? 'Orta' : 
               user.level === 'advanced' ? 'İleri' : 
-              user.level === 'professional' ? 'Profesyonel' : 'Belirtilmemiş',
+              user.level === 'professional' ? 'Profesyonel' : 'Başlangıç',
       dans: standardizedDanceStyles,
       konum: user.city || 'Belirtilmemiş',
       saatler: user.availableTimes || [],
-      foto: user.photoURL || '', // Varsayılan resmi kaldırıyoruz
-      puan: user.rating || 4.0,
-      boy: user.height,
-      kilo: user.weight,
-      role: user.role,
+      foto: user.photoURL || '', 
+      puan: typeof user.rating === 'number' ? user.rating : 4.0,
+      boy: typeof user.height === 'number' ? user.height : undefined,
+      kilo: typeof user.weight === 'number' ? user.weight : undefined,
+      role: user.role || 'student',
     };
   }, [styleMapping]);
 

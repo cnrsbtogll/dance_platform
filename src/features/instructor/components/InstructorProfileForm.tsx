@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { doc, updateDoc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { db, auth, storage } from '../../../api/firebase/firebase';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { User } from '../../../types';
+import { User, DanceLevel, DanceStyle } from '../../../types';
 import ImageUploader from '../../../common/components/ui/ImageUploader';
 import { toast } from 'react-hot-toast';
 import CustomSelect from '../../../common/components/ui/CustomSelect';
@@ -16,6 +16,13 @@ interface InstructorProfileFormProps {
   user: User;
 }
 
+// Dans stilleri için tip tanımı
+interface DanceStyleOption {
+  value: string;
+  label: string;
+}
+
+// Form verisi için tip tanımı
 interface InstructorProfileFormData {
   displayName: string;
   bio: string;
@@ -25,6 +32,21 @@ interface InstructorProfileFormData {
   countryCode: string;
   location: string;
   photoURL: string;
+  // User table fields
+  gender: string;
+  age: number | undefined;
+  level: DanceLevel;
+  city: string;
+  height?: number;
+  weight?: number;
+  danceStyles: string[];
+  availableTimes: string[];
+  // Additional fields
+  createdAt?: string;
+  updatedAt?: string;
+  isActive?: boolean;
+  role?: string;
+  userId?: string;
 }
 
 const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) => {
@@ -47,7 +69,15 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
       phoneNumber: '',
       countryCode: '+90',
       location: '',
-      photoURL: ''
+      photoURL: '',
+      gender: '',
+      age: undefined,
+      level: 'beginner',
+      city: '',
+      height: undefined,
+      weight: undefined,
+      danceStyles: [],
+      availableTimes: []
     }
   });
 
@@ -62,12 +92,12 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
   }, [user, navigate]);
 
   // Dans stilleri seçenekleri
-  const specialtyOptions = [
-    { label: 'Salsa', value: 'salsa' },
-    { label: 'Bachata', value: 'bachata' },
-    { label: 'Kizomba', value: 'kizomba' },
-    { label: 'Tango', value: 'tango' },
-    { label: 'Vals', value: 'vals' }
+  const danceStyleOptions: DanceStyleOption[] = [
+    { value: 'salsa', label: 'Salsa' },
+    { value: 'bachata', label: 'Bachata' },
+    { value: 'kizomba', label: 'Kizomba' },
+    { value: 'tango', label: 'Tango' },
+    { value: 'vals', label: 'Vals' }
   ];
 
   // Form değerlerini izle ve logla
@@ -104,23 +134,43 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
           return;
         }
 
+        const userData = userSnap.data();
         const instructorRef = doc(db, 'instructors', user.id);
         const instructorSnap = await getDoc(instructorRef);
 
         if (instructorSnap.exists()) {
-          const data = instructorSnap.data();
-          console.log('✅ Instructor profile found:', data);
+          const instructorData = instructorSnap.data();
+          console.log('✅ Instructor profile found:', instructorData);
+          console.log('✅ User data found:', userData);
 
-          // Form verilerini güncelle
+          // Her iki koleksiyondan gelen verileri birleştir
           const formData = {
-            displayName: data.displayName || user.displayName || '',
-            bio: data.bio || '',
-            specialties: data.specialties || [],
-            experience: data.experience || '',
-            phoneNumber: data.phoneNumber || '',
-            countryCode: data.countryCode || '+90',
-            location: data.location || '',
-            photoURL: data.photoURL || user.photoURL || ''
+            // Instructor koleksiyonundan gelen veriler
+            displayName: instructorData.displayName || userData.displayName || '',
+            bio: instructorData.bio || '',
+            specialties: instructorData.specialties || [],
+            experience: instructorData.experience || '',
+            phoneNumber: instructorData.phoneNumber || '',
+            countryCode: instructorData.countryCode || '+90',
+            location: instructorData.location || '',
+            photoURL: instructorData.photoURL || userData.photoURL || '',
+            
+            // User koleksiyonundan gelen veriler
+            gender: userData.gender || '',
+            age: userData.age,
+            level: userData.level || 'beginner',
+            city: userData.city || '',
+            height: userData.height,
+            weight: userData.weight,
+            danceStyles: userData.danceStyles || [],
+            availableTimes: userData.availableTimes || [],
+            
+            // Diğer alanlar
+            createdAt: instructorData.createdAt || '',
+            updatedAt: instructorData.updatedAt || '',
+            isActive: instructorData.isActive || true,
+            role: userData.role || 'instructor',
+            userId: user.id
           };
 
           console.log('📝 Setting form data:', formData);
@@ -132,30 +182,37 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
           console.log('ℹ️ No instructor profile found, creating new instructor profile');
           
           // Yeni eğitmen profili oluştur
-          const newInstructorData = {
-            userId: user.id,
-            displayName: user.displayName || '',
+          const newInstructorData: Partial<InstructorProfileFormData> = {
+            displayName: userData.displayName || '',
             bio: '',
             specialties: [],
             experience: '',
             phoneNumber: '',
             countryCode: '+90',
             location: '',
-            photoURL: user.photoURL || '',
+            photoURL: userData.photoURL || '',
+            gender: userData.gender || '',
+            age: userData.age,
+            level: userData.level || 'beginner' as DanceLevel,
+            city: userData.city || '',
+            height: userData.height,
+            weight: userData.weight,
+            danceStyles: userData.danceStyles || [],
+            availableTimes: userData.availableTimes || [],
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             isActive: true,
-            role: 'instructor'
+            role: 'instructor',
+            userId: user.id
           };
 
           try {
             await setDoc(instructorRef, newInstructorData);
             console.log('✅ New instructor profile created:', newInstructorData);
             
-            // Form verilerini set et
-            reset(newInstructorData);
+            reset(newInstructorData as InstructorProfileFormData);
             setSelectedSpecialties([]);
-            setProfilePhotoURL(user.photoURL || '');
+            setProfilePhotoURL(userData.photoURL || '');
             toast.success('Yeni eğitmen profili oluşturuldu');
             
             // User dokümanını da güncelle
@@ -189,7 +246,7 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
     }
 
     console.log('📤 Form verileri:', data);
-    console.log('📍 Seçilen dans stilleri:', selectedSpecialties);
+    console.log('📍 Seçilen dans stilleri:', data.danceStyles);
 
     setLoading(true);
     setSaveSuccess(false);
@@ -201,17 +258,28 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
       const instructorUpdates = {
         displayName: data.displayName.trim(),
         bio: data.bio.trim(),
-        specialties: selectedSpecialties,
+        specialties: data.danceStyles || [],
         experience: data.experience.trim(),
         phoneNumber: data.phoneNumber.replace(/\s/g, ''),
         countryCode: data.countryCode,
         location: data.location.trim(),
-        updatedAt: updateTimestamp
+        updatedAt: updateTimestamp,
+        isActive: true,
+        role: 'instructor'
       };
 
-      // Users koleksiyonu için alanlar
+      // Users koleksiyonu için alanlar - boş değerleri kontrol et
       const userUpdates = {
         displayName: data.displayName.trim(),
+        gender: data.gender || 'Belirtilmemiş',
+        age: typeof data.age === 'number' ? data.age : 0,
+        level: data.level || 'beginner',
+        city: data.city || 'Belirtilmemiş',
+        height: typeof data.height === 'number' ? data.height : 0,
+        weight: typeof data.weight === 'number' ? data.weight : 0,
+        danceStyles: data.danceStyles || [],
+        availableTimes: data.availableTimes || [],
+        role: 'instructor',
         updatedAt: updateTimestamp
       };
 
@@ -222,25 +290,31 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
       const instructorRef = doc(db, 'instructors', user.id);
       const userRef = doc(db, 'users', user.id);
 
-      // Önce instructor dokümanını güncelle
-      console.log('🔄 Instructor dokümanı güncelleniyor...');
-      await updateDoc(instructorRef, instructorUpdates);
-      console.log('✅ Instructor dokümanı güncellendi');
+      // Batch write kullanarak her iki tabloyu da güncelle
+      const batch = writeBatch(db);
+      batch.update(instructorRef, instructorUpdates);
+      batch.update(userRef, userUpdates);
 
-      // Sonra user dokümanını güncelle
-      console.log('🔄 User dokümanı güncelleniyor...');
-      await updateDoc(userRef, userUpdates);
-      console.log('✅ User dokümanı güncellendi');
-
-      // Başarılı güncelleme
+      // Batch'i commit et
+      await batch.commit();
       console.log('✅ Tüm güncellemeler tamamlandı');
+
       setSaveSuccess(true);
       toast.success('Profil başarıyla güncellendi');
 
       // Form verilerini yeniden yükle
-      const instructorSnap = await getDoc(instructorRef);
-      if (instructorSnap.exists()) {
-        const updatedData = instructorSnap.data();
+      const [instructorSnap, userSnap] = await Promise.all([
+        getDoc(instructorRef),
+        getDoc(userRef)
+      ]);
+
+      if (instructorSnap.exists() && userSnap.exists()) {
+        const instructorData = instructorSnap.data();
+        const userData = userSnap.data();
+        const updatedData = {
+          ...instructorData,
+          ...userData
+        };
         console.log('📥 Güncel veriler:', updatedData);
         reset({
           ...data,
@@ -336,11 +410,12 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
     }
   };
 
-  const handleSpecialtiesChange = (value: string | string[]) => {
-    console.log('🎯 Specialties changed:', value);
-    const specialtiesArray = Array.isArray(value) ? value : [value];
-    const filteredSpecialties = value === '' ? [] : specialtiesArray.filter(style => style !== '');
-    setSelectedSpecialties(filteredSpecialties);
+  // Dans stilleri değişikliğini handle eden fonksiyon
+  const handleDanceStylesChange = (value: string | string[]) => {
+    const styles = Array.isArray(value) ? value : [value];
+    const filteredStyles = value === '' ? [] : styles.filter(style => style !== '');
+    setValue('danceStyles', filteredStyles);
+    setSelectedSpecialties(filteredStyles);
   };
 
   if (initialLoading) {
@@ -374,6 +449,220 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
     );
   }
 
+  // Form içeriğine yeni alanları ekle
+  const renderBasicInfoForm = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Temel Bilgiler</h3>
+        <p className="text-sm text-gray-500 mb-6">
+          Bu bilgiler profilinizde görüntülenecek ve öğrencilerinizle eşleşmeniz için kullanılacaktır.
+        </p>
+      </div>
+      
+      <ImageUploader
+        currentPhotoURL={profilePhotoURL}
+        onImageChange={handleImageUploadComplete}
+        displayName={watch('displayName') || ''}
+        userType="instructor"
+        shape="circle"
+        width={150}
+        height={150}
+      />
+      
+      <div>
+        <CustomInput
+          name="displayName"
+          label="Adınız Soyadınız"
+          value={watch('displayName')}
+          onChange={(e) => setValue('displayName', e.target.value)}
+          required
+        />
+      </div>
+      
+      <div>
+        <CustomSelect
+          name="gender"
+          label="Cinsiyet"
+          value={watch('gender')}
+          onChange={(value: string | string[]) => setValue('gender', value as string)}
+          options={[
+            { value: 'male', label: 'Erkek' },
+            { value: 'female', label: 'Kadın' },
+            { value: 'other', label: 'Diğer' }
+          ]}
+          required
+        />
+      </div>
+      
+      <div>
+        <CustomInput
+          type="text"
+          name="age"
+          label="Yaş"
+          value={watch('age')?.toString() || ''}
+          onChange={(e) => {
+            const value = e.target.value ? parseInt(e.target.value) : undefined;
+            setValue('age', value);
+          }}
+          required
+        />
+      </div>
+      
+      <div>
+        <CustomSelect
+          name="level"
+          label="Dans Seviyesi"
+          value={watch('level')}
+          onChange={(value: string | string[]) => setValue('level', value as DanceLevel)}
+          options={[
+            { value: 'beginner', label: 'Başlangıç' },
+            { value: 'intermediate', label: 'Orta Seviye' },
+            { value: 'advanced', label: 'İleri Seviye' },
+            { value: 'professional', label: 'Profesyonel' }
+          ]}
+          required
+        />
+      </div>
+      
+      <div>
+        <CustomInput
+          name="city"
+          label="Şehir"
+          value={watch('city')}
+          onChange={(e) => setValue('city', e.target.value)}
+          required
+          placeholder="Örn: İstanbul, Ankara"
+        />
+      </div>
+      
+      <div>
+        <CustomPhoneInput
+          name="phoneNumber"
+          label="Telefon Numarası"
+          countryCode={watch('countryCode')}
+          phoneNumber={watch('phoneNumber')}
+          onCountryCodeChange={(value) => setValue('countryCode', value)}
+          onPhoneNumberChange={(value) => setValue('phoneNumber', value)}
+        />
+      </div>
+    </div>
+  );
+
+  // Dans ve fiziksel özellikler formu
+  const renderDanceAndPhysicalForm = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Dans ve Fiziksel Özellikler</h3>
+        <p className="text-sm text-gray-500 mb-6">
+          Dans stilleriniz ve fiziksel özellikleriniz hakkında bilgi verin.
+        </p>
+      </div>
+      
+      <div>
+        <CustomSelect
+          name="danceStyles"
+          label="Dans Stilleri"
+          value={watch('danceStyles')}
+          onChange={handleDanceStylesChange}
+          options={danceStyleOptions}
+          multiple={true}
+          required
+        />
+        <p className="mt-2 text-sm text-gray-500">
+          Seçtiğiniz dans stilleri hem uzmanlık alanlarınız hem de dans stilleriniz olarak kaydedilecektir.
+        </p>
+      </div>
+      
+      <div>
+        <CustomInput
+          type="text"
+          name="height"
+          label="Boy (cm)"
+          value={watch('height')?.toString() || ''}
+          onChange={(e) => {
+            const value = e.target.value ? parseInt(e.target.value) : undefined;
+            setValue('height', value);
+          }}
+          placeholder="Örn: 175"
+        />
+      </div>
+      
+      <div>
+        <CustomInput
+          type="text"
+          name="weight"
+          label="Kilo (kg)"
+          value={watch('weight')?.toString() || ''}
+          onChange={(e) => {
+            const value = e.target.value ? parseInt(e.target.value) : undefined;
+            setValue('weight', value);
+          }}
+          placeholder="Örn: 70"
+        />
+      </div>
+      
+      <div>
+        <CustomSelect
+          name="availableTimes"
+          label="Müsait Zamanlar"
+          value={watch('availableTimes')}
+          onChange={(value: string | string[]) => setValue('availableTimes', value as string[])}
+          options={[
+            { value: 'Sabah', label: 'Sabah' },
+            { value: 'Öğlen', label: 'Öğlen' },
+            { value: 'Akşam', label: 'Akşam' },
+            { value: 'Hafta Sonu', label: 'Hafta Sonu' }
+          ]}
+          multiple={true}
+        />
+      </div>
+    </div>
+  );
+
+  // Eğitmen özellikleri formu
+  const renderInstructorDetailsForm = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Eğitmen Bilgileri</h3>
+        <p className="text-sm text-gray-500 mb-6">
+          Eğitmenlik deneyiminiz hakkında bilgi verin.
+        </p>
+      </div>
+      
+      <div>
+        <CustomInput
+          name="bio"
+          label="Biyografi"
+          value={watch('bio')}
+          onChange={(e) => setValue('bio', e.target.value)}
+          placeholder="Kendinizden, dans geçmişinizden ve öğretim yaklaşımınızdan bahsedin..."
+          multiline
+          rows={4}
+        />
+      </div>
+      
+      <div>
+        <CustomInput
+          name="experience"
+          label="Deneyim"
+          value={watch('experience')}
+          onChange={(e) => setValue('experience', e.target.value)}
+          placeholder="Örn: 5 yıl profesyonel dans eğitmenliği"
+        />
+      </div>
+      
+      <div>
+        <CustomInput
+          name="location"
+          label="Ders Lokasyonu"
+          value={watch('location')}
+          onChange={(e) => setValue('location', e.target.value)}
+          placeholder="Ders verdiğiniz stüdyo veya mekan"
+        />
+      </div>
+    </div>
+  );
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
@@ -385,112 +674,10 @@ const InstructorProfileForm: React.FC<InstructorProfileFormProps> = ({ user }) =
           </p>
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* Profil Fotoğrafı */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 pb-6 border-b border-gray-200">
-            <div className="shrink-0">
-              <ImageUploader
-                currentPhotoURL={profilePhotoURL}
-                onImageChange={handleImageUploadComplete}
-                shape="circle"
-                width={96}
-                height={96}
-              />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-base font-medium text-gray-900">Profil Fotoğrafı</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                JPG veya PNG formatında, yüksek kaliteli bir fotoğraf yükleyin
-              </p>
-            </div>
-          </div>
-
-          {/* Kişisel Bilgiler */}
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-6">
-              {/* İsim */}
-              <div>
-                <CustomInput
-                  name="displayName"
-                  label="İsim Soyisim"
-                  value={watch('displayName')}
-                  onChange={(e) => setValue('displayName', e.target.value)}
-                  placeholder="Adınız ve soyadınız"
-                  required
-                />
-              </div>
-
-              {/* Biyografi */}
-              <div>
-                <CustomInput
-                  name="bio"
-                  label="Biyografi"
-                  value={watch('bio')}
-                  onChange={(e) => setValue('bio', e.target.value)}
-                  placeholder="Kendinizden, dans geçmişinizden ve öğretim yaklaşımınızdan bahsedin..."
-                  multiline
-                  rows={4}
-                />
-                <p className="mt-2 text-sm text-gray-500">
-                  Öğrencilerinizin sizi daha iyi tanımasını sağlayacak bilgiler ekleyin
-                </p>
-              </div>
-
-              {/* Uzmanlık Alanları */}
-              <div>
-                <CustomSelect
-                  name="specialties"
-                  label="Uzmanlık Alanları"
-                  options={specialtyOptions}
-                  value={selectedSpecialties}
-                  onChange={handleSpecialtiesChange}
-                  placeholder="Dans stillerinizi seçin"
-                  multiple={true}
-                />
-                <p className="mt-2 text-sm text-gray-500">
-                  Uzman olduğunuz dans stillerini seçin
-                </p>
-              </div>
-
-              {/* Deneyim */}
-              <div>
-                <CustomInput
-                  name="experience"
-                  label="Deneyim"
-                  value={watch('experience')}
-                  onChange={(e) => setValue('experience', e.target.value)}
-                  placeholder="Örn: 5 yıl profesyonel dans eğitmenliği"
-                />
-              </div>
-
-              {/* İletişim Bilgileri */}
-              <div>
-                <h3 className="text-base font-medium text-gray-900 mb-4">İletişim Bilgileri</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <CustomPhoneInput
-                      name="phoneNumber"
-                      label="Telefon"
-                      countryCode={watch('countryCode')}
-                      phoneNumber={watch('phoneNumber')}
-                      onCountryCodeChange={(value) => setValue('countryCode', value)}
-                      onPhoneNumberChange={(value) => setValue('phoneNumber', value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <CustomInput
-                      name="location"
-                      label="Konum"
-                      value={watch('location')}
-                      onChange={(e) => setValue('location', e.target.value)}
-                      placeholder="Şehir, İlçe"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div className="p-6 space-y-8">
+          {renderBasicInfoForm()}
+          {renderDanceAndPhysicalForm()}
+          {renderInstructorDetailsForm()}
         </div>
 
         {/* Footer - Kaydet Butonu */}
