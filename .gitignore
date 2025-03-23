@@ -36,3 +36,11 @@ pnpm-debug.log*
 
 # Cursor specific
 .cursor/
+
+# Credentials and secrets
+**/service-account*.json
+**/credentials*.json
+**/*.key.json
+**/*.pem
+**/*.key
+**/secrets*.json
