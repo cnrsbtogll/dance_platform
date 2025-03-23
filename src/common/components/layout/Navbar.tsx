@@ -342,11 +342,11 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
             <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-2">
               {/* Kullanıcının rolüne göre butonları göster */}
               <div className="flex space-x-2">
-                {/* 'Eğitmen Ol' butonunu eğitmen ve okul olmayanlar görür */}
+                {/* 'Eğitmen Ol' butonu */}
                 {!hasInstructorRole && !hasSchoolRole && !hasSchoolAdminRole && (
                   <Link
                     to="/become-instructor"
-                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
+                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -355,11 +355,11 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                   </Link>
                 )}
 
-                {/* Dans Okulu Aç butonu - okul rolü olmayanlar görebilir */}
+                {/* Dans Okulu Aç butonu */}
                 {!hasSchoolRole && !hasSchoolAdminRole && (
                   <Link
                     to="/become-school"
-                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
+                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -367,24 +367,37 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                     Dans Okulu Aç
                   </Link>
                 )}
+
+                {/* Eğitim Paneli butonu */}
+                {hasInstructorRole && (
+                  <Link
+                    to="/instructor"
+                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                    Eğitim Paneli
+                  </Link>
+                )}
               </div>
               
               {isAuthenticated ? (
                 <>
-                  {/* Admin Panel Butonları */}
+                  {/* Admin Panel Butonu */}
                   {hasSuperAdminRole && (
                     <Link
                       to="/admin"
-                      className="mr-3 inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
+                      className="mr-3 inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
                     >
                       Admin Panel
                     </Link>
                   )}
-                  {/* Okul Yönetim Paneli - sadece okul rolü olanlar görebilir */}
+                  {/* Okul Yönetim Paneli */}
                   {hasSchoolRole && !hasSuperAdminRole && (
                     <Link
                       to="/school-admin"
-                      className="mr-3 inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
+                      className="mr-3 inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 transition-all duration-200 shadow-sm hover:shadow"
                     >
                       Okul Yönetim Paneli
                     </Link>
@@ -500,7 +513,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                 {!hasInstructorRole && !hasSchoolRole && !hasSchoolAdminRole && (
                   <Link 
                     to="/become-instructor"
-                    className="block w-full px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500 focus:ring-offset-1 shadow-sm transition-all duration-200"
+                    className="block w-full px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 focus:outline-none focus:ring-1 focus:ring-rose-500 focus:ring-offset-1 shadow-sm transition-all duration-200"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     <div className="flex items-center justify-center">
@@ -532,7 +545,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                       });
                       setIsMenuOpen(false);
                     }}
-                    className="block w-full px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:ring-offset-1 shadow-sm transition-all duration-200"
+                    className="block w-full px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:ring-offset-1 shadow-sm transition-all duration-200"
                   >
                     <div className="flex items-center justify-center">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -609,7 +622,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                     {hasSchoolRole && !hasSuperAdminRole && (
                       <Link
                         to="/school-admin"
-                        className="block px-3 py-1 mt-2 rounded-md text-base font-medium text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 transition-colors duration-150"
+                        className="block px-3 py-1 mt-2 rounded-md text-base font-medium text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 transition-colors duration-150"
                         onClick={() => setIsMenuOpen(false)}
                       >
                         Okul Yönetim Paneli

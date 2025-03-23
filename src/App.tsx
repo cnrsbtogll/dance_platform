@@ -30,6 +30,29 @@ import theme from './styles/theme';
 console.log('🔍 App bileşeni yükleniyor');
 console.log('🔍 Firebase auth durumu:', auth ? 'Tanımlı' : 'Tanımsız', auth);
 
+// Instructor redirect component
+const InstructorRedirect: React.FC<{ user: any }> = ({ user }) => {
+  const location = useLocation();
+  
+  if (!user?.role?.includes('instructor')) {
+    return null;
+  }
+
+  // Eğitmenlerin erişemeyeceği sayfalar
+  const restrictedPaths = [
+    '/progress',
+    '/admin',
+    '/school-admin'
+  ];
+
+  // Eğer kısıtlı bir sayfadaysa eğitmen paneline yönlendir
+  if (restrictedPaths.includes(location.pathname)) {
+    return <Navigate to="/instructor" replace />;
+  }
+  
+  return null;
+};
+
 function App(): JSX.Element {
   console.log('🔍 App bileşeni render ediliyor');
   
@@ -39,22 +62,6 @@ function App(): JSX.Element {
   const isAuthenticated = !!user;
   const [firebaseInitError, setFirebaseInitError] = useState<string | null>(null);
   const [resetTrigger, setResetTrigger] = useState<number>(0);
-
-  // Instructor redirect component
-  const InstructorRedirect: React.FC = () => {
-    const location = useLocation();
-    
-    // /become-school sayfasına gidildiğinde yönlendirme yapma
-    if (location.pathname === '/become-school') {
-      return null;
-    }
-    
-    if (user?.role?.includes('instructor') && location.pathname !== '/instructor') {
-      return <Navigate to="/instructor" replace />;
-    }
-    
-    return null;
-  };
 
   // Profil fotoğrafının güncellendiğini log'la (debug için)
   useEffect(() => {
@@ -266,11 +273,11 @@ function App(): JSX.Element {
 
   return (
     <Router>
-      {isAuthenticated && <InstructorRedirect />}
       <AuthProvider>
         <ThemeProvider theme={theme}>
           <NotificationsCenter />
           <div className="min-h-screen bg-gray-50">
+            {isAuthenticated && <InstructorRedirect user={user} />}
             {isOffline && (
               <div className="bg-yellow-500 text-white text-center py-2 px-4 fixed top-0 left-0 w-full z-50">
                 ⚠️ Çevrimdışı moddasınız. İnternet bağlantınızı kontrol edin.
