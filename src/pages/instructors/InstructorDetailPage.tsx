@@ -6,6 +6,7 @@ import { Instructor, UserWithProfile, DanceClass } from '../../types';
 import { fetchAllInstructors } from '../../api/services/userService';
 import { ChatDialog } from '../../features/chat/components/ChatDialog';
 import { useAuth } from '../../contexts/AuthContext';
+import LoginRequiredModal from '../../common/components/modals/LoginRequiredModal';
 
 // Eğitmen ve kullanıcı bilgisini birleştiren tip tanımı
 interface InstructorWithUser extends Omit<Instructor, 'specialties' | 'experience'> {
@@ -41,6 +42,7 @@ const InstructorDetailPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   useEffect(() => {
     const fetchInstructorDetails = async () => {
@@ -111,8 +113,7 @@ const InstructorDetailPage: React.FC = () => {
 
   const handleContactClick = () => {
     if (!currentUser) {
-      // Kullanıcı giriş yapmamışsa giriş sayfasına yönlendir
-      navigate('/login', { state: { from: `/instructors/${id}` } });
+      setShowLoginModal(true);
       return;
     }
     setIsChatOpen(true);
@@ -363,6 +364,13 @@ const InstructorDetailPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Login Required Modal */}
+      <LoginRequiredModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        message="Eğitmen ile iletişime geçmek için giriş yapmanız gerekmektedir."
+      />
 
       {/* Chat Dialog */}
       {instructor && (

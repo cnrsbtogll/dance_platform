@@ -11,6 +11,7 @@ import { motion } from 'framer-motion';
 import { fetchSignInMethodsForEmail } from 'firebase/auth';
 import { Pagination } from '@mui/material';
 import { ChatDialog } from '../../features/chat/components/ChatDialog';
+import LoginRequiredModal from '../../common/components/modals/LoginRequiredModal';
 
 // Placeholder görüntü yolları - 404 hatasını önlemek için var olan bir görsele yönlendirelim
 const PLACEHOLDER_PARTNER_IMAGE = '/assets/images/dance/egitmen1.jpg';
@@ -80,9 +81,26 @@ interface FirestoreUser {
   weight?: number;
 }
 
+interface ToastState {
+  show: boolean;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
+
+interface ContactStatus {
+  partnerId: string;
+  sent: boolean;
+  message: string;
+  contactId: string;
+}
+
 function PartnerSearchPage(): JSX.Element {
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [contactStatuses, setContactStatuses] = useState<ContactStatus[]>([]);
+  const [contactStatus, setContactStatus] = useState<ContactStatus | null>(null);
+  const [contactActionLoading, setContactActionLoading] = useState<boolean>(false);
   const [dansTuru, setDansTuru] = useState<string>('');
   const [cinsiyet, setCinsiyet] = useState<string>('');
   const [seviye, setSeviye] = useState<string>('');
@@ -98,12 +116,12 @@ function PartnerSearchPage(): JSX.Element {
   const [loadingStyles, setLoadingStyles] = useState(true);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState<boolean>(false);
-  const [contactStatuses, setContactStatuses] = useState<{partnerId: string, sent: boolean, message: string, contactId: string}[]>([]);
-  const [contactStatus, setContactStatus] = useState<{partnerId: string, sent: boolean, message: string, contactId?: string} | null>(null);
-  // Toast bildirim durumu
-  const [toast, setToast] = useState<{show: boolean, message: string, type: 'success' | 'error' | 'info'} | null>(null);
-  // İletişim talebi gönderme veya iptal etme yükleniyor durumu
-  const [contactActionLoading, setContactActionLoading] = useState<boolean>(false);
+  const [selectedPartner, setSelectedPartner] = useState<{
+    id: string;
+    displayName: string;
+    photoURL?: string;
+    role?: 'student' | 'instructor' | 'school' | 'partner';
+  } | null>(null);
 
   // Dans stilleri eşleştirme haritası - danceStyles ile users tablosundaki değerler arasında
   const [styleMapping, setStyleMapping] = useState<{[key: string]: DanceStyle}>({});
@@ -1015,10 +1033,6 @@ function PartnerSearchPage(): JSX.Element {
 
   // Partner kartı bileşeni - Modern tasarım
   const PartnerKarti: React.FC<PartnerKartiProps> = ({ partner }) => {
-    // Bu partnere ait bir iletişim talebi var mı kontrol et
-    const pendingRequest = contactStatuses.find(status => status.partnerId === partner.id);
-    
-    // Eğitmen kontrolü
     const isInstructor = Array.isArray(partner.role) 
       ? partner.role.includes('instructor')
       : partner.role === 'instructor';
@@ -1042,32 +1056,24 @@ function PartnerSearchPage(): JSX.Element {
           {/* Alt bilgiler için gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-4">
             {/* İsim ve puan bilgisi */}
-            <div className="flex justify-between items-center mb-1">
-              <h2 className="text-xl font-bold text-white">{partner.ad}</h2>
-              {partner.puan && partner.puan > 0 && (
-                <div className="flex items-center bg-white/90 px-2 py-1 rounded-full">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
+            <div className="flex items-end justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-white mb-1">{partner.ad}</h2>
+                <p className="text-gray-200 text-sm">{partner.yas} yaşında • {partner.cinsiyet}</p>
+              </div>
+              {partner.puan > 0 && (
+                <div className="flex items-center bg-black/30 px-2 py-1 rounded-lg">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                   </svg>
-                  <span className="ml-1 text-sm font-semibold">{partner.puan}</span>
+                  <span className="text-white text-sm ml-1">{partner.puan.toFixed(1)}</span>
                 </div>
               )}
             </div>
             
-            {/* Yaş ve cinsiyet bilgisi */}
-            {(partner.yas > 0 || partner.cinsiyet !== 'Belirtilmemiş') && (
-              <div className="flex items-center text-white/90 mb-1 text-sm">
-                <span>
-                  {partner.yas > 0 ? `${partner.yas} yaşında` : ""} 
-                  {partner.yas > 0 && partner.cinsiyet !== 'Belirtilmemiş' ? '•' : ''} 
-                  {partner.cinsiyet !== 'Belirtilmemiş' ? partner.cinsiyet : ''}
-                </span>
-              </div>
-            )}
-            
             {/* Konum bilgisi */}
-            {partner.konum !== 'Belirtilmemiş' && (
-              <div className="flex items-center text-white/90 text-sm">
+            {partner.konum && (
+              <div className="flex items-center text-gray-200 text-sm mt-2">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                 </svg>
@@ -1106,18 +1112,6 @@ function PartnerSearchPage(): JSX.Element {
               </span>
             </div>
           )}
-          
-          {/* Bekleyen iletişim talebi varsa badge göster */}
-          {pendingRequest && (
-            <div className="absolute bottom-3 right-3">
-              <span className="px-2 py-1 text-xs font-semibold bg-green-600 text-white rounded-full shadow-md flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                Talep Gönderildi
-              </span>
-            </div>
-          )}
         </div>
         
         {/* Kart içeriği - alt kısım */}
@@ -1153,7 +1147,7 @@ function PartnerSearchPage(): JSX.Element {
               {partner.dans.length > 0 ? (
                 partner.dans.map((dansTuru, index) => (
                   <span 
-                    key={index} 
+                    key={index}
                     className="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded-full"
                   >
                     {dansTuru}
@@ -1184,65 +1178,15 @@ function PartnerSearchPage(): JSX.Element {
           </div>
           
           <div className="mt-auto">
-            {pendingRequest ? (
-              <div className="rounded-lg mb-4">
-                <div className="p-3 bg-green-100 text-green-800 rounded-lg mb-2 text-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  {pendingRequest.message || `${partner.ad} adlı partnere iletişim talebiniz gönderildi. Yanıt bekleyin.`}
-                </div>
-                <button 
-                  className="w-full py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors duration-300 flex items-center justify-center font-medium"
-                  onClick={() => {
-                    if (pendingRequest.contactId) {
-                      cancelContactRequest(pendingRequest.contactId);
-                    }
-                  }}
-                  disabled={contactActionLoading}
-                >
-                  {contactActionLoading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-red-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      İşlem yapılıyor...
-                    </>
-                  ) : (
-                    <>
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                      İletişim Talebini İptal Et
-                    </>
-                  )}
-                </button>
-              </div>
-            ) : (
-              <button 
-                className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-colors duration-300 flex items-center justify-center font-medium shadow-md"
-                onClick={() => handleContact(partner)}
-                disabled={contactActionLoading}
-              >
-                {contactActionLoading ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    İşlem yapılıyor...
-                  </>
-                ) : (
-                  <>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
-                    İletişime Geç
-                  </>
-                )}
-              </button>
-            )}
+            <button 
+              className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-colors duration-300 flex items-center justify-center font-medium shadow-md"
+              onClick={() => handleContact(partner)}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              İletişime Geç
+            </button>
           </div>
         </div>
       </div>
@@ -1280,18 +1224,15 @@ function PartnerSearchPage(): JSX.Element {
     label: seviye
   }));
 
-  const [selectedPartner, setSelectedPartner] = useState<{
-    id: string;
-    displayName: string;
-    photoURL?: string;
-    role?: 'student' | 'instructor' | 'school' | 'partner';
-  } | null>(null);
-
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Render the login prompt modal */}
-      <LoginPromptModal />
-      
+      {/* Login Required Modal */}
+      <LoginRequiredModal
+        isOpen={showLoginPrompt}
+        onClose={() => setShowLoginPrompt(false)}
+        message="Partner ile iletişime geçmek için giriş yapmanız gerekmektedir."
+      />
+
       {/* Toast bildirim */}
       <Toast />
       
