@@ -15,16 +15,19 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../../../api/firebase/firebase';
 import { Instructor as InstructorType } from '../../../../types';
+import Avatar from '../../../../common/components/ui/Avatar';
 
 interface InstructorRequest {
   id: string;
-  fullName: string;
+  firstName: string;
+  lastName: string;
   experience: string;
-  danceStyles: string | string[];
+  danceStyles: string[];
   contactNumber: string;
   bio: string;
   userId: string;
   userEmail: string;
+  photoURL?: string | null;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: Timestamp;
 }
@@ -78,6 +81,8 @@ function InstructorRequests() {
     setProcessingId(requestId);
     
     try {
+      console.log('🔵 Onaylama işlemi başlatıldı:', { requestId, userId });
+      
       // 1. Get the request document
       const requestDocRef = doc(db, 'instructorRequests', requestId);
       const requestDoc = await getDoc(requestDocRef);
@@ -87,31 +92,39 @@ function InstructorRequests() {
       }
       
       const requestData = requestDoc.data() as InstructorRequest;
+      console.log('✅ Talep verileri alındı:', requestData);
       
       // 2. Get the user document
       const userDocRef = doc(db, 'users', userId);
       const userDoc = await getDoc(userDocRef);
       
       if (!userDoc.exists()) {
-        console.error('Kullanıcı bulunamadı. User ID:', userId);
-        console.error('Request Data:', requestData);
+        console.log('⚠️ Kullanıcı bulunamadı, yeni kullanıcı oluşturuluyor. User ID:', userId);
         
         // Kullanıcı yoksa, önce users koleksiyonunda yeni kullanıcı oluştur
         try {
-          await setDoc(userDocRef, {
+          const newUserData = {
             email: requestData.userEmail,
-            displayName: requestData.fullName,
+            displayName: `${requestData.firstName} ${requestData.lastName}`.trim(),
             phoneNumber: requestData.contactNumber,
-            role: ['instructor'],
+            role: 'instructor',
             isInstructor: true,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
-            status: 'active'
-          });
+            status: 'active',
+            // Varsayılan değerler ekle
+            gender: 'Belirtilmemiş',
+            age: 0,
+            city: 'Belirtilmemiş',
+            level: 'beginner',
+            danceStyles: requestData.danceStyles,
+            photoURL: requestData.photoURL || "/assets/images/dance/egitmen_default.jpg"
+          };
           
-          console.log('Yeni kullanıcı oluşturuldu. User ID:', userId);
+          await setDoc(userDocRef, newUserData);
+          console.log('✅ Yeni kullanıcı oluşturuldu:', newUserData);
         } catch (createError) {
-          console.error('Kullanıcı oluşturulurken hata:', createError);
+          console.error('❌ Kullanıcı oluşturma hatası:', createError);
           throw new Error('Kullanıcı oluşturulamadı. Lütfen tekrar deneyin.');
         }
       }
@@ -121,69 +134,77 @@ function InstructorRequests() {
       const userData = freshUserDoc.data();
       
       if (!userData) {
+        console.error('❌ Kullanıcı verileri alınamadı');
         throw new Error('Kullanıcı verilerine erişilemedi');
       }
       
-      // Roles array'ini kontrol et ve güncelle
-      let roles = userData.role || [];
-      if (!Array.isArray(roles)) {
-        roles = [roles];
-      }
-      if (!roles.includes('instructor')) {
-        roles.push('instructor');
-      }
+      console.log('✅ Güncel kullanıcı verileri:', userData);
       
-      // Add instructor-specific data to the user document
-      await updateDoc(userDocRef, {
-        role: roles,
-        isInstructor: true,
-        instructorSpecialization: requestData.danceStyles,
-        instructorExperience: requestData.experience,
-        instructorBio: requestData.bio,
-        instructorApprovedAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
-      
-      // 4. Add instructor to the instructors collection with more user data
+      // 4. Add instructor to the instructors collection
       const instructorData: Partial<InstructorType> = {
         userId: userId,
-        displayName: requestData.fullName,
+        displayName: `${requestData.firstName} ${requestData.lastName}`.trim(),
         email: userData.email || requestData.userEmail,
-        photoURL: userData.photoURL || "/assets/images/dance/egitmen_default.jpg",
+        photoURL: requestData.photoURL || userData.photoURL || "/assets/images/dance/egitmen_default.jpg",
         phoneNumber: userData.phoneNumber || requestData.contactNumber,
-        role: ['instructor'],
-        specialties: Array.isArray(requestData.danceStyles) 
-          ? requestData.danceStyles 
-          : typeof requestData.danceStyles === 'string'
-            ? requestData.danceStyles.split(',').map(s => s.trim())
-            : [],
-        experience: requestData.experience,
-        bio: requestData.bio,
+        role: 'instructor',
+        specialties: requestData.danceStyles,
+        experience: parseInt(requestData.experience) || 0,
+        bio: requestData.bio || '',
         status: 'active',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
       
+      console.log('📝 Eğitmen verileri:', instructorData);
       const instructorsCollectionRef = collection(db, 'instructors');
       const instructorDoc = await addDoc(instructorsCollectionRef, instructorData);
-      console.log('Eğitmen dokümanı oluşturuldu. ID:', instructorDoc.id);
+      console.log('✅ Eğitmen dokümanı oluşturuldu. ID:', instructorDoc.id);
       
-      // 5. Update the request status
-      await updateDoc(requestDocRef, {
+      // 5. Update user document with instructor data
+      const userUpdates = {
+        role: 'instructor',
+        isInstructor: true,
+        displayName: instructorData.displayName,
+        photoURL: instructorData.photoURL,
+        phoneNumber: instructorData.phoneNumber,
+        instructorSpecialization: requestData.danceStyles,
+        instructorExperience: requestData.experience,
+        instructorBio: requestData.bio,
+        instructorApprovedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+      
+      console.log('📝 Kullanıcı güncellemeleri:', userUpdates);
+      await updateDoc(userDocRef, userUpdates);
+      console.log('✅ Kullanıcı dokümanı güncellendi');
+      
+      // 6. Update the request status
+      const requestUpdates = {
         status: 'approved',
         updatedAt: serverTimestamp(),
         approvedBy: 'admin',
-        instructorDocId: instructorDoc.id // Oluşturulan eğitmen dokümanının referansını sakla
-      });
+        instructorDocId: instructorDoc.id
+      };
       
-      // 6. Update the local state
+      console.log('📝 Talep güncellemeleri:', requestUpdates);
+      await updateDoc(requestDocRef, requestUpdates);
+      console.log('✅ Talep dokümanı güncellendi');
+      
+      // 7. Update the local state
       setRequests(prev => prev.filter(req => req.id !== requestId));
       
       alert('Eğitmen talebi başarıyla onaylandı. Eğitmen, eğitmenler listesine eklendi ve kullanıcı bilgileri güncellendi.');
       
-    } catch (err) {
-      console.error('Eğitmen talebi onaylanırken hata oluştu:', err);
-      alert(`Hata: ${err instanceof Error ? err.message : 'Bilinmeyen bir hata oluştu'}`);
+    } catch (error: any) {
+      console.error('❌ Eğitmen talebi onaylanırken hata oluştu:', error);
+      console.error('Hata detayları:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        code: error.code
+      });
+      alert(`Hata: ${error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu'}`);
     } finally {
       setProcessingId(null);
     }
@@ -249,61 +270,112 @@ function InstructorRequests() {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-2xl font-semibold text-gray-800 mb-6">Eğitmen Başvuruları</h2>
+    <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+      <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-6">Eğitmen Başvuruları</h2>
       
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Adı Soyadı</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">E-posta</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deneyim</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dans Stilleri</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Başvuru Tarihi</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İşlemler</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {requests.map((request) => (
-              <tr key={request.id}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="font-medium text-gray-900">{request.fullName}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-gray-500">{request.userEmail}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-gray-500">{request.experience}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-gray-500">{request.danceStyles}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-gray-500">
-                    {request.createdAt ? request.createdAt.toDate().toLocaleDateString('tr-TR') : '-'}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button
-                    onClick={() => handleApproveRequest(request.id, request.userId)}
-                    disabled={processingId === request.id}
-                    className="text-green-600 hover:text-green-900 mr-4 disabled:opacity-50"
-                  >
-                    {processingId === request.id ? 'İşleniyor...' : 'Onayla'}
-                  </button>
-                  <button
-                    onClick={() => handleRejectRequest(request.id)}
-                    disabled={processingId === request.id}
-                    className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                  >
-                    {processingId === request.id ? 'İşleniyor...' : 'Reddet'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="-mx-4 sm:mx-0 overflow-hidden">
+        <div className="inline-block min-w-full align-middle">
+          <div className="overflow-x-auto border border-gray-200 sm:rounded-lg shadow-sm">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Eğitmen
+                  </th>
+                  <th scope="col" className="hidden md:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    E-posta
+                  </th>
+                  <th scope="col" className="hidden lg:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Deneyim
+                  </th>
+                  <th scope="col" className="hidden xl:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Dans Stilleri
+                  </th>
+                  <th scope="col" className="hidden lg:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Başvuru Tarihi
+                  </th>
+                  <th scope="col" className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    İşlemler
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {requests.map((request) => (
+                  <tr key={request.id} className="hover:bg-gray-50">
+                    <td className="px-4 sm:px-6 py-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex-shrink-0 h-10 w-10">
+                          <Avatar
+                            src={request.photoURL || ''}
+                            alt={`${request.firstName} ${request.lastName}`}
+                            className="h-10 w-10 rounded-full"
+                          />
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {`${request.firstName} ${request.lastName}`.trim()}
+                          </div>
+                          <div className="text-sm text-gray-500 md:hidden">
+                            {request.userEmail}
+                          </div>
+                          <div className="text-sm text-gray-500 lg:hidden">
+                            {request.experience}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="hidden md:table-cell px-4 sm:px-6 py-4 text-sm text-gray-500">
+                      {request.userEmail}
+                    </td>
+                    <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-500">
+                      {request.experience}
+                    </td>
+                    <td className="hidden xl:table-cell px-4 sm:px-6 py-4">
+                      <div className="flex flex-wrap gap-1">
+                        {request.danceStyles.map((style, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800"
+                          >
+                            {style}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                      {request.createdAt ? request.createdAt.toDate().toLocaleDateString('tr-TR') : '-'}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 text-right text-sm font-medium whitespace-nowrap">
+                      <div className="flex justify-end space-x-2">
+                        <button
+                          onClick={() => handleApproveRequest(request.id, request.userId)}
+                          disabled={processingId === request.id}
+                          className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                        >
+                          {processingId === request.id ? 'İşleniyor...' : 'Onayla'}
+                        </button>
+                        <button
+                          onClick={() => handleRejectRequest(request.id)}
+                          disabled={processingId === request.id}
+                          className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+                        >
+                          {processingId === request.id ? 'İşleniyor...' : 'Reddet'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {requests.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 sm:px-6 py-4 text-sm text-center text-gray-500">
+                      Henüz eğitmen başvurusu bulunmamaktadır.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   );

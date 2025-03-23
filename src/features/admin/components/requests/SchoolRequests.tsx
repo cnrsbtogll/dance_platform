@@ -14,6 +14,7 @@ import {
   addDoc
 } from 'firebase/firestore';
 import { db } from '../../../../api/firebase/firebase';
+import Avatar from '../../../../common/components/ui/Avatar';
 
 interface SchoolRequest {
   id: string;
@@ -105,19 +106,10 @@ function SchoolRequests(): JSX.Element {
       
       // 3. Update the user document to add the school role
       const userData = userDoc.data();
-      let roles = userData.role || [];
-      
-      if (!Array.isArray(roles)) {
-        roles = [roles];
-      }
-      
-      if (!roles.includes('school')) {
-        roles.push('school');
-      }
       
       // Add school-specific data to the user document
       await updateDoc(userDocRef, {
-        role: roles,
+        role: 'school', // Artık array değil, string
         isSchool: true,
         schoolApprovedAt: serverTimestamp(),
         updatedAt: serverTimestamp()
@@ -243,7 +235,7 @@ function SchoolRequests(): JSX.Element {
               <thead className="bg-gray-50">
                 <tr>
                   <th scope="col" className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    Okul Adı
+                    Okul
                   </th>
                   <th scope="col" className="hidden sm:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     İletişim Kişisi
@@ -254,14 +246,8 @@ function SchoolRequests(): JSX.Element {
                   <th scope="col" className="hidden lg:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Telefon
                   </th>
-                  <th scope="col" className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    Şehir
-                  </th>
                   <th scope="col" className="hidden xl:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Dans Stilleri
-                  </th>
-                  <th scope="col" className="hidden lg:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    Başvuru Tarihi
                   </th>
                   <th scope="col" className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     İşlemler
@@ -272,8 +258,25 @@ function SchoolRequests(): JSX.Element {
                 {requests.map((request) => (
                   <tr key={request.id} className="hover:bg-gray-50">
                     <td className="px-4 sm:px-6 py-4">
-                      <div className="flex items-center">
-                        <div className="text-sm font-medium text-gray-900">{request.schoolName}</div>
+                      <div className="flex items-center space-x-3">
+                        <div className="flex-shrink-0 h-10 w-10">
+                          <Avatar
+                            src={null}
+                            alt={request.schoolName}
+                            className="h-10 w-10 rounded-full"
+                          />
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {request.schoolName}
+                          </div>
+                          <div className="text-sm text-gray-500 sm:hidden">
+                            {request.contactPerson}
+                          </div>
+                          <div className="text-sm text-gray-500 md:hidden">
+                            {request.contactEmail}
+                          </div>
+                        </div>
                       </div>
                     </td>
                     <td className="hidden sm:table-cell px-4 sm:px-6 py-4 text-sm text-gray-500">
@@ -284,9 +287,6 @@ function SchoolRequests(): JSX.Element {
                     </td>
                     <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-500">
                       {request.contactPhone}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-500">
-                      {request.city}
                     </td>
                     <td className="hidden xl:table-cell px-4 sm:px-6 py-4">
                       <div className="flex flex-wrap gap-1">
@@ -300,22 +300,21 @@ function SchoolRequests(): JSX.Element {
                         ))}
                       </div>
                     </td>
-                    <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
-                      {new Date(request.createdAt.toDate()).toLocaleDateString('tr-TR')}
-                    </td>
                     <td className="px-4 sm:px-6 py-4 text-right text-sm font-medium whitespace-nowrap">
                       <div className="flex justify-end space-x-2">
                         <button
                           onClick={() => handleApproveRequest(request.id, request.userId)}
-                          className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                          disabled={processingId === request.id}
+                          className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
                         >
-                          Onayla
+                          {processingId === request.id ? 'İşleniyor...' : 'Onayla'}
                         </button>
                         <button
                           onClick={() => handleRejectRequest(request.id)}
-                          className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                          disabled={processingId === request.id}
+                          className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
                         >
-                          Reddet
+                          {processingId === request.id ? 'İşleniyor...' : 'Reddet'}
                         </button>
                         <button
                           onClick={() => handleViewDetails(request)}
@@ -329,7 +328,7 @@ function SchoolRequests(): JSX.Element {
                 ))}
                 {requests.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 sm:px-6 py-4 text-sm text-center text-gray-500">
+                    <td colSpan={6} className="px-4 sm:px-6 py-4 text-sm text-center text-gray-500">
                       Henüz okul başvurusu bulunmamaktadır.
                     </td>
                   </tr>
@@ -354,14 +353,17 @@ function SchoolRequests(): JSX.Element {
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
                   <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                      Okul Başvuru Detayları
-                    </h3>
+                    <div className="flex items-center space-x-4 mb-6">
+                      <Avatar
+                        src={null}
+                        alt={selectedRequest.schoolName}
+                        className="h-16 w-16 rounded-full"
+                      />
+                      <h3 className="text-lg leading-6 font-medium text-gray-900">
+                        {selectedRequest.schoolName}
+                      </h3>
+                    </div>
                     <div className="mt-2 space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Okul Adı</label>
-                        <p className="mt-1 text-sm text-gray-900">{selectedRequest.schoolName}</p>
-                      </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700">İletişim Kişisi</label>
                         <p className="mt-1 text-sm text-gray-900">{selectedRequest.contactPerson}</p>
@@ -373,6 +375,10 @@ function SchoolRequests(): JSX.Element {
                       <div>
                         <label className="block text-sm font-medium text-gray-700">Telefon</label>
                         <p className="mt-1 text-sm text-gray-900">{selectedRequest.contactPhone}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Adres</label>
+                        <p className="mt-1 text-sm text-gray-900">{selectedRequest.address}</p>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700">Şehir</label>
@@ -390,6 +396,14 @@ function SchoolRequests(): JSX.Element {
                             </span>
                           ))}
                         </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Açıklama</label>
+                        <p className="mt-1 text-sm text-gray-900">{selectedRequest.schoolDescription}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Kuruluş Yılı</label>
+                        <p className="mt-1 text-sm text-gray-900">{selectedRequest.establishedYear}</p>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700">Başvuru Tarihi</label>

@@ -408,8 +408,8 @@ export const UserManagement: React.FC = () => {
   const editStudent = (student: FirebaseUser): void => {
     setSelectedStudent(student);
     
-    // Determine user type and set form data accordingly
-    const userType = Array.isArray(student.role) ? student.role[0] : student.role;
+    // Artık role her zaman string
+    const userType = student.role;
     setSelectedUserType(userType as 'student' | 'instructor' | 'school');
     
     const baseFormData = {
@@ -890,31 +890,25 @@ export const UserManagement: React.FC = () => {
   };
 
   // Render role badges
-  const renderRoleBadges = (roles: UserRole | UserRole[]) => {
-    const roleArray = Array.isArray(roles) ? roles : [roles];
+  const renderRoleBadges = (role: UserRole) => {
     return (
       <div className="flex flex-wrap gap-1">
-        {roleArray.map((role, index) => (
-          <span
-            key={index}
-            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(role)}`}
-          >
-            {role === 'admin' && 'Admin'}
-            {role === 'instructor' && 'Eğitmen'}
-            {role === 'school' && 'Dans Okulu'}
-            {role === 'student' && 'Öğrenci'}
-            {!['admin', 'instructor', 'school', 'student'].includes(role) && role}
-          </span>
-        ))}
+        <span
+          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(role)}`}
+        >
+          {role === 'admin' && 'Admin'}
+          {role === 'instructor' && 'Eğitmen'}
+          {role === 'school' && 'Dans Okulu'}
+          {role === 'student' && 'Öğrenci'}
+          {!['admin', 'instructor', 'school', 'student'].includes(role) && role}
+        </span>
       </div>
     );
   };
 
   // Get avatar type based on user role
-  const getAvatarType = (role: UserRole | UserRole[]): "student" | "instructor" | "school" => {
-    const roleToCheck = Array.isArray(role) ? role[0] : role;
-    
-    switch (roleToCheck) {
+  const getAvatarType = (role: UserRole): "student" | "instructor" | "school" => {
+    switch (role) {
       case 'instructor':
         return 'instructor';
       case 'school':
@@ -1059,10 +1053,7 @@ export const UserManagement: React.FC = () => {
 
     // Apply role filter
     if (filterConfig.roles.length > 0) {
-      result = result.filter(student => {
-        const studentRoles = Array.isArray(student.role) ? student.role : [student.role];
-        return studentRoles.some(role => filterConfig.roles.includes(role));
-      });
+      result = result.filter(student => filterConfig.roles.includes(student.role));
     }
 
     // Apply sorting
@@ -1070,12 +1061,6 @@ export const UserManagement: React.FC = () => {
       result.sort((a: any, b: any) => {
         let aValue = a[sortConfig.field];
         let bValue = b[sortConfig.field];
-
-        // Special handling for roles array
-        if (sortConfig.field === 'role') {
-          aValue = Array.isArray(aValue) ? aValue.join(', ') : aValue;
-          bValue = Array.isArray(bValue) ? bValue.join(', ') : bValue;
-        }
 
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;

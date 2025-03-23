@@ -219,11 +219,15 @@ function BecomeInstructor() {
   };
 
   const handlePhotoChange = (base64Image: string | null) => {
+    console.log('🖼️ Fotoğraf değişikliği:', base64Image ? 'Fotoğraf seçildi' : 'Fotoğraf seçilmedi');
     if (base64Image) {
-      setFormData(prev => ({
-        ...prev,
-        photoURL: base64Image
-      }));
+      setFormData(prev => {
+        console.log('📸 Fotoğraf formData\'ya ekleniyor');
+        return {
+          ...prev,
+          photoURL: base64Image
+        };
+      });
     }
   };
 
@@ -232,6 +236,8 @@ function BecomeInstructor() {
     setIsSubmitting(true);
     setGeneralError(null);
     setFormErrors({});
+    
+    console.log('🔵 Form gönderme işlemi başlatıldı:', formData);
     
     const errors: Partial<Record<keyof FormData, string>> = {};
     
@@ -261,13 +267,12 @@ function BecomeInstructor() {
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
         errors.email = 'Geçerli bir email adresi girin';
       }
-      
-      if (!formData.photoURL) {
-        errors.photoURL = 'Profil fotoğrafı seçmelisiniz';
-      }
     }
+
+    console.log('✅ Form validasyonu tamamlandı. Hatalar:', errors);
     
     if (Object.keys(errors).length > 0) {
+      console.log('❌ Form validasyonu başarısız');
       setFormErrors(errors);
       setIsSubmitting(false);
       return;
@@ -278,6 +283,7 @@ function BecomeInstructor() {
       let userEmail = currentUser?.email;
 
       if (!currentUser && formData.email) {
+        console.log('🔵 Yeni kullanıcı oluşturuluyor...');
         try {
           const userCredential = await createUserWithEmailAndPassword(
             auth,
@@ -293,9 +299,9 @@ function BecomeInstructor() {
           userId = userCredential.user.uid;
           userEmail = userCredential.user.email;
 
-          console.log('Yeni kullanıcı oluşturuldu:', userId);
+          console.log('✅ Yeni kullanıcı oluşturuldu:', userId);
         } catch (authError) {
-          console.error('Kullanıcı oluşturulurken hata:', authError);
+          console.error('❌ Kullanıcı oluşturma hatası:', authError);
           setGeneralError('Hesap oluşturulurken bir hata oluştu. Lütfen farklı bir e-posta adresi deneyin.');
           setIsSubmitting(false);
           return;
@@ -305,8 +311,9 @@ function BecomeInstructor() {
       if (!userId || !userEmail) {
         throw new Error('Kullanıcı bilgileri eksik');
       }
-      
-      await addDoc(collection(db, 'instructorRequests'), {
+
+      console.log('🔵 Eğitmen başvurusu oluşturuluyor...');
+      const instructorRequestData = {
         firstName: formData.firstName,
         lastName: formData.lastName,
         experience: formData.experience,
@@ -318,15 +325,18 @@ function BecomeInstructor() {
         photoURL: formData.photoURL,
         status: 'pending',
         createdAt: serverTimestamp()
-      });
+      };
+      console.log('📝 Gönderilecek veri:', instructorRequestData);
+      
+      await addDoc(collection(db, 'instructorRequests'), instructorRequestData);
+      console.log('✅ Başvuru başarıyla gönderildi');
       
       setSuccess(true);
-      
       setFormData(initialFormData);
       setSelectedDanceStyles([]);
       
     } catch (err) {
-      console.error('Error submitting instructor application:', err);
+      console.error('❌ Başvuru gönderilirken hata oluştu:', err);
       setGeneralError(`Başvuru gönderilirken bir hata oluştu: ${err instanceof Error ? err.message : 'Bilinmeyen bir hata'}`);
     } finally {
       setIsSubmitting(false);

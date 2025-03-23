@@ -20,8 +20,7 @@ export interface User {
   height?: number;
   weight?: number;
   availableTimes?: string[];
-  roles?: string[];
-  role?: UserRole | string;  // Tekil role alanı
+  role: UserRole;  // Artık zorunlu ve tekil
   createdAt?: Date;
   updatedAt?: Date;
   schoolId?: string;  // Kullanıcının bağlı olduğu okul ID'si
@@ -202,7 +201,7 @@ export interface FirebaseUser {
   displayName: string;
   photoURL?: string;
   phoneNumber?: string;
-  role: UserRole | UserRole[];
+  role: UserRole; // Artık sadece tekil string
   level?: DanceLevel;
   instructorId?: string | null;
   instructorName?: string | null;
@@ -232,7 +231,7 @@ export interface FirebaseUser {
 // Update the invitation data type
 export interface InvitationData {
   displayName: string;
-  roles: UserRole[];
+  role: UserRole; // Artık tekil string
   level?: DanceLevel;
   schoolId?: string;
   schoolName?: string;
