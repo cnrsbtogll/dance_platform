@@ -979,6 +979,24 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
             {student.schoolName || '-'}
           </div>
         </td>
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="text-sm text-gray-900">
+            {student.courseIds && student.courseIds.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {student.courseIds.map(courseId => {
+                  const course = courses.find(c => c.id === courseId);
+                  return course ? (
+                    <span key={courseId} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
+                      {course.name}
+                    </span>
+                  ) : null;
+                })}
+              </div>
+            ) : (
+              <span className="text-gray-500">-</span>
+            )}
+          </div>
+        </td>
         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium min-w-[140px]">
           <div className="flex justify-end space-x-2">
             <button
@@ -1364,6 +1382,9 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Okul
                   </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Kurslar
+                  </th>
                   <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     İşlemler
                   </th>
@@ -1450,6 +1471,23 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                     <div>
                       <span className="text-gray-500">Okul:</span>
                       <p className="font-medium">{student.schoolName || '-'}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-500">Kurslar:</span>
+                      {student.courseIds && student.courseIds.length > 0 ? (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {student.courseIds.map(courseId => {
+                            const course = courses.find(c => c.id === courseId);
+                            return course ? (
+                              <span key={courseId} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
+                                {course.name}
+                              </span>
+                            ) : null;
+                          })}
+                        </div>
+                      ) : (
+                        <p className="font-medium">-</p>
+                      )}
                     </div>
                   </div>
                 </div>
