@@ -10,6 +10,7 @@ import { User, DanceStyle as DanceStyleType, DanceLevel } from '../../types';
 import { motion } from 'framer-motion';
 import { fetchSignInMethodsForEmail } from 'firebase/auth';
 import { Pagination } from '@mui/material';
+import { ChatDialog } from '../../features/chat/components/ChatDialog';
 
 // Placeholder görüntü yolları - 404 hatasını önlemek için var olan bir görsele yönlendirelim
 const PLACEHOLDER_PARTNER_IMAGE = '/assets/images/dance/egitmen1.jpg';
@@ -845,72 +846,13 @@ function PartnerSearchPage(): JSX.Element {
       return;
     }
 
-    // İşlem sırasında yükleniyor durumunu aktifleştir
-    setContactActionLoading(true);
-    
-    try {
-      // Firebase'e iletişim talebini kaydet
-      const contactRequestsRef = collection(db, 'contactRequests');
-      
-      // İletişim talebi verisini oluştur
-      const contactRequestData = {
-        senderId: currentUser.id,
-        senderName: currentUser.displayName,
-        senderPhoto: currentUser.photoURL,
-        receiverId: partner.id,
-        receiverName: partner.ad,
-        receiverPhoto: partner.foto,
-        status: 'pending', // pending, accepted, rejected, cancelled
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
-      
-      // Firebase'e kaydet
-      const newContactRef = await addDoc(contactRequestsRef, contactRequestData);
-      
-      // Yeni talep nesnesi
-      const newContactRequest = {
-        partnerId: partner.id,
-        sent: true,
-        message: `${partner.ad} adlı partnere iletişim talebiniz gönderildi. Yanıt bekleyin.`,
-        contactId: newContactRef.id
-      };
-      
-      // contactStatuses dizisine yeni talebi ekle
-      setContactStatuses(prevStatuses => [...prevStatuses, newContactRequest]);
-      
-      // Geriye uyumluluk için contactStatus'u da güncelle
-      setContactStatus(newContactRequest);
-      
-      // LocalStorage'a kaydet - sayfa yenilendiğinde kaybolmaması için
-      localStorage.setItem('contactStatus', JSON.stringify({
-        ...newContactRequest,
-        timestamp: new Date().getTime()
-      }));
-      
-      // Toast bildirimini göster
-      setToast({
-        show: true,
-        message: `${partner.ad} adlı partnere iletişim talebiniz gönderildi. Yanıt bekleyin.`,
-        type: 'success'
-      });
-      
-      // 5 saniye sonra toast'u kapat
-      setTimeout(() => {
-        setToast(null);
-      }, 5000);
-      
-      console.log(`${partner.ad} adlı partnere iletişim talebi gönderildi!`);
-    } catch (error) {
-      console.error('İletişim talebi gönderilirken hata:', error);
-      setToast({
-        show: true,
-        message: 'İletişim talebi gönderilirken bir hata oluştu. Lütfen tekrar deneyin.',
-        type: 'error'
-      });
-    } finally {
-      setContactActionLoading(false);
-    }
+    // Partner bilgilerini ayarla ve chat dialogunu aç
+    setSelectedPartner({
+      id: partner.id,
+      displayName: partner.ad,
+      photoURL: partner.foto,
+      role: 'partner'
+    });
   };
 
   // İletişim talebini iptal et
@@ -1338,6 +1280,13 @@ function PartnerSearchPage(): JSX.Element {
     label: seviye
   }));
 
+  const [selectedPartner, setSelectedPartner] = useState<{
+    id: string;
+    displayName: string;
+    photoURL?: string;
+    role?: 'student' | 'instructor' | 'school' | 'partner';
+  } | null>(null);
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Render the login prompt modal */}
@@ -1581,6 +1530,15 @@ function PartnerSearchPage(): JSX.Element {
           </div>
         </div>
       </div>
+      
+      {selectedPartner && (
+        <ChatDialog
+          open={!!selectedPartner}
+          onClose={() => setSelectedPartner(null)}
+          partner={selectedPartner}
+          chatType="partner-partner"
+        />
+      )}
     </div>
   );
 }

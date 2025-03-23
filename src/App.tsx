@@ -26,6 +26,10 @@ import SchoolAdmin from './features/school/pages/SchoolAdmin';
 import NotificationsCenter from './common/components/badges/NotificationsCenter';
 import { ThemeProvider } from '@mui/material/styles';
 import theme from './styles/theme';
+import { collection, query, where, onSnapshot, writeBatch, getDocs } from 'firebase/firestore';
+import { db } from './api/firebase/firebase';
+import { ChatDialog } from './features/chat/components/ChatDialog';
+import { ChatList } from './features/chat/components/ChatList';
 
 console.log('🔍 App bileşeni yükleniyor');
 console.log('🔍 Firebase auth durumu:', auth ? 'Tanımlı' : 'Tanımsız', auth);
@@ -62,6 +66,8 @@ function App(): JSX.Element {
   const isAuthenticated = !!user;
   const [firebaseInitError, setFirebaseInitError] = useState<string | null>(null);
   const [resetTrigger, setResetTrigger] = useState<number>(0);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showChatList, setShowChatList] = useState(false);
 
   // Profil fotoğrafının güncellendiğini log'la (debug için)
   useEffect(() => {
@@ -230,6 +236,62 @@ function App(): JSX.Element {
       console.log('SchoolAdmin component unmounted');
     };
   }, []);
+
+  // Okunmamış mesajları takip et
+  useEffect(() => {
+    if (!user?.id) return;
+
+    console.log('Mesaj dinleyicisi başlatılıyor...');
+
+    const messagesRef = collection(db, 'messages');
+    const q = query(
+      messagesRef,
+      where('receiverId', '==', user.id),
+      where('viewed', '==', false)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const unviewedCount = snapshot.docs.length;
+      console.log('Okunmamış mesaj sayısı güncellendi:', unviewedCount);
+      setUnreadCount(unviewedCount);
+    }, (error) => {
+      console.error('Mesaj dinleyici hatası:', error);
+    });
+
+    return () => {
+      console.log('Mesaj dinleyicisi temizleniyor...');
+      unsubscribe();
+    };
+  }, [user?.id]); // Sadece user.id değiştiğinde yeniden bağlan
+
+  // Tüm mesajları görüntülendi olarak işaretle
+  const markAllMessagesAsViewed = async () => {
+    if (!user?.id) return;
+
+    try {
+      const q = query(
+        collection(db, 'messages'),
+        where('receiverId', '==', user.id),
+        where('viewed', '==', false)
+      );
+
+      const snapshot = await getDocs(q);
+      const batch = writeBatch(db);
+
+      snapshot.docs.forEach((doc) => {
+        batch.update(doc.ref, { viewed: true });
+      });
+
+      await batch.commit();
+    } catch (error) {
+      console.error('Error marking all messages as viewed:', error);
+    }
+  };
+
+  // Chat listesi kapatılırken mesajları görüntülendi olarak işaretle
+  const handleCloseChatList = () => {
+    setShowChatList(false);
+  };
 
   if (loading) {
     return (
@@ -405,6 +467,60 @@ function App(): JSX.Element {
                 </div>
               </div>
             </footer>
+
+            {/* Floating Chat Button */}
+            {user && (
+              <>
+                <button
+                  onClick={() => setShowChatList(true)}
+                  className="fixed bottom-6 right-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center group z-50"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs w-6 h-6 rounded-full flex items-center justify-center animate-pulse">
+                      {unreadCount}
+                    </span>
+                  )}
+                  <span className="absolute right-full mr-2 bg-gray-900 text-white text-sm py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                    Mesajlarım {unreadCount > 0 ? `(${unreadCount})` : ''}
+                  </span>
+                </button>
+
+                {/* Chat List Dialog */}
+                {showChatList && (
+                  <div className="fixed inset-0 z-50 overflow-hidden">
+                    <div 
+                      className="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+                      onClick={handleCloseChatList} 
+                    />
+                    <div className="fixed inset-y-0 right-0 max-w-md w-full bg-white shadow-xl">
+                      <div className="h-full flex flex-col">
+                        <div className="px-4 py-6 bg-gradient-to-r from-indigo-600 to-purple-600">
+                          <div className="flex items-center justify-between">
+                            <h2 className="text-xl font-semibold text-white">
+                              Mesajlarım {unreadCount > 0 && <span className="text-sm ml-2">({unreadCount} okunmamış)</span>}
+                            </h2>
+                            <button
+                              onClick={handleCloseChatList}
+                              className="text-white hover:text-gray-200"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto">
+                          <ChatList onClose={handleCloseChatList} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </ThemeProvider>
       </AuthProvider>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogTitle, IconButton } from '@mui/material';
-import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, getDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, getDoc, doc, updateDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '../../../api/firebase/firebase';
 import { useAuth } from '../../../contexts/AuthContext';
 
@@ -10,7 +10,8 @@ interface Message {
   receiverId: string;
   content: string;
   timestamp: Date | any;
-  read: boolean;
+  read?: boolean;
+  viewed: boolean;
   participants: string[];
   metadata?: {
     senderName?: string;
@@ -47,6 +48,45 @@ export const ChatDialog: React.FC<ChatDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
 
+  // Mesajları görüntülendi olarak işaretle
+  const markMessagesAsViewed = async () => {
+    if (!currentUser || !partner.id) return;
+
+    try {
+      const q = query(
+        collection(db, 'messages'),
+        where('receiverId', '==', currentUser.uid),
+        where('senderId', '==', partner.id),
+        where('viewed', '==', false)
+      );
+
+      const snapshot = await getDocs(q);
+      const batch = writeBatch(db);
+
+      snapshot.docs.forEach((doc) => {
+        batch.update(doc.ref, { viewed: true });
+      });
+
+      await batch.commit();
+    } catch (error) {
+      console.error('Error marking messages as viewed:', error);
+    }
+  };
+
+  // Dialog açıldığında ve kapandığında mesajları görüntülendi olarak işaretle
+  useEffect(() => {
+    if (open) {
+      markMessagesAsViewed();
+    }
+  }, [open, currentUser, partner.id]);
+
+  // Dialog kapatılırken de mesajları görüntülendi olarak işaretle
+  const handleClose = () => {
+    markMessagesAsViewed().then(() => {
+      onClose();
+    });
+  };
+
   // Scroll to bottom of messages
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
@@ -79,22 +119,28 @@ export const ChatDialog: React.FC<ChatDialogProps> = ({
     const q = query(
       collection(db, 'messages'),
       where('participants', 'array-contains', currentUser.uid),
-      orderBy('timestamp', 'asc') // Eskiden yeniye sırala
+      orderBy('timestamp', 'asc')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      // Benzersiz mesaj ID'lerini takip etmek için Set kullan
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
       const processedMessageIds = new Set<string>();
       const newMessages: Message[] = [];
+      const messagesToUpdate: string[] = [];
 
       snapshot.forEach((doc) => {
         const data = doc.data();
-        // Sadece bu sohbete ait mesajları filtrele ve tekrarı önle
+        // Sadece bu sohbete ait mesajları filtrele
         if (!processedMessageIds.has(doc.id) &&
             ((data.senderId === currentUser.uid && data.receiverId === partner.id) ||
              (data.senderId === partner.id && data.receiverId === currentUser.uid))) {
           
           processedMessageIds.add(doc.id);
+          
+          // Eğer mesaj bize geldiyse ve görüntülenmemişse, güncelleme listesine ekle
+          if (data.senderId === partner.id && data.receiverId === currentUser.uid && !data.viewed) {
+            messagesToUpdate.push(doc.id);
+          }
+
           const timestamp = data.timestamp?.toDate?.() || 
                           (data.timestamp instanceof Date ? data.timestamp : new Date(data.timestamp)) || 
                           new Date();
@@ -106,8 +152,20 @@ export const ChatDialog: React.FC<ChatDialogProps> = ({
           } as Message);
         }
       });
+
+      // Görüntülenmemiş mesajları batch update ile güncelle
+      if (messagesToUpdate.length > 0) {
+        console.log('Görüntülenecek mesajlar:', messagesToUpdate.length);
+        const batch = writeBatch(db);
+        messagesToUpdate.forEach((messageId) => {
+          const messageRef = doc(db, 'messages', messageId);
+          batch.update(messageRef, { viewed: true });
+        });
+        await batch.commit();
+        console.log('Mesajlar görüntülendi olarak işaretlendi');
+      }
       
-      // Mesajları tarihe göre sırala (eskiden yeniye)
+      // Mesajları tarihe göre sırala
       const sortedMessages = newMessages.sort((a, b) => {
         const timeA = a.timestamp?.toDate?.() || a.timestamp || new Date(0);
         const timeB = b.timestamp?.toDate?.() || b.timestamp || new Date(0);
@@ -116,13 +174,10 @@ export const ChatDialog: React.FC<ChatDialogProps> = ({
       });
       
       setMessages(sortedMessages);
-      // Yeni mesaj geldiğinde hemen scroll yap
       setTimeout(scrollToBottom, 100);
     });
 
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [open, currentUser, partner.id]);
 
   // Mesaj gönderildikten sonra input'a focus ol
@@ -139,7 +194,7 @@ export const ChatDialog: React.FC<ChatDialogProps> = ({
         senderId: currentUser.uid,
         receiverId: partner.id,
         timestamp: serverTimestamp(),
-        read: false,
+        viewed: false,
         participants: [currentUser.uid, partner.id].sort(),
         metadata: {
           senderName: currentUser.displayName || undefined,
@@ -150,7 +205,6 @@ export const ChatDialog: React.FC<ChatDialogProps> = ({
 
       await addDoc(collection(db, 'messages'), messageData);
       setNewMessage('');
-      // Mesaj gönderildikten sonra input'a focus ol
       inputRef.current?.focus();
       
     } catch (error) {
@@ -179,7 +233,7 @@ export const ChatDialog: React.FC<ChatDialogProps> = ({
   return (
     <Dialog 
       open={open} 
-      onClose={onClose}
+      onClose={handleClose}
       maxWidth="sm"
       fullWidth
     >
@@ -199,7 +253,7 @@ export const ChatDialog: React.FC<ChatDialogProps> = ({
             )}
           </div>
         </div>
-        <IconButton onClick={onClose} size="small">
+        <IconButton onClick={handleClose} size="small">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>

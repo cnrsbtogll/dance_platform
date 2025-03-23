@@ -21,7 +21,11 @@ interface Chat {
   unreadCount: number;
 }
 
-export const ChatList: React.FC = () => {
+interface ChatListProps {
+  onClose?: () => void;
+}
+
+export const ChatList: React.FC<ChatListProps> = ({ onClose }) => {
   const { currentUser } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChat, setSelectedChat] = useState<{
@@ -93,24 +97,16 @@ export const ChatList: React.FC = () => {
                 partnerPhotoURL: userData.photoURL || '/assets/images/default-avatar.png',
                 lastMessage: message.content,
                 timestamp: message.timestamp?.toDate() || new Date(),
-                unreadCount: message.senderId !== currentUser.uid && !message.read ? 1 : 0
+                unreadCount: message.senderId !== currentUser.uid && !message.viewed ? 1 : 0
               });
 
               // Okunmamış mesaj sayısını hesapla
               const unreadMessages = snapshot.docs.filter(msgDoc => {
                 const msgData = msgDoc.data();
-                // Gönderen partner ise ve mesaj okunmamışsa
-                if (msgData.senderId === partnerId && !msgData.read) {
-                  // Bu mesaja cevap verilip verilmediğini kontrol et
-                  const hasReply = snapshot.docs.some(replyDoc => {
-                    const replyData = replyDoc.data();
-                    return replyData.senderId === currentUser.uid && 
-                           replyData.timestamp > msgData.timestamp;
-                  });
-                  // Mesaj okunmamış VE cevap verilmemişse sayaca ekle
-                  return !hasReply;
-                }
-                return false;
+                // Gönderen partner ise ve mesaj görüntülenmemişse
+                return msgData.senderId === partnerId && 
+                       msgData.receiverId === currentUser.uid && 
+                       !msgData.viewed;
               });
 
               if (chatMap.has(partnerId)) {
@@ -169,12 +165,12 @@ export const ChatList: React.FC = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex justify-between items-center px-4 sm:px-0">
+      {/* <div className="flex justify-between items-center px-4 sm:px-0">
         <h2 className="text-xl sm:text-2xl font-bold">Mesajlarım</h2>
         <span className="text-xs sm:text-sm text-gray-500">
           {chats.length} sohbet
         </span>
-      </div>
+      </div> */}
       
       <div className="bg-white rounded-lg shadow divide-y">
         {chats.length === 0 ? (
@@ -210,7 +206,7 @@ export const ChatList: React.FC = () => {
                       }}
                     />
                     {chat.unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-indigo-500 text-white text-xs w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center">
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center">
                         {chat.unreadCount}
                       </span>
                     )}
@@ -230,7 +226,9 @@ export const ChatList: React.FC = () => {
                       </span>
                     </div>
                     
-                    <p className="text-xs sm:text-sm text-gray-600 truncate">{chat.lastMessage}</p>
+                    <p className={`text-xs sm:text-sm ${chat.unreadCount > 0 ? 'font-semibold text-gray-900' : 'text-gray-600'} truncate`}>
+                      {chat.lastMessage}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -242,7 +240,9 @@ export const ChatList: React.FC = () => {
       {selectedChat && (
         <ChatDialog
           open={true}
-          onClose={() => setSelectedChat(null)}
+          onClose={() => {
+            setSelectedChat(null);
+          }}
           partner={selectedChat}
         />
       )}
