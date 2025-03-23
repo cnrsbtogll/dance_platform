@@ -40,6 +40,7 @@ interface Partner {
   relevanceScore?: number;
   boy?: number;
   kilo?: number;
+  role?: string | string[]; // Role ekle
 }
 
 // PartnerKarti bileşeni için prop tipi
@@ -140,6 +141,7 @@ function PartnerSearchPage(): JSX.Element {
       puan: user.rating || 4.0,
       boy: user.height,
       kilo: user.weight,
+      role: user.role,
     };
   }, [styleMapping]);
 
@@ -327,7 +329,7 @@ function PartnerSearchPage(): JSX.Element {
         weight: extendedCurrentUser.weight,
       } : null;
 
-      // Fetch all users who are students (regardless of current user login status)
+      // Fetch all users who are students or instructors
       const usersRef = collection(db, 'users');
       const q = query(usersRef);
       const querySnapshot = await getDocs(q);
@@ -336,21 +338,20 @@ function PartnerSearchPage(): JSX.Element {
       querySnapshot.forEach((doc) => {
         const userData = doc.data() as DocumentData;
         
-        // Check if user has student role and does not have admin or instructor role
-        let isOnlyStudent = false;
+        // Check if user has student or instructor role but not admin role
+        let isValidUser = false;
         
         if (Array.isArray(userData.role)) {
-          // If role is an array, check it includes 'student' but not 'admin' or 'instructor'
-          isOnlyStudent = userData.role.includes('student') && 
-                         !userData.role.includes('admin') && 
-                         !userData.role.includes('instructor');
+          // If role is an array, check it includes 'student' or 'instructor' but not 'admin'
+          isValidUser = (userData.role.includes('student') || userData.role.includes('instructor')) && 
+                       !userData.role.includes('admin');
         } else {
-          // If role is a string, it should be exactly 'student'
-          isOnlyStudent = userData.role === 'student';
+          // If role is a string, it should be either 'student' or 'instructor'
+          isValidUser = userData.role === 'student' || userData.role === 'instructor';
         }
         
-        // Include students & exclude current user if logged in
-        if ((!currentUser || doc.id !== currentUser.id) && isOnlyStudent) {
+        // Include students & instructors & exclude current user if logged in
+        if ((!currentUser || doc.id !== currentUser.id) && isValidUser) {
           users.push({
             id: doc.id,
             displayName: userData.displayName || '',
@@ -1075,6 +1076,11 @@ function PartnerSearchPage(): JSX.Element {
     // Bu partnere ait bir iletişim talebi var mı kontrol et
     const pendingRequest = contactStatuses.find(status => status.partnerId === partner.id);
     
+    // Eğitmen kontrolü
+    const isInstructor = Array.isArray(partner.role) 
+      ? partner.role.includes('instructor')
+      : partner.role === 'instructor';
+    
     return (
       <div className="bg-white rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 flex flex-col h-full">
         {/* Profil fotoğrafı ve üst kısım */}
@@ -1134,6 +1140,18 @@ function PartnerSearchPage(): JSX.Element {
               {partner.seviye}
             </span>
           </div>
+          
+          {/* Eğitmen badge */}
+          {isInstructor && (
+            <div className="absolute top-12 right-3">
+              <span className="px-2 py-1 text-xs font-semibold bg-amber-500 text-white rounded-full shadow-md flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z"/>
+                </svg>
+                Eğitmen
+              </span>
+            </div>
+          )}
           
           {/* Uyumlu badge */}
           {partner.relevanceScore && partner.relevanceScore > 50 && (
