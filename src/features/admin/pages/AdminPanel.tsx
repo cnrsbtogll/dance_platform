@@ -37,12 +37,12 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<TabType>('kullanicilar');
   const [activeRequestType, setActiveRequestType] = useState<RequestType>('egitmen-talepleri');
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Check if the current user should be promoted to super admin
   useEffect(() => {
     const checkAndUpdateSuperAdmin = async () => {
       if (user?.id === 'HyH991wAtrU2E6JlTt711A6zHoL2' && user.email === 'super@admin.com') {
-        // Check if the user already has the 'admin' role
         const userRef = doc(db, 'users', user.id);
         const userSnap = await getDoc(userRef);
         
@@ -55,7 +55,6 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
           }
           
           if (!roles.includes('admin')) {
-            // Add the 'admin' role to the user
             roles.push('admin');
             await updateDoc(userRef, { role: roles });
             console.log('Super admin role added to user');
@@ -74,49 +73,77 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
   }, [user]);
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="text-center mb-10"
+        className="text-center mb-6 sm:mb-10"
       >
-        <h1 className="text-3xl sm:text-4xl font-bold mb-4 inline-block relative bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4 inline-block relative bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
           Yönetim Paneli
         </h1>
-        <p className="text-gray-600 max-w-2xl mx-auto">
+        <p className="text-gray-600 max-w-2xl mx-auto text-sm sm:text-base">
           Dans okulları, eğitmenler ve dans stilleri gibi sistem genelindeki içerikleri yönetin ve platformu kontrol edin.
         </p>
       </motion.div>
       
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="border-b overflow-x-auto">
-          <nav className="flex -mb-px">
+        {/* Mobile Menu Button */}
+        <div className="md:hidden border-b border-gray-200 p-4">
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="w-full flex items-center justify-between px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <span>{
+              activeTab === 'kullanicilar' ? 'Tüm Kullanıcılar' :
+              activeTab === 'kurslar' ? 'Kurslar' :
+              activeTab === 'talepler' ? 'Talepler' :
+              'Örnek Veri'
+            }</span>
+            <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className={`border-b border-gray-200 ${isMobileMenuOpen ? 'block' : 'hidden'} md:block`}>
+          <nav className="flex flex-col md:flex-row -mb-px">
             <button
-              onClick={() => setActiveTab('kullanicilar')}
-              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
+              onClick={() => {
+                setActiveTab('kullanicilar');
+                setIsMobileMenuOpen(false);
+              }}
+              className={`py-3 md:py-4 px-4 md:px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
                 activeTab === 'kullanicilar'
-                  ? 'border-indigo-500 text-indigo-600'
+                  ? 'border-indigo-500 text-indigo-600 bg-indigo-50 md:bg-transparent'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
               Tüm Kullanıcılar
             </button>
             <button
-              onClick={() => setActiveTab('kurslar')}
-              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
+              onClick={() => {
+                setActiveTab('kurslar');
+                setIsMobileMenuOpen(false);
+              }}
+              className={`py-3 md:py-4 px-4 md:px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
                 activeTab === 'kurslar'
-                  ? 'border-indigo-500 text-indigo-600'
+                  ? 'border-indigo-500 text-indigo-600 bg-indigo-50 md:bg-transparent'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
               Kurslar
             </button>
             <button
-              onClick={() => setActiveTab('talepler')}
-              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
+              onClick={() => {
+                setActiveTab('talepler');
+                setIsMobileMenuOpen(false);
+              }}
+              className={`py-3 md:py-4 px-4 md:px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
                 activeTab === 'talepler'
-                  ? 'border-indigo-500 text-indigo-600'
+                  ? 'border-indigo-500 text-indigo-600 bg-indigo-50 md:bg-transparent'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
@@ -124,10 +151,13 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
             </button>
             {isSuperAdmin && (
               <button
-                onClick={() => setActiveTab('ornek-veri')}
-                className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
+                onClick={() => {
+                  setActiveTab('ornek-veri');
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`py-3 md:py-4 px-4 md:px-6 text-center font-medium text-sm md:text-base border-b-2 whitespace-nowrap ${
                   activeTab === 'ornek-veri'
-                    ? 'border-indigo-500 text-indigo-600'
+                    ? 'border-indigo-500 text-indigo-600 bg-indigo-50 md:bg-transparent'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
@@ -137,7 +167,7 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
           </nav>
         </div>
         
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {activeTab === 'kullanicilar' && <UserManagement />}
           {activeTab === 'kurslar' && <CourseManagement isAdmin={true} />}
           {activeTab === 'talepler' && (
@@ -158,47 +188,55 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
             </div>
           )}
           {activeTab === 'ornek-veri' && isSuperAdmin && (
-            <div>
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold mb-4">Dans Stilleri Yönetimi</h2>
-                <p className="mb-4 text-gray-700">
+            <div className="space-y-8">
+              <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200">
+                <h2 className="text-lg sm:text-xl font-semibold mb-4">Dans Stilleri Yönetimi</h2>
+                <p className="mb-4 text-sm sm:text-base text-gray-700">
                   Dans stillerini ekleyebilir, düzenleyebilir ve silebilirsiniz. Eklenen dans stilleri, kurs oluşturma ve eğitmen profillerinde kullanılabilir.
                 </p>
                 <DanceStyleManagement />
               </div>
 
-              <div className="mt-8 border-t pt-6">
-                <h2 className="text-xl font-semibold mb-4">Örnek Veri Ekleme</h2>
-                <p className="mb-4 text-gray-700">
+              <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200">
+                <h2 className="text-lg sm:text-xl font-semibold mb-4">Örnek Veri Ekleme</h2>
+                <p className="mb-4 text-sm sm:text-base text-gray-700">
                   Bu panel ile veritabanına örnek kullanıcılar ekleyebilirsiniz. Eklenen kullanıcılar dans partneri eşleştirme 
                   sistemi için kullanılabilir. Her bir örnek kullanıcı çeşitli dans stilleri, seviyeler, boy, kilo ve konum 
                   bilgileri içerir.
                 </p>
-                <SeedUsersButton />
+                <div className="flex flex-wrap gap-4">
+                  <SeedUsersButton />
+                </div>
               </div>
               
-              <div className="mt-8 border-t pt-6">
-                <h2 className="text-xl font-semibold mb-4">Örnek Dans Kursları</h2>
-                <p className="mb-4 text-gray-700">
+              <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200">
+                <h2 className="text-lg sm:text-xl font-semibold mb-4">Örnek Dans Kursları</h2>
+                <p className="mb-4 text-sm sm:text-base text-gray-700">
                   Bu bölümde veritabanına örnek dans kursları ekleyebilirsiniz. Oluşturulan kurslar, mevcut dans okulları ve eğitmenlerle ilişkilendirilecektir.
                 </p>
-                <SeedCoursesButton courseCount={25} />
+                <div className="flex flex-wrap gap-4">
+                  <SeedCoursesButton courseCount={25} />
+                </div>
               </div>
               
-              <div className="mt-8 border-t pt-6">
-                <h2 className="text-xl font-semibold mb-4">İlerleme Durumu Koleksiyonları</h2>
-                <p className="mb-4 text-gray-700">
+              <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200">
+                <h2 className="text-lg sm:text-xl font-semibold mb-4">İlerleme Durumu Koleksiyonları</h2>
+                <p className="mb-4 text-sm sm:text-base text-gray-700">
                   Bu bölümde İlerleme Durumu sayfası için gerekli Firebase koleksiyonlarını oluşturabilirsiniz. Bu koleksiyonlar, kullanıcıların dans kurslarındaki ilerlemelerini, başarı rozetlerini ve katılım durumlarını takip etmek için kullanılır.
                 </p>
-                <CreateProgressCollectionsButton />
+                <div className="flex flex-wrap gap-4">
+                  <CreateProgressCollectionsButton />
+                </div>
               </div>
               
-              <div className="mt-8 border-t pt-6">
-                <h2 className="text-xl font-semibold mb-4">Veri Migrasyon Araçları</h2>
-                <p className="mb-4 text-gray-700">
+              <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200">
+                <h2 className="text-lg sm:text-xl font-semibold mb-4">Veri Migrasyon Araçları</h2>
+                <p className="mb-4 text-sm sm:text-base text-gray-700">
                   Bu bölümde veritabanındaki koleksiyonlar arasında veri taşıma işlemleri yapabilirsiniz.
                 </p>
-                <MigrateSchoolsButton />
+                <div className="flex flex-wrap gap-4">
+                  <MigrateSchoolsButton />
+                </div>
               </div>
             </div>
           )}
@@ -206,18 +244,18 @@ function AdminPanel({ user }: AdminPanelProps): JSX.Element {
       </div>
       
       {isSuperAdmin && (
-        <div className="mt-8 bg-purple-50 rounded-lg p-4">
-          <h2 className="font-semibold text-purple-800">Süper Admin Yetkileri</h2>
-          <p className="mt-2 text-sm text-purple-700">
+        <div className="mt-6 sm:mt-8 bg-purple-50 rounded-lg p-4 sm:p-6">
+          <h2 className="text-base sm:text-lg font-semibold text-purple-800">Süper Admin Yetkileri</h2>
+          <p className="mt-2 text-sm sm:text-base text-purple-700">
             Süper admin olarak, tüm dans okullarını, eğitmenleri, kursları ve kullanıcıları yönetebilirsiniz. 
             Eğitmen başvurularını onaylayabilir veya reddedebilirsiniz. Dans stillerini de yönetebilirsiniz.
           </p>
         </div>
       )}
       
-      <div className="mt-4 bg-blue-50 rounded-lg p-4">
-        <h2 className="font-semibold text-blue-800">Yönetici İpuçları</h2>
-        <ul className="mt-2 space-y-2 text-sm text-blue-700">
+      <div className="mt-4 sm:mt-6 bg-blue-50 rounded-lg p-4 sm:p-6">
+        <h2 className="text-base sm:text-lg font-semibold text-blue-800">Yönetici İpuçları</h2>
+        <ul className="mt-2 space-y-2 text-sm sm:text-base text-blue-700">
           <li>• Dans okulu ve eğitmen bilgilerinizi güncel tutmak müşteri güvenini artırır.</li>
           <li>• Kurs programınızı düzenli olarak güncelleyerek yeni öğrencilerin ilgisini çekin.</li>
           <li>• Eğitmenlerin profillerinde detaylı bilgiler sunarak deneyimlerini vurgulayın.</li>

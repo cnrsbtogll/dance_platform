@@ -40,6 +40,7 @@ function SchoolRequests(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<SchoolRequest | null>(null);
 
   useEffect(() => {
     fetchRequests();
@@ -195,6 +196,10 @@ function SchoolRequests(): JSX.Element {
     }
   };
 
+  const handleViewDetails = (request: SchoolRequest) => {
+    setSelectedRequest(request);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -228,70 +233,187 @@ function SchoolRequests(): JSX.Element {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-2xl font-semibold text-gray-800 mb-6">Okul Başvuruları</h2>
+    <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+      <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-6">Okul Başvuruları</h2>
       
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Okul Adı</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İletişim Kişisi</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">E-posta</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telefon</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Şehir</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dans Stilleri</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Başvuru Tarihi</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İşlemler</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {requests.map((request) => (
-              <tr key={request.id}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="font-medium text-gray-900">{request.schoolName}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-gray-500">{request.contactPerson}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-gray-500">{request.contactEmail}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-gray-500">{request.contactPhone}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-gray-500">{request.city}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-gray-500">{request.danceStyles.join(', ')}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-gray-500">
-                    {request.createdAt ? request.createdAt.toDate().toLocaleDateString('tr-TR') : '-'}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button
-                    onClick={() => handleApproveRequest(request.id, request.userId)}
-                    disabled={processingId === request.id}
-                    className="text-green-600 hover:text-green-900 mr-4 disabled:opacity-50"
-                  >
-                    {processingId === request.id ? 'İşleniyor...' : 'Onayla'}
-                  </button>
-                  <button
-                    onClick={() => handleRejectRequest(request.id)}
-                    disabled={processingId === request.id}
-                    className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                  >
-                    {processingId === request.id ? 'İşleniyor...' : 'Reddet'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="-mx-4 sm:mx-0 overflow-hidden">
+        <div className="inline-block min-w-full align-middle">
+          <div className="overflow-x-auto border border-gray-200 sm:rounded-lg shadow-sm">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Okul Adı
+                  </th>
+                  <th scope="col" className="hidden sm:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    İletişim Kişisi
+                  </th>
+                  <th scope="col" className="hidden md:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    E-posta
+                  </th>
+                  <th scope="col" className="hidden lg:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Telefon
+                  </th>
+                  <th scope="col" className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Şehir
+                  </th>
+                  <th scope="col" className="hidden xl:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Dans Stilleri
+                  </th>
+                  <th scope="col" className="hidden lg:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Başvuru Tarihi
+                  </th>
+                  <th scope="col" className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    İşlemler
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {requests.map((request) => (
+                  <tr key={request.id} className="hover:bg-gray-50">
+                    <td className="px-4 sm:px-6 py-4">
+                      <div className="flex items-center">
+                        <div className="text-sm font-medium text-gray-900">{request.schoolName}</div>
+                      </div>
+                    </td>
+                    <td className="hidden sm:table-cell px-4 sm:px-6 py-4 text-sm text-gray-500">
+                      {request.contactPerson}
+                    </td>
+                    <td className="hidden md:table-cell px-4 sm:px-6 py-4 text-sm text-gray-500">
+                      {request.contactEmail}
+                    </td>
+                    <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-500">
+                      {request.contactPhone}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-500">
+                      {request.city}
+                    </td>
+                    <td className="hidden xl:table-cell px-4 sm:px-6 py-4">
+                      <div className="flex flex-wrap gap-1">
+                        {request.danceStyles.map((style, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800"
+                          >
+                            {style}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                      {new Date(request.createdAt.toDate()).toLocaleDateString('tr-TR')}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 text-right text-sm font-medium whitespace-nowrap">
+                      <div className="flex justify-end space-x-2">
+                        <button
+                          onClick={() => handleApproveRequest(request.id, request.userId)}
+                          className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                        >
+                          Onayla
+                        </button>
+                        <button
+                          onClick={() => handleRejectRequest(request.id)}
+                          className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                        >
+                          Reddet
+                        </button>
+                        <button
+                          onClick={() => handleViewDetails(request)}
+                          className="inline-flex items-center px-2.5 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                          Detaylar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {requests.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="px-4 sm:px-6 py-4 text-sm text-center text-gray-500">
+                      Henüz okul başvurusu bulunmamaktadır.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
+
+      {/* Details Modal */}
+      {selectedRequest && (
+        <div className="fixed inset-0 z-10 overflow-y-auto">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+                      Okul Başvuru Detayları
+                    </h3>
+                    <div className="mt-2 space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Okul Adı</label>
+                        <p className="mt-1 text-sm text-gray-900">{selectedRequest.schoolName}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">İletişim Kişisi</label>
+                        <p className="mt-1 text-sm text-gray-900">{selectedRequest.contactPerson}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">E-posta</label>
+                        <p className="mt-1 text-sm text-gray-900">{selectedRequest.contactEmail}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Telefon</label>
+                        <p className="mt-1 text-sm text-gray-900">{selectedRequest.contactPhone}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Şehir</label>
+                        <p className="mt-1 text-sm text-gray-900">{selectedRequest.city}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Dans Stilleri</label>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {selectedRequest.danceStyles.map((style, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800"
+                            >
+                              {style}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Başvuru Tarihi</label>
+                        <p className="mt-1 text-sm text-gray-900">
+                          {new Date(selectedRequest.createdAt.toDate()).toLocaleDateString('tr-TR')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={() => setSelectedRequest(null)}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Kapat
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

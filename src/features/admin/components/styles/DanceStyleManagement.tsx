@@ -295,56 +295,89 @@ function DanceStyleManagement(): JSX.Element {
           <span className="ml-3 text-gray-700">Yükleniyor...</span>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Dans Stili
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Teknik Değer
-                </th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  İşlemler
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {danceStyles.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="px-6 py-4 text-center text-gray-500">
-                    Henüz dans stili eklenmemiş.
-                  </td>
-                </tr>
-              ) : (
-                danceStyles.map((style) => (
-                  <tr key={style.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{style.label}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">{style.value}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => handleEdit(style)}
-                        className="text-indigo-600 hover:text-indigo-900 mr-4"
-                      >
-                        Düzenle
-                      </button>
-                      <button
-                        onClick={() => handleDelete(style.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Sil
-                      </button>
-                    </td>
+        <div className="-mx-4 sm:mx-0 overflow-hidden">
+          <div className="inline-block min-w-full align-middle">
+            <div className="overflow-x-auto border border-gray-200 sm:rounded-lg shadow-sm">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                      Dans Stili
+                    </th>
+                    <th scope="col" className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                      Teknik Değer
+                    </th>
+                    <th scope="col" className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                      İşlemler
+                    </th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {danceStyles.map((style) => (
+                    <tr key={style.id} className="hover:bg-gray-50">
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                        {isEditing && selectedStyle && selectedStyle.id === style.id ? (
+                          <input
+                            type="text"
+                            value={formData.label}
+                            onChange={(e) => setFormData({ ...formData, label: e.target.value })}
+                            className="w-full sm:w-auto px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                          />
+                        ) : (
+                          style.label
+                        )}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                        {isEditing && selectedStyle && selectedStyle.id === style.id ? (
+                          <input
+                            type="text"
+                            value={formData.value}
+                            onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+                            className="w-full sm:w-auto px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                          />
+                        ) : (
+                          style.value
+                        )}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 text-sm text-right space-x-2 whitespace-nowrap">
+                        {isEditing && selectedStyle && selectedStyle.id === style.id ? (
+                          <>
+                            <button
+                              onClick={handleSubmit}
+                              className="text-green-600 hover:text-green-900 font-medium"
+                            >
+                              Kaydet
+                            </button>
+                            <button
+                              onClick={resetForm}
+                              className="text-gray-600 hover:text-gray-900 font-medium"
+                            >
+                              İptal
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handleEdit(style)}
+                              className="text-indigo-600 hover:text-indigo-900 font-medium"
+                            >
+                              Düzenle
+                            </button>
+                            <button
+                              onClick={() => handleDelete(style.id)}
+                              className="text-red-600 hover:text-red-900 font-medium"
+                            >
+                              Sil
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
     </div>
