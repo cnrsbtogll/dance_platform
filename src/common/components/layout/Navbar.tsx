@@ -555,6 +555,22 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                     </div>
                   </Link>
                 )}
+
+                {/* Eğitmen Paneli butonu - Mobil */}
+                {hasInstructorRole && (
+                  <Link 
+                    to="/instructor"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="block w-full px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-500 focus:ring-offset-1 shadow-sm transition-all duration-200"
+                  >
+                    <div className="flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      </svg>
+                      Eğitmen Paneli
+                    </div>
+                  </Link>
+                )}
               </div>
 
               {isAuthenticated ? (
