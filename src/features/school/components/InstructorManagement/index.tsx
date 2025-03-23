@@ -14,6 +14,7 @@ import {
   orderBy 
 } from 'firebase/firestore';
 import { db } from '../../../../api/firebase/firebase';
+import { useAuth } from '../../../../contexts/AuthContext';
 import { 
   Box, 
   Button, 
@@ -52,6 +53,11 @@ import {
   Star as StarIcon
 } from '@mui/icons-material';
 import { DanceLevel, DanceStyle } from '../../../../types';
+import { SelectChangeEvent } from '@mui/material';
+import CustomInput from '../../../../common/components/ui/CustomInput';
+import CustomSelect from '../../../../common/components/ui/CustomSelect';
+import CustomPhoneInput from '../../../../common/components/ui/CustomPhoneInput';
+import ImageUploader from '../../../../common/components/ui/ImageUploader';
 
 interface Instructor {
   id: string;
@@ -83,6 +89,11 @@ interface InstructorFormData {
   experience: number;
 }
 
+interface Option {
+  value: string;
+  label: string;
+}
+
 const defaultInstructorFormData: InstructorFormData = {
   id: '',
   displayName: '',
@@ -95,6 +106,7 @@ const defaultInstructorFormData: InstructorFormData = {
 };
 
 const InstructorManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo }) => {
+  const { currentUser } = useAuth();
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [filteredInstructors, setFilteredInstructors] = useState<Instructor[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -123,7 +135,7 @@ const InstructorManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo
 
   useEffect(() => {
     fetchInstructors();
-  }, [schoolInfo.id]);
+  }, [currentUser?.uid]);
 
   useEffect(() => {
     if (successMessage) {
@@ -144,16 +156,27 @@ const InstructorManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo
 
   const fetchInstructors = async () => {
     try {
+      if (!currentUser?.uid) return;
+      
       setLoading(true);
       const instructorsRef = collection(db, 'users');
+      console.log('Fetching instructors for currentUser.uid:', currentUser.uid);
+      
       const q = query(
         instructorsRef, 
         where('role', '==', 'instructor'),
-        where('schoolId', '==', schoolInfo.id),
+        where('schoolId', '==', currentUser.uid),
         orderBy('createdAt', 'desc')
       );
       
       const querySnapshot = await getDocs(q);
+      console.log('Query snapshot size:', querySnapshot.size);
+      console.log('Raw query results:');
+      querySnapshot.forEach((doc) => {
+        console.log('Document ID:', doc.id);
+        console.log('Document data:', doc.data());
+      });
+      
       const instructorsData: Instructor[] = [];
       
       querySnapshot.forEach((doc) => {
@@ -162,6 +185,8 @@ const InstructorManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo
           ...doc.data()
         } as Instructor);
       });
+      
+      console.log('Processed instructors data:', instructorsData);
       
       setInstructors(instructorsData);
       setFilteredInstructors(instructorsData);
@@ -199,19 +224,33 @@ const InstructorManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo
     setFormData(defaultInstructorFormData);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement> | { target: { name: string; value: any } }) => {
     const { name, value } = e.target;
-    if (name) {
-      setFormData({ ...formData, [name]: value });
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSelectChange = (name: string, value: string | string[]) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePhoneChange = (countryCode: string, phoneNumber: string) => {
+    setFormData(prev => ({ ...prev, phoneNumber: `${countryCode}${phoneNumber}` }));
+  };
+
+  const handleImageChange = (base64Image: string | null) => {
+    if (base64Image) {
+      setFormData(prev => ({ ...prev, photoURL: base64Image }));
     }
   };
 
-  const handleDanceStylesChange = (event: React.ChangeEvent<{ value: unknown }>) => {
-    const value = event.target.value as DanceStyle[];
-    setFormData({ ...formData, danceStyles: value });
-  };
-
   const handleSubmit = async () => {
+    if (!currentUser?.uid) {
+      setError('Oturum bilgisi bulunamadı.');
+      return;
+    }
+
+    const currentUserId = currentUser.uid;
+
     try {
       setLoading(true);
       
@@ -257,7 +296,7 @@ const InstructorManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo
           if (userData.role === 'instructor' || (Array.isArray(userData.role) && userData.role.includes('instructor'))) {
             // Already an instructor, just update the school association
             await updateDoc(doc(db, 'users', existingUserId), {
-              schoolId: schoolInfo.id,
+              schoolId: currentUserId,
               schoolName: schoolInfo.displayName,
               updatedAt: serverTimestamp()
             });
@@ -267,7 +306,7 @@ const InstructorManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo
             const updatedInstructor = {
               ...existingInstructorData,
               id: existingUserId,
-              schoolId: schoolInfo.id,
+              schoolId: currentUserId,
               schoolName: schoolInfo.displayName,
             };
             
@@ -292,7 +331,7 @@ const InstructorManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo
             
             await updateDoc(doc(db, 'users', existingUserId), {
               role: newRole,
-              schoolId: schoolInfo.id,
+              schoolId: currentUserId,
               schoolName: schoolInfo.displayName,
               danceStyles: formData.danceStyles,
               biography: formData.biography,
@@ -306,7 +345,7 @@ const InstructorManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo
               ...existingUserData,
               id: existingUserId,
               role: newRole,
-              schoolId: schoolInfo.id,
+              schoolId: currentUserId,
               schoolName: schoolInfo.displayName,
               danceStyles: formData.danceStyles,
               biography: formData.biography,
@@ -328,7 +367,7 @@ const InstructorManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo
             danceStyles: formData.danceStyles,
             biography: formData.biography,
             experience: formData.experience,
-            schoolId: schoolInfo.id,
+            schoolId: currentUserId,
             schoolName: schoolInfo.displayName,
             photoURL: formData.photoURL || '/assets/placeholders/default-instructor.png',
             createdAt: serverTimestamp(),
@@ -423,31 +462,62 @@ const InstructorManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo
         )}
       </Box>
       
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <TextField
-          label="Eğitmen Ara"
-          variant="outlined"
-          size="small"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          sx={{ width: { xs: '100%', sm: '300px' } }}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ color: 'action.active', mr: 1 }} />,
-          }}
-        />
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: { xs: 'column', sm: 'row' }, 
+        justifyContent: 'space-between', 
+        alignItems: { xs: 'stretch', sm: 'center' }, 
+        gap: { xs: 2, sm: 0 },
+        mb: 3 
+      }}>
+        <Box sx={{ 
+          flex: { xs: '1', sm: '0 1 300px' },
+          order: { xs: 2, sm: 1 },
+          position: 'relative',
+          '& .MuiInputBase-root': {
+            paddingLeft: '40px'
+          }
+        }}>
+          <SearchIcon 
+            sx={{ 
+              position: 'absolute',
+              left: '12px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'action.active',
+              pointerEvents: 'none'
+            }} 
+          />
+          <CustomInput
+            name="search"
+            label=""
+            placeholder="Eğitmen Ara..."
+            value={searchTerm}
+            onChange={(e: { target: { name: string; value: any } }) => setSearchTerm(e.target.value)}
+            fullWidth
+          />
+        </Box>
         
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog(false)}
-          sx={{ 
-            bgcolor: 'primary.main', 
-            '&:hover': { bgcolor: 'primary.dark' } 
-          }}
-        >
-          Yeni Eğitmen
-        </Button>
+        <Box sx={{ 
+          order: { xs: 1, sm: 2 },
+          width: { xs: '100%', sm: 'auto' }
+        }}>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog(false)}
+            fullWidth={false}
+            sx={{ 
+              width: { xs: '100%', sm: 'auto' },
+              minWidth: { sm: '160px' },
+              bgcolor: 'primary.main',
+              '&:hover': { bgcolor: 'primary.dark' }
+            }}
+          >
+            Yeni Eğitmen
+          </Button>
+        </Box>
       </Box>
       
       {loading && instructors.length === 0 ? (
@@ -583,115 +653,142 @@ const InstructorManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo
       )}
       
       {/* Add/Edit Instructor Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-        <DialogTitle>{isEdit ? 'Eğitmen Düzenle' : 'Yeni Eğitmen Ekle'}</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 0.5 }}>
+      <Dialog 
+        open={openDialog} 
+        onClose={handleCloseDialog} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            m: { xs: 2, sm: 4 },
+            width: '100%',
+            maxWidth: { xs: '100%', sm: '600px', md: '800px' }
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          pb: 1,
+          fontSize: { xs: '1.25rem', sm: '1.5rem' }
+        }}>
+          {isEdit ? 'Eğitmen Düzenle' : 'Yeni Eğitmen Ekle'}
+        </DialogTitle>
+        <DialogContent sx={{ 
+          p: { xs: 2, sm: 3 },
+          '&:first-of-type': { pt: { xs: 2, sm: 3 } }
+        }}>
+          <Grid container spacing={{ xs: 2, sm: 3 }}>
+            {/* Kişisel Bilgiler */}
+            <Grid item xs={12}>
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'medium' }}>
+                Kişisel Bilgiler
+              </Typography>
+            </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                label="Ad Soyad"
+              <CustomInput
                 name="displayName"
+                label="Ad Soyad"
                 value={formData.displayName}
                 onChange={handleInputChange}
-                fullWidth
                 required
-                margin="normal"
+                fullWidth
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                label="E-posta"
+              <CustomInput
                 name="email"
+                label="E-posta"
                 type="email"
                 value={formData.email}
                 onChange={handleInputChange}
-                fullWidth
                 required
-                margin="normal"
-                disabled={isEdit} // E-posta adresi düzenlenemez
+                disabled={isEdit}
+                fullWidth
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                label="Telefon"
+              <CustomPhoneInput
                 name="phoneNumber"
-                value={formData.phoneNumber}
-                onChange={handleInputChange}
-                fullWidth
-                margin="normal"
+                label="Telefon"
+                countryCode="+90"
+                phoneNumber={formData.phoneNumber.replace('+90', '')}
+                onCountryCodeChange={(code) => handlePhoneChange(code, formData.phoneNumber.replace('+90', ''))}
+                onPhoneNumberChange={(number) => handlePhoneChange('+90', number)}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth margin="normal">
-                <InputLabel>Deneyim</InputLabel>
-                <Select
-                  name="experience"
-                  value={formData.experience}
-                  onChange={handleInputChange}
-                  label="Deneyim"
-                >
-                  {experienceLevels.map((level) => (
-                    <MenuItem key={level.value} value={level.value}>
-                      {level.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth margin="normal">
-                <InputLabel>Uzmanlık Alanları</InputLabel>
-                <Select
-                  multiple
-                  name="danceStyles"
-                  value={formData.danceStyles}
-                  onChange={handleDanceStylesChange}
-                  label="Uzmanlık Alanları"
-                  renderValue={(selected) => (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {(selected as DanceStyle[]).map((value) => (
-                        <Chip key={value} label={value.charAt(0).toUpperCase() + value.slice(1)} />
-                      ))}
-                    </Box>
-                  )}
-                >
-                  {danceStyles.map((style) => (
-                    <MenuItem key={style} value={style}>
-                      {style.charAt(0).toUpperCase() + style.slice(1)}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Profil Fotoğrafı URL"
-                name="photoURL"
-                value={formData.photoURL}
-                onChange={handleInputChange}
-                fullWidth
-                margin="normal"
-                placeholder="https://example.com/photo.jpg"
-                helperText="Eğitmenin profil fotoğrafı için URL (opsiyonel)"
+              <ImageUploader
+                currentPhotoURL={formData.photoURL}
+                onImageChange={handleImageChange}
+                displayName={formData.displayName}
+                userType="instructor"
               />
+            </Grid>
+
+            {/* Dans Bilgileri */}
+            <Grid item xs={12} sx={{ mt: { xs: 2, sm: 3 } }}>
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'medium' }}>
+                Dans Bilgileri
+              </Typography>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <CustomSelect
+                name="experience"
+                label="Deneyim"
+                value={String(formData.experience)}
+                onChange={(value) => handleSelectChange('experience', value)}
+                options={experienceLevels.map(level => ({
+                  value: String(level.value),
+                  label: level.label
+                }))}
+                fullWidth
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <CustomSelect
+                name="danceStyles"
+                label="Uzmanlık Alanları"
+                value={formData.danceStyles}
+                onChange={(value) => handleSelectChange('danceStyles', value)}
+                options={danceStyles.map(style => ({
+                  value: style,
+                  label: style.charAt(0).toUpperCase() + style.slice(1)
+                }))}
+                multiple
+                fullWidth
+              />
+            </Grid>
+
+            {/* Biyografi */}
+            <Grid item xs={12} sx={{ mt: { xs: 2, sm: 3 } }}>
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'medium' }}>
+                Biyografi
+              </Typography>
             </Grid>
             <Grid item xs={12}>
-              <TextField
-                label="Biyografi"
+              <CustomInput
                 name="biography"
+                label="Biyografi"
                 value={formData.biography}
                 onChange={handleInputChange}
-                fullWidth
                 multiline
                 rows={4}
-                margin="normal"
                 placeholder="Eğitmen hakkında kısa bir tanıtım yazısı..."
+                fullWidth
               />
             </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog} color="secondary">
+        <DialogActions sx={{ 
+          p: { xs: 2, sm: 3 },
+          gap: 1
+        }}>
+          <Button 
+            onClick={handleCloseDialog} 
+            color="secondary"
+            sx={{ 
+              minWidth: { xs: '80px', sm: '100px' }
+            }}
+          >
             İptal
           </Button>
           <Button 
@@ -699,6 +796,9 @@ const InstructorManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo
             variant="contained" 
             color="primary"
             disabled={!formData.displayName || !formData.email}
+            sx={{ 
+              minWidth: { xs: '80px', sm: '100px' }
+            }}
           >
             {isEdit ? 'Güncelle' : 'Ekle'}
           </Button>

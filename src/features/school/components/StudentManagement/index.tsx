@@ -24,15 +24,10 @@ import {
   TableHead, 
   TableRow, 
   Paper, 
-  TextField, 
   Dialog, 
   DialogActions, 
   DialogContent, 
   DialogTitle, 
-  FormControl, 
-  InputLabel, 
-  Select, 
-  MenuItem, 
   Typography,
   Chip,
   IconButton,
@@ -55,6 +50,10 @@ import {
   Photo as PhotoIcon
 } from '@mui/icons-material';
 import { DanceLevel, DanceStyle } from '../../../../types';
+import CustomInput from '../../../../common/components/ui/CustomInput';
+import CustomSelect from '../../../../common/components/ui/CustomSelect';
+import CustomPhoneInput from '../../../../common/components/ui/CustomPhoneInput';
+import ImageUploader from '../../../../common/components/ui/ImageUploader';
 
 interface Student {
   id: string;
@@ -96,10 +95,20 @@ interface StudentFormData {
   displayName: string;
   email: string;
   phoneNumber: string;
+  countryCode: string;
   level: DanceLevel;
   photoURL: string;
   instructorId: string;
   danceStyles: DanceStyle[];
+}
+
+interface DanceStyleOption {
+  id: string;
+  name: string;
+  value: DanceStyle;
+  description?: string;
+  icon?: string;
+  active: boolean;
 }
 
 const defaultStudentFormData: StudentFormData = {
@@ -107,6 +116,7 @@ const defaultStudentFormData: StudentFormData = {
   displayName: '',
   email: '',
   phoneNumber: '',
+  countryCode: '+90',
   level: 'beginner',
   photoURL: '',
   instructorId: '',
@@ -120,6 +130,7 @@ const StudentManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [instructors, setInstructors] = useState<Instructor[]>([]);
+  const [danceStyles, setDanceStyles] = useState<DanceStyleOption[]>([]);
   
   // Dialog states
   const [openDialog, setOpenDialog] = useState(false);
@@ -131,12 +142,10 @@ const StudentManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo })
   // Success message state
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Dance styles
-  const danceStyles: DanceStyle[] = ['salsa', 'bachata', 'kizomba', 'other'];
-
   useEffect(() => {
     fetchStudents();
     fetchInstructors();
+    fetchDanceStyles();
   }, [schoolInfo.id]);
 
   useEffect(() => {
@@ -159,23 +168,50 @@ const StudentManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo })
   const fetchStudents = async () => {
     try {
       setLoading(true);
+      const currentUserId = 'hlhpXCJknrhrA8Ths11WI9Ao1S42';
+      console.log('Fetching students for currentUserId:', currentUserId);
+      
       const studentsRef = collection(db, 'users');
       const q = query(
         studentsRef, 
-        where('role', '==', 'student'),
-        where('schoolId', '==', schoolInfo.id),
+        where('role', 'in', ['student', ['student']]),
+        where('schoolId', '==', currentUserId),
         orderBy('createdAt', 'desc')
       );
+      
+      console.log('Query parameters:', {
+        role: ['student', ['student']],
+        schoolId: currentUserId
+      });
       
       const querySnapshot = await getDocs(q);
       const studentsData: Student[] = [];
       
+      console.log('Query returned:', querySnapshot.size, 'students');
+      
       querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        console.log('Raw student data:', {
+          id: doc.id,
+          displayName: data.displayName,
+          email: data.email,
+          schoolId: data.schoolId,
+          role: data.role
+        });
+        
         studentsData.push({
           id: doc.id,
           ...doc.data()
         } as Student);
       });
+      
+      console.log('Final students:', studentsData.length);
+      console.log('Students data:', studentsData.map(s => ({
+        id: s.id,
+        name: s.displayName,
+        email: s.email,
+        schoolId: s.schoolId
+      })));
       
       setStudents(studentsData);
       setFilteredStudents(studentsData);
@@ -213,6 +249,75 @@ const StudentManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo })
     }
   };
 
+  const fetchDanceStyles = async () => {
+    try {
+      console.log('Dans stilleri yükleniyor...');
+      const danceStylesRef = collection(db, 'danceStyles');
+      const q = query(danceStylesRef, orderBy('label'));
+      
+      console.log('Dans stilleri sorgusu:', {
+        collection: 'danceStyles',
+        orderBy: 'label'
+      });
+      
+      const querySnapshot = await getDocs(q);
+      console.log('Dans stilleri sorgu sonucu:', {
+        totalDocs: querySnapshot.size,
+        empty: querySnapshot.empty
+      });
+      
+      const danceStylesData: DanceStyleOption[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        console.log('Dans stili dokümanı:', {
+          id: doc.id,
+          data: {
+            label: data.label,
+            value: data.value,
+            createdAt: data.createdAt,
+            updatedAt: data.updatedAt
+          }
+        });
+        
+        danceStylesData.push({
+          id: doc.id,
+          name: data.label,
+          value: data.value,
+          active: true
+        });
+      });
+      
+      if (danceStylesData.length === 0) {
+        console.warn('⚠️ Firestore\'dan dans stili gelmedi, varsayılan stiller kullanılacak');
+        const defaultStyles: DanceStyleOption[] = [
+          { id: 'salsa', name: 'Salsa', value: 'salsa', active: true },
+          { id: 'bachata', name: 'Bachata', value: 'bachata', active: true },
+          { id: 'kizomba', name: 'Kizomba', value: 'kizomba', active: true },
+          { id: 'zouk', name: 'Zouk', value: 'zouk', active: true },
+          { id: 'tango', name: 'Tango', value: 'tango', active: true },
+          { id: 'other', name: 'Diğer', value: 'other', active: true }
+        ];
+        console.log('Varsayılan dans stilleri:', defaultStyles);
+        setDanceStyles(defaultStyles);
+      } else {
+        console.log('✅ Firebase\'den yüklenen dans stilleri:', danceStylesData);
+        setDanceStyles(danceStylesData);
+      }
+    } catch (err) {
+      console.error('❌ Dans stilleri yüklenirken hata oluştu:', err);
+      const defaultStyles: DanceStyleOption[] = [
+        { id: 'salsa', name: 'Salsa', value: 'salsa', active: true },
+        { id: 'bachata', name: 'Bachata', value: 'bachata', active: true },
+        { id: 'kizomba', name: 'Kizomba', value: 'kizomba', active: true },
+        { id: 'zouk', name: 'Zouk', value: 'zouk', active: true },
+        { id: 'tango', name: 'Tango', value: 'tango', active: true },
+        { id: 'other', name: 'Diğer', value: 'other', active: true }
+      ];
+      console.log('⚠️ Hata nedeniyle varsayılan dans stilleri kullanılıyor:', defaultStyles);
+      setDanceStyles(defaultStyles);
+    }
+  };
+
   const handleOpenDialog = (isEditMode: boolean, student?: Student) => {
     setIsEdit(isEditMode);
     
@@ -222,6 +327,7 @@ const StudentManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo })
         displayName: student.displayName,
         email: student.email,
         phoneNumber: student.phoneNumber || '',
+        countryCode: student.phoneNumber?.slice(0, 3) || '+90',
         level: student.level || 'beginner',
         photoURL: student.photoURL || '',
         instructorId: student.instructorId || '',
@@ -239,23 +345,36 @@ const StudentManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo })
     setFormData(defaultStudentFormData);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }> | SelectChangeEvent) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement> | { target: { name: string; value: any } }
+  ) => {
     const { name, value } = e.target;
-    if (name) {
-      setFormData({ ...formData, [name]: value });
-    }
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  const handleDanceStylesChange = (event: SelectChangeEvent<DanceStyle[]>) => {
-    const value = event.target.value as DanceStyle[];
-    setFormData({ ...formData, danceStyles: value });
+  const handlePhoneChange = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      phoneNumber: value
+    }));
+  };
+
+  const handleDanceStylesChange = (value: string | string[]) => {
+    setFormData(prev => ({
+      ...prev,
+      danceStyles: value as DanceStyle[]
+    }));
   };
 
   const handleSubmit = async () => {
     try {
       setLoading(true);
+      const currentUserId = 'hlhpXCJknrhrA8Ths11WI9Ao1S42';
+      console.log('Handling student submit with currentUserId:', currentUserId);
       
-      // Instructor name for storing in the student record
       let instructorName = '';
       if (formData.instructorId) {
         const instructor = instructors.find(ins => ins.id === formData.instructorId);
@@ -263,32 +382,30 @@ const StudentManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo })
       }
       
       if (isEdit) {
-        // Update existing student
         const studentRef = doc(db, 'users', formData.id);
         await updateDoc(studentRef, {
           displayName: formData.displayName,
-          phoneNumber: formData.phoneNumber,
+          phoneNumber: formData.countryCode + formData.phoneNumber,
           level: formData.level,
           instructorId: formData.instructorId || null,
           instructorName: instructorName || null,
-          schoolId: schoolInfo.id,
+          schoolId: currentUserId,
           schoolName: schoolInfo.displayName,
           danceStyles: formData.danceStyles,
           photoURL: formData.photoURL || '/assets/placeholders/default-student.png',
           updatedAt: serverTimestamp()
         });
         
-        // Update the student in the local state
         setStudents(students.map(student => 
           student.id === formData.id 
             ? { 
                 ...student, 
                 displayName: formData.displayName,
-                phoneNumber: formData.phoneNumber,
+                phoneNumber: formData.countryCode + formData.phoneNumber,
                 level: formData.level,
                 instructorId: formData.instructorId || null,
                 instructorName: instructorName || null,
-                schoolId: schoolInfo.id,
+                schoolId: currentUserId,
                 schoolName: schoolInfo.displayName,
                 danceStyles: formData.danceStyles,
                 photoURL: formData.photoURL || '/assets/placeholders/default-student.png',
@@ -298,28 +415,25 @@ const StudentManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo })
         
         setSuccessMessage('Öğrenci bilgileri başarıyla güncellendi.');
       } else {
-        // Check if student with this email already exists
         const userSnapshot = await getDocs(query(collection(db, 'users'), where('email', '==', formData.email)));
         
         if (!userSnapshot.empty) {
-          // Email already exists, just update the school association
           const existingUser = userSnapshot.docs[0];
           const existingUserId = existingUser.id;
           
           await updateDoc(doc(db, 'users', existingUserId), {
-            schoolId: schoolInfo.id,
+            schoolId: currentUserId,
             schoolName: schoolInfo.displayName,
             instructorId: formData.instructorId || null,
             instructorName: instructorName || null,
             updatedAt: serverTimestamp()
           });
           
-          // Add to the local state
           const existingUserData = existingUser.data() as Student;
           const updatedStudent = {
             ...existingUserData,
             id: existingUserId,
-            schoolId: schoolInfo.id,
+            schoolId: currentUserId,
             schoolName: schoolInfo.displayName,
             instructorId: formData.instructorId || null,
             instructorName: instructorName || null,
@@ -328,18 +442,17 @@ const StudentManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo })
           setStudents([updatedStudent, ...students]);
           setSuccessMessage('Mevcut öğrenci okulunuza bağlandı.');
         } else {
-          // Create a new student
           const newStudentId = `student_${Date.now()}`;
           const newStudentData = {
             id: newStudentId,
             displayName: formData.displayName,
             email: formData.email,
-            phoneNumber: formData.phoneNumber || '',
+            phoneNumber: formData.countryCode + formData.phoneNumber,
             role: 'student',
             level: formData.level,
             instructorId: formData.instructorId || null,
             instructorName: instructorName || null,
-            schoolId: schoolInfo.id,
+            schoolId: currentUserId,
             schoolName: schoolInfo.displayName,
             danceStyles: formData.danceStyles,
             photoURL: formData.photoURL || '/assets/placeholders/default-student.png',
@@ -349,7 +462,6 @@ const StudentManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo })
           
           await setDoc(doc(db, 'users', newStudentId), newStudentData);
           
-          // Add the new student to the local state
           const newStudent = {
             ...newStudentData,
             createdAt: Timestamp.now()
@@ -380,7 +492,6 @@ const StudentManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo })
     try {
       setLoading(true);
       
-      // Remove the school association from the student
       const studentRef = doc(db, 'users', selectedStudentId);
       await updateDoc(studentRef, {
         schoolId: null,
@@ -390,7 +501,6 @@ const StudentManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo })
         updatedAt: serverTimestamp()
       });
       
-      // Remove from local state
       setStudents(students.filter(student => student.id !== selectedStudentId));
       setSuccessMessage('Öğrenci okul listenizden kaldırıldı.');
       
@@ -416,296 +526,391 @@ const StudentManagement: React.FC<{ schoolInfo: SchoolInfo }> = ({ schoolInfo })
   };
 
   return (
-    <div>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h5" component="h1" gutterBottom fontWeight="bold">
-          Öğrenci Yönetimi
-        </Typography>
-        <Typography variant="body1" color="text.secondary" paragraph>
-          Okulunuza kayıtlı öğrencileri yönetin, yeni öğrenciler ekleyin ve mevcut öğrencileri düzenleyin.
-        </Typography>
-        
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-        
-        {successMessage && (
-          <Alert severity="success" sx={{ mb: 2 }}>
+    <div className="container mx-auto px-4">
+      {successMessage && (
+        <div className="mb-4">
+          <Alert severity="success" onClose={() => setSuccessMessage(null)}>
             {successMessage}
           </Alert>
-        )}
-      </Box>
-      
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <TextField
-          label="Öğrenci Ara"
-          variant="outlined"
-          size="small"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          sx={{ width: { xs: '100%', sm: '300px' } }}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ color: 'action.active', mr: 1 }} />,
-          }}
-        />
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-4">
+          <Alert severity="error" onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        </div>
+      )}
+
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div>
+          <Typography variant="h5" component="h2" className="text-gray-900">
+            Öğrenci Yönetimi
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            Öğrencilerinizi ekleyin, düzenleyin ve yönetin
+          </Typography>
+        </div>
         
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog(false)}
-          sx={{ 
-            bgcolor: 'primary.main', 
-            '&:hover': { bgcolor: 'primary.dark' } 
-          }}
-        >
-          Yeni Öğrenci
-        </Button>
-      </Box>
-      
-      {loading && students.length === 0 ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}>
-          <CircularProgress />
-        </Box>
-      ) : (
-        <TableContainer component={Paper} sx={{ boxShadow: 2, borderRadius: 2 }}>
+        <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
+          <CustomInput
+            placeholder="Öğrenci ara..."
+            name="search"
+            label=""
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            fullWidth
+            className="min-w-[200px]"
+          />
+          
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog(false)}
+            className="whitespace-nowrap"
+          >
+            Yeni Öğrenci
+          </Button>
+        </div>
+      </div>
+
+      <div className="hidden md:block">
+        <TableContainer component={Paper} className="shadow-md rounded-lg">
           <Table>
-            <TableHead sx={{ bgcolor: 'primary.light' }}>
+            <TableHead>
               <TableRow>
-                <TableCell>Öğrenci</TableCell>
-                <TableCell>E-posta</TableCell>
-                <TableCell>Seviye</TableCell>
-                <TableCell>Dans Türleri</TableCell>
-                <TableCell>Eğitmen</TableCell>
-                <TableCell align="right">İşlemler</TableCell>
+                <TableCell className="font-semibold">Öğrenci</TableCell>
+                <TableCell className="font-semibold">E-posta</TableCell>
+                <TableCell className="font-semibold">Seviye</TableCell>
+                <TableCell className="font-semibold">Eğitmen</TableCell>
+                <TableCell className="font-semibold text-right">İşlemler</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredStudents.length > 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} align="center" className="py-8">
+                    <CircularProgress />
+                  </TableCell>
+                </TableRow>
+              ) : filteredStudents.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} align="center" className="py-8 text-gray-500">
+                    {searchTerm ? 'Aramanızla eşleşen öğrenci bulunamadı.' : 'Henüz öğrenci bulunmuyor.'}
+                  </TableCell>
+                </TableRow>
+              ) : (
                 filteredStudents.map((student) => (
-                  <TableRow key={student.id} hover>
+                  <TableRow key={student.id} className="hover:bg-gray-50">
                     <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar 
-                          src={student.photoURL} 
+                      <div className="flex items-center gap-3">
+                        <Avatar
+                          src={student.photoURL}
                           alt={student.displayName}
-                          sx={{ width: 40, height: 40, mr: 2 }}
-                        />
-                        <Box>
-                          <Typography variant="body1">{student.displayName}</Typography>
-                          <Typography variant="body2" color="textSecondary">
-                            {student.phoneNumber || '-'}
+                          className="w-10 h-10"
+                        >
+                          {student.displayName[0]}
+                        </Avatar>
+                        <div>
+                          <Typography variant="body1" className="font-medium">
+                            {student.displayName}
                           </Typography>
-                        </Box>
-                      </Box>
+                        </div>
+                      </div>
                     </TableCell>
                     <TableCell>{student.email}</TableCell>
-                    <TableCell>{getLevelText(student.level || 'beginner')}</TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {student.danceStyles && student.danceStyles.length > 0 ? (
-                          student.danceStyles.map((style) => (
-                            <Chip 
-                              key={style} 
-                              label={style.charAt(0).toUpperCase() + style.slice(1)} 
-                              size="small" 
-                              sx={{ fontWeight: 'medium' }}
-                            />
-                          ))
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">-</Typography>
-                        )}
-                      </Box>
+                      <Chip
+                        label={
+                          student.level === 'beginner' ? 'Başlangıç' :
+                          student.level === 'intermediate' ? 'Orta' :
+                          student.level === 'advanced' ? 'İleri' :
+                          student.level === 'professional' ? 'Profesyonel' : '-'
+                        }
+                        size="small"
+                        color={
+                          student.level === 'beginner' ? 'default' :
+                          student.level === 'intermediate' ? 'primary' :
+                          student.level === 'advanced' ? 'secondary' :
+                          student.level === 'professional' ? 'success' : 'default'
+                        }
+                      />
                     </TableCell>
                     <TableCell>{student.instructorName || '-'}</TableCell>
                     <TableCell align="right">
-                      <Tooltip title="Düzenle">
-                        <IconButton 
-                          color="primary" 
-                          onClick={() => handleOpenDialog(true, student)}
-                          size="small"
-                        >
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Sil">
-                        <IconButton 
-                          color="error" 
-                          onClick={() => handleDeleteConfirmOpen(student.id)}
-                          size="small"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
+                      <div className="flex justify-end gap-2">
+                        <Tooltip title="Düzenle">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenDialog(true, student)}
+                          >
+                            <EditIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Sil">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => {
+                              setSelectedStudentId(student.id);
+                              setDeleteConfirmOpen(true);
+                            }}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 2 }}>
-                      <SchoolIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 1 }} />
-                      <Typography variant="h6" color="text.secondary" gutterBottom>
-                        {searchTerm ? 'Arama kriterine uygun öğrenci bulunamadı.' : 'Henüz hiç öğrenci kaydı bulunmuyor.'}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {searchTerm ? 'Farklı bir arama terimi deneyin veya yeni öğrenci ekleyin.' : 'Yeni bir öğrenci eklemek için "Yeni Öğrenci" butonuna tıklayın.'}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                </TableRow>
               )}
             </TableBody>
           </Table>
         </TableContainer>
-      )}
-      
-      {/* Add/Edit Student Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-        <DialogTitle>{isEdit ? 'Öğrenci Düzenle' : 'Yeni Öğrenci Ekle'}</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 0.5 }}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Ad Soyad"
-                name="displayName"
-                value={formData.displayName}
-                onChange={handleInputChange}
-                fullWidth
-                required
-                margin="normal"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="E-posta"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                fullWidth
-                required
-                margin="normal"
-                disabled={isEdit} // E-posta adresi düzenlenemez
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Telefon"
-                name="phoneNumber"
-                value={formData.phoneNumber}
-                onChange={handleInputChange}
-                fullWidth
-                margin="normal"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth margin="normal">
-                <InputLabel>Dans Seviyesi</InputLabel>
-                <Select
-                  name="level"
-                  value={formData.level}
-                  onChange={handleInputChange}
-                  label="Dans Seviyesi"
-                >
-                  <MenuItem value="beginner">Başlangıç</MenuItem>
-                  <MenuItem value="intermediate">Orta</MenuItem>
-                  <MenuItem value="advanced">İleri</MenuItem>
-                  <MenuItem value="professional">Profesyonel</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth margin="normal">
-                <InputLabel>Eğitmen</InputLabel>
-                <Select
-                  name="instructorId"
-                  value={formData.instructorId}
-                  onChange={handleInputChange}
-                  label="Eğitmen"
-                >
-                  <MenuItem value="">Eğitmen Seçilmedi</MenuItem>
-                  {instructors.map((instructor) => (
-                    <MenuItem key={instructor.id} value={instructor.id}>
-                      {instructor.displayName}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth margin="normal">
-                <InputLabel>Dans Türleri</InputLabel>
-                <Select
-                  multiple
-                  name="danceStyles"
-                  value={formData.danceStyles}
-                  onChange={handleDanceStylesChange}
-                  label="Dans Türleri"
-                  renderValue={(selected) => (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {(selected as DanceStyle[]).map((value) => (
-                        <Chip key={value} label={value.charAt(0).toUpperCase() + value.slice(1)} />
-                      ))}
-                    </Box>
-                  )}
-                >
-                  {danceStyles.map((style) => (
-                    <MenuItem key={style} value={style}>
-                      {style.charAt(0).toUpperCase() + style.slice(1)}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Profil Fotoğrafı URL"
-                name="photoURL"
-                value={formData.photoURL}
-                onChange={handleInputChange}
-                fullWidth
-                margin="normal"
-                placeholder="https://example.com/photo.jpg"
-                helperText="Öğrencinin profil fotoğrafı için URL (opsiyonel)"
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog} color="secondary">
-            İptal
-          </Button>
-          <Button 
-            onClick={handleSubmit} 
-            variant="contained" 
-            color="primary"
-            disabled={!formData.displayName || !formData.email}
-          >
-            {isEdit ? 'Güncelle' : 'Ekle'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
-      {/* Delete Confirmation Dialog */}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:hidden">
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <CircularProgress />
+          </div>
+        ) : filteredStudents.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            {searchTerm ? 'Aramanızla eşleşen öğrenci bulunamadı.' : 'Henüz öğrenci bulunmuyor.'}
+          </div>
+        ) : (
+          filteredStudents.map((student) => (
+            <Paper key={student.id} className="p-4 rounded-lg shadow-md">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <Avatar
+                    src={student.photoURL}
+                    alt={student.displayName}
+                    className="w-12 h-12 flex-shrink-0"
+                  >
+                    {student.displayName[0]}
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <Typography 
+                      variant="subtitle1" 
+                      className="font-medium truncate"
+                      title={student.displayName}
+                    >
+                      {student.displayName}
+                    </Typography>
+                    <Typography 
+                      variant="body2" 
+                      className="text-gray-600 truncate"
+                      title={student.email}
+                    >
+                      {student.email}
+                    </Typography>
+                  </div>
+                </div>
+                <div className="flex gap-1 ml-2 flex-shrink-0">
+                  <IconButton
+                    size="small"
+                    onClick={() => handleOpenDialog(true, student)}
+                  >
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() => {
+                      setSelectedStudentId(student.id);
+                      setDeleteConfirmOpen(true);
+                    }}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </div>
+              </div>
+              
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div>
+                  <Typography variant="caption" className="text-gray-500">
+                    Seviye
+                  </Typography>
+                  <Chip
+                    label={
+                      student.level === 'beginner' ? 'Başlangıç' :
+                      student.level === 'intermediate' ? 'Orta' :
+                      student.level === 'advanced' ? 'İleri' :
+                      student.level === 'professional' ? 'Profesyonel' : '-'
+                    }
+                    size="small"
+                    color={
+                      student.level === 'beginner' ? 'default' :
+                      student.level === 'intermediate' ? 'primary' :
+                      student.level === 'advanced' ? 'secondary' :
+                      student.level === 'professional' ? 'success' : 'default'
+                    }
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Typography variant="caption" className="text-gray-500">
+                    Eğitmen
+                  </Typography>
+                  <Typography variant="body2">
+                    {student.instructorName || '-'}
+                  </Typography>
+                </div>
+                {student.danceStyles && student.danceStyles.length > 0 && (
+                  <div className="col-span-2">
+                    <Typography variant="caption" className="text-gray-500">
+                      Dans Stilleri
+                    </Typography>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {student.danceStyles.map((style) => {
+                        const danceStyle = danceStyles.find(ds => ds.value === style);
+                        return (
+                          <Chip
+                            key={style}
+                            label={danceStyle?.name || style}
+                            size="small"
+                            variant="outlined"
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Paper>
+          ))
+        )}
+      </div>
+
       <Dialog
         open={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}
+        maxWidth="xs"
+        fullWidth
       >
         <DialogTitle>Öğrenciyi Sil</DialogTitle>
         <DialogContent>
-          <Typography>
-            Bu öğrenciyi okulunuzun listesinden kaldırmak istediğinize emin misiniz? Bu işlem geri alınamaz.
-          </Typography>
+          <Typography>Bu öğrenciyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)} color="secondary">
+          <Button onClick={() => setDeleteConfirmOpen(false)}>
             İptal
           </Button>
-          <Button onClick={handleDeleteStudent} color="error" variant="contained">
+          <Button
+            color="error"
+            onClick={() => {
+              if (selectedStudentId) {
+                handleDeleteStudent();
+                setDeleteConfirmOpen(false);
+              }
+            }}
+          >
             Sil
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          {isEdit ? 'Öğrenci Düzenle' : 'Yeni Öğrenci Ekle'}
+        </DialogTitle>
+        <DialogContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <CustomInput
+              label="Ad Soyad"
+              name="displayName"
+              value={formData.displayName}
+              onChange={handleInputChange}
+              required
+              fullWidth
+            />
+            <CustomInput
+              label="E-posta"
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={handleInputChange}
+              required
+              fullWidth
+              disabled={isEdit}
+            />
+            <CustomPhoneInput
+              label="Telefon"
+              name="phoneNumber"
+              countryCode={formData.countryCode}
+              phoneNumber={formData.phoneNumber}
+              onCountryCodeChange={(value) => setFormData(prev => ({ ...prev, countryCode: value }))}
+              onPhoneNumberChange={handlePhoneChange}
+              fullWidth
+            />
+            <CustomSelect
+              label="Seviye"
+              name="level"
+              value={formData.level}
+              onChange={(value) => handleInputChange({ target: { name: 'level', value }})}
+              options={[
+                { value: 'beginner', label: 'Başlangıç' },
+                { value: 'intermediate', label: 'Orta' },
+                { value: 'advanced', label: 'İleri' },
+                { value: 'professional', label: 'Profesyonel' }
+              ]}
+              fullWidth
+            />
+            <CustomSelect
+              label="Eğitmen"
+              name="instructorId"
+              value={formData.instructorId}
+              onChange={(value) => handleInputChange({ target: { name: 'instructorId', value }})}
+              options={[
+                { value: '', label: 'Seçiniz' },
+                ...instructors.map(instructor => ({
+                  value: instructor.id,
+                  label: instructor.displayName
+                }))
+              ]}
+              fullWidth
+            />
+            <CustomSelect
+              label="Dans Stilleri"
+              name="danceStyles"
+              value={formData.danceStyles}
+              onChange={handleDanceStylesChange}
+              options={danceStyles.map(style => ({
+                value: style.value,
+                label: style.name
+              }))}
+              multiple
+              fullWidth
+            />
+            <div className="col-span-full">
+              <ImageUploader
+                currentPhotoURL={formData.photoURL}
+                onImageChange={(base64Image: string | null) => setFormData(prev => ({ ...prev, photoURL: base64Image || '' }))}
+                displayName={formData.displayName}
+                userType="student"
+              />
+            </div>
+          </div>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>
+            İptal
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleSubmit}
+            disabled={loading}
+          >
+            {loading ? 'Kaydediliyor...' : (isEdit ? 'Güncelle' : 'Kaydet')}
           </Button>
         </DialogActions>
       </Dialog>

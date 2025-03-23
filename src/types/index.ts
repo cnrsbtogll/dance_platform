@@ -1,6 +1,6 @@
 // src/types/index.ts
 
-export type DanceStyle = 'salsa' | 'bachata' | 'kizomba' | 'zouk' | 'tango';
+export type DanceStyle = 'salsa' | 'bachata' | 'kizomba' | 'zouk' | 'tango' | 'other';
 
 export type DanceLevel = 'beginner' | 'intermediate' | 'advanced' | 'professional';
 
