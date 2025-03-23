@@ -12,6 +12,7 @@ import { fetchSignInMethodsForEmail } from 'firebase/auth';
 import { Pagination } from '@mui/material';
 import { ChatDialog } from '../../features/chat/components/ChatDialog';
 import LoginRequiredModal from '../../common/components/modals/LoginRequiredModal';
+import { generateInitialsAvatar } from '../../common/utils/imageUtils';
 
 // Placeholder görüntü yolları - 404 hatasını önlemek için var olan bir görsele yönlendirelim
 const PLACEHOLDER_PARTNER_IMAGE = '/assets/images/dance/egitmen1.jpg';
@@ -135,14 +136,20 @@ function PartnerSearchPage(): JSX.Element {
         // StyleMapping'den eşleşen dans stilini bul
         const matchedStyle = styleMapping[styleLower];
         if (matchedStyle) {
-          // Console.log'u kaldırarak gereksiz log çıktısını önleyebiliriz
-          // console.log(`Dans stili '${style}' eşleştirildi:`, matchedStyle.label);
           return matchedStyle.label; // Standart label değerini döndür
         }
       }
       // Eşleşme bulunamadıysa orijinal değeri döndür
       return style;
     }) || [];
+
+    // Debug için loglama
+    console.log('convertUserToPartner Debug:', {
+      userId: user.id,
+      userName: user.displayName,
+      photoURL: user.photoURL,
+      role: user.role
+    });
 
     return {
       id: user.id,
@@ -153,10 +160,10 @@ function PartnerSearchPage(): JSX.Element {
               user.level === 'intermediate' ? 'Orta' : 
               user.level === 'advanced' ? 'İleri' : 
               user.level === 'professional' ? 'Profesyonel' : 'Belirtilmemiş',
-      dans: standardizedDanceStyles, // Standartlaştırılmış dans stilleri
+      dans: standardizedDanceStyles,
       konum: user.city || 'Belirtilmemiş',
       saatler: user.availableTimes || [],
-      foto: user.photoURL || PLACEHOLDER_PARTNER_IMAGE,
+      foto: user.photoURL || '', // Varsayılan resmi kaldırıyoruz
       puan: user.rating || 4.0,
       boy: user.height,
       kilo: user.weight,
@@ -1037,19 +1044,39 @@ function PartnerSearchPage(): JSX.Element {
       ? partner.role.includes('instructor')
       : partner.role === 'instructor';
     
+    // Partner tipi belirleme
+    const userType = isInstructor ? 'instructor' : 'student';
+
+    // Debug için loglama
+    console.log('Partner Kartı Debug:', {
+      partnerId: partner.id,
+      partnerName: partner.ad,
+      photoURL: partner.foto,
+      userType: userType,
+      generatedAvatar: generateInitialsAvatar(partner.ad, userType)
+    });
+    
     return (
       <div className="bg-white rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 flex flex-col h-full">
         {/* Profil fotoğrafı ve üst kısım */}
         <div className="relative h-64 overflow-hidden">
           {/* Profil fotoğrafı */}
           <img 
-            src={partner.foto || PLACEHOLDER_PARTNER_IMAGE} 
+            src={partner.foto || generateInitialsAvatar(partner.ad, userType)} 
             alt={partner.ad} 
-            className="h-full w-full object-cover object-center transition-transform duration-300"
-            style={{ objectPosition: 'center top' }}
+            className={`h-full w-full ${partner.foto ? 'object-cover' : 'object-cover bg-gray-50'}`}
+            style={{ objectPosition: 'center center' }}
             onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = PLACEHOLDER_PARTNER_IMAGE;
+              const target = e.currentTarget;
+              target.onerror = null;
+              console.log('Resim yükleme hatası, avatar oluşturuluyor:', {
+                partnerId: partner.id,
+                partnerName: partner.ad,
+                failedURL: target.src,
+                generatedAvatar: generateInitialsAvatar(partner.ad, userType)
+              });
+              target.src = generateInitialsAvatar(partner.ad, userType);
+              target.className = 'h-full w-full object-cover bg-gray-50';
             }}
           />
           
