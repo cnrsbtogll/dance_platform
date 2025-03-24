@@ -4,6 +4,7 @@ import { Instructor, UserWithProfile } from '../../../types';
 import { useAuth } from '../../../contexts/AuthContext';
 import { ChatDialog } from '../../../features/chat/components/ChatDialog';
 import LoginRequiredModal from '../modals/LoginRequiredModal';
+import { generateInitialsAvatar } from '../../utils/imageUtils';
 
 interface InstructorWithUser extends Instructor {
   user: UserWithProfile;
@@ -38,10 +39,15 @@ const InstructorCard: React.FC<InstructorCardProps> = ({
     <>
       <div className="h-64 bg-gray-200 relative overflow-hidden">
         <img
-          src={instructor.user.photoURL || `/assets/images/dance/egitmen${(index % 4) + 1}.jpg`}
+          src={instructor.user.photoURL || generateInitialsAvatar(instructor.user.displayName || 'Eğitmen', 'instructor')}
           alt={instructor.user.displayName || "Eğitmen"}
           className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
           style={{ objectPosition: 'center top' }}
+          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+            const target = e.currentTarget;
+            target.onerror = null;
+            target.src = generateInitialsAvatar(instructor.user.displayName || 'Eğitmen', 'instructor');
+          }}
         />
       </div>
       <div className="p-5">
