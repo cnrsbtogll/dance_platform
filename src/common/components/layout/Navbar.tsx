@@ -327,14 +327,22 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                     >
                       Kurs Bul
                     </Link>
-                    <button 
-                      onClick={() => handleProtectedFeatureClick('progress') && navigate('/progress')}
-                      className={`${isActive('/progress') 
+                    <Link 
+                      to="/festivals" 
+                      className={`${isActive('/festivals') 
                         ? 'border-indigo-500 text-indigo-700 font-medium' 
                         : 'border-transparent text-gray-500 hover:text-indigo-600 hover:border-indigo-400'} inline-flex items-center px-1 pt-1 border-b-2 text-sm transition-all duration-200`}
                     >
-                      İlerleme Durumum
-                    </button>
+                      Festivaller
+                    </Link>
+                    <Link 
+                      to="/nights" 
+                      className={`${isActive('/nights') 
+                        ? 'border-indigo-500 text-indigo-700 font-medium' 
+                        : 'border-transparent text-gray-500 hover:text-indigo-600 hover:border-indigo-400'} inline-flex items-center px-1 pt-1 border-b-2 text-sm transition-all duration-200`}
+                    >
+                      Geceler
+                    </Link>
                   </>
                 )}
               </div>
@@ -447,13 +455,26 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                               Admin Profilim
                             </Link>
                           ) : hasStudentRole ? (
-                            <Link
-                              to="/profile"
-                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-150"
-                              onClick={() => setIsProfileMenuOpen(false)}
-                            >
-                              Profilim
-                            </Link>
+                            <>
+                              <Link
+                                to="/profile"
+                                className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-150"
+                                onClick={() => setIsProfileMenuOpen(false)}
+                              >
+                                Profilim
+                              </Link>
+                              <button
+                                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-150"
+                                onClick={() => {
+                                  if (handleProtectedFeatureClick('progress')) {
+                                    navigate('/progress');
+                                    setIsProfileMenuOpen(false);
+                                  }
+                                }}
+                              >
+                                İlerleme Durumum
+                              </button>
+                            </>
                           ) : null}
                           <button
                             onClick={() => {
@@ -611,20 +632,29 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                         >
                           Kurs Bul
                         </Link>
-                        <button
-                          className="block w-full text-left px-3 py-1 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
-                          onClick={() => {
-                            if (handleProtectedFeatureClick('progress')) {
-                              navigate('/progress');
-                              setIsMenuOpen(false);
-                            }
-                          }}
+                        <Link
+                          to="/festivals"
+                          className="block px-3 py-1 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
+                          onClick={() => setIsMenuOpen(false)}
                         >
-                          İlerleme Durumum
-                        </button>
+                          Festivaller
+                        </Link>
+                        <Link
+                          to="/nights"
+                          className="block px-3 py-1 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          Geceler
+                        </Link>
                       </>
                     )}
                     
+                    {/* Ayırıcı çizgi */}
+                    <div className="my-4 border-t border-gray-200" />
+                    <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Profil Menüsü
+                    </div>
+
                     {/* Admin Panel Linkleri - Mobil */}
                     {hasSuperAdminRole && (
                       <Link
@@ -658,13 +688,26 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                         Admin Profilim
                       </Link>
                     ) : hasStudentRole ? (
-                      <Link
-                        to="/profile"
-                        className="block px-3 py-1 rounded-md text-base font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        Profilim
-                      </Link>
+                      <>
+                        <Link
+                          to="/profile"
+                          className="block px-3 py-1 rounded-md text-base font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          Profilim
+                        </Link>
+                        <button
+                          className="block w-full text-left px-3 py-1 rounded-md text-base font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
+                          onClick={() => {
+                            if (handleProtectedFeatureClick('progress')) {
+                              navigate('/progress');
+                              setIsMenuOpen(false);
+                            }
+                          }}
+                        >
+                          İlerleme Durumum
+                        </button>
+                      </>
                     ) : null}
                     <button
                       onClick={() => {

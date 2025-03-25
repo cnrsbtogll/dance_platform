@@ -18,6 +18,8 @@ import InstructorDetailPage from './pages/instructors/InstructorDetailPage';
 import InstructorsListPage from './pages/instructors/InstructorsListPage';
 import SchoolsListPage from './pages/schools/SchoolsListPage';
 import SchoolDetailPage from './pages/schools/SchoolDetailPage';
+import Festivals from './pages/festivals/Festivals';
+import Nights from './pages/nights/Nights';
 import useAuth from './common/hooks/useAuth';
 import { auth } from './api/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -356,14 +358,15 @@ function App(): JSX.Element {
             <div className="pt-16">
               <Routes>
                 <Route path="/" element={<HomePage isAuthenticated={isAuthenticated} user={user} />} />
+                <Route path="/partners" element={<PartnerSearchPage />} />
+                <Route path="/courses" element={<CourseSearchPage />} />
                 <Route path="/courses/:id" element={<CourseDetailPage />} />
                 <Route path="/instructors" element={<InstructorsListPage />} />
                 <Route path="/instructors/:id" element={<InstructorDetailPage />} />
-                <Route path="/partners" element={<PartnerSearchPage />} />
-                <Route path="/progress" element={<ProgressPage />} />
-                <Route path="/courses" element={<CourseSearchPage />} />
                 <Route path="/schools" element={<SchoolsListPage />} />
                 <Route path="/schools/:id" element={<SchoolDetailPage />} />
+                <Route path="/festivals" element={<Festivals />} />
+                <Route path="/nights" element={<Nights />} />
                 <Route 
                   path="/admin" 
                   element={
