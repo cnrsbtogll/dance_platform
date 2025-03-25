@@ -1,9 +1,3 @@
-// Schools
-export * from './schools';
-
-// Instructors
-export * from './instructors';
-
 // Users
 export * from './users';
 
@@ -14,7 +8,6 @@ export * from './requests';
 export * from './styles';
 
 // Additional re-exports
-export { default as InstructorManagement } from './instructors/InstructorManagement';
 export { default as InstructorRequests } from './requests/InstructorRequests';
 export { default as DanceStyleManagement } from './styles/DanceStyleManagement';
 export { default as ContactRequests } from './requests/ContactRequests';

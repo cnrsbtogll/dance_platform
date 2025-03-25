@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  SchoolManagement,
-  InstructorManagement, 
+import {
   InstructorRequests, 
   DanceStyleManagement, 
   ContactRequests,

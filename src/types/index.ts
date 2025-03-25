@@ -298,3 +298,15 @@ export const isSchoolForm = (data: FormDataType): data is SchoolFormData => {
 
 // Helper type for form data updates
 export type FormDataUpdate<T extends FormDataType> = Partial<T> & { role?: never };
+
+export interface School {
+  id: string;
+  displayName: string;
+  email: string;
+  phoneNumber?: string;
+  address?: string;
+  city?: string;
+  photoURL?: string;
+  createdAt?: any;
+  updatedAt?: any;
+}

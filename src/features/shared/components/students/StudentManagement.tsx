@@ -32,6 +32,7 @@ import CustomInput from '../../../../common/components/ui/CustomInput';
 import CustomSelect from '../../../../common/components/ui/CustomSelect';
 import CustomPhoneInput from '../../../../common/components/ui/CustomPhoneInput';
 import { Button, Card, CardContent, Dialog, DialogActions, DialogContent, DialogTitle, Grid, IconButton, TextField } from '@mui/material';
+import { SchoolProfile } from '../../../school/components/SchoolProfile/SchoolProfile';
 
 // Default placeholder image for students
 const DEFAULT_STUDENT_IMAGE = '/assets/placeholders/default-student.png';
@@ -935,7 +936,6 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                   onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                     const target = e.currentTarget;
                     target.onerror = null;
-                    // Hata durumunda baş harf avatarını göster
                     target.src = generateInitialsAvatar(student.displayName, 'student');
                   }}
                 />
@@ -969,16 +969,24 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
             {!student.level && '-'}
           </div>
         </td>
-        <td className="px-6 py-4 whitespace-nowrap">
-          <div className="text-sm text-gray-900">
-            {student.instructorName || '-'}
-          </div>
-        </td>
-        <td className="px-6 py-4 whitespace-nowrap">
-          <div className="text-sm text-gray-900">
-            {student.schoolName || '-'}
-          </div>
-        </td>
+        {userRole !== 'instructor' && (
+          <td className="px-6 py-4 whitespace-nowrap">
+            <div className="text-sm text-gray-900">
+              {student.instructorName || '-'}
+            </div>
+          </td>
+        )}
+        {userRole !== 'school' && (
+          <td className="px-6 py-4 whitespace-nowrap">
+            <SchoolProfile 
+              school={{
+                id: student.schoolId || '',
+                displayName: student.schoolName || '',
+                email: ''
+              }}
+            />
+          </td>
+        )}
         <td className="px-6 py-4 whitespace-nowrap">
           <div className="text-sm text-gray-900">
             {student.courseIds && student.courseIds.length > 0 ? (
@@ -1295,14 +1303,14 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                 </div>
               ) : userRole.includes('school') && (
                 <div>
-                  <CustomInput
-                    name="schoolName"
-                    label="Okul"
-                    type="text"
-                    value={schools.find(s => s.id === currentUser?.uid)?.displayName || ''}
-                    onChange={() => {}}
-                    disabled
-                    fullWidth
+                  <span className="text-gray-500">Okul:</span>
+                  <SchoolProfile 
+                    school={{
+                      id: currentUser?.uid || '',
+                      displayName: schools.find(s => s.id === currentUser?.uid)?.displayName || '',
+                      email: schools.find(s => s.id === currentUser?.uid)?.email || ''
+                    }}
+                    variant="card"
                   />
                 </div>
               )}
@@ -1376,12 +1384,16 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Dans Seviyesi
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Eğitmen
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Okul
-                  </th>
+                  {userRole !== 'instructor' && (
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Eğitmen
+                    </th>
+                  )}
+                  {userRole !== 'school' && (
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Okul
+                    </th>
+                  )}
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Kurslar
                   </th>
@@ -1464,14 +1476,25 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ isAdmin = 
                         <p className="font-medium">{student.phoneNumber}</p>
                       </div>
                     )}
-                    <div>
-                      <span className="text-gray-500">Eğitmen:</span>
-                      <p className="font-medium">{student.instructorName || '-'}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Okul:</span>
-                      <p className="font-medium">{student.schoolName || '-'}</p>
-                    </div>
+                    {userRole !== 'instructor' && (
+                      <div>
+                        <span className="text-gray-500">Eğitmen:</span>
+                        <p className="font-medium">{student.instructorName || '-'}</p>
+                      </div>
+                    )}
+                    {userRole !== 'school' && (
+                      <div>
+                        <span className="text-gray-500">Okul:</span>
+                        <SchoolProfile 
+                          school={{
+                            id: student.schoolId || '',
+                            displayName: student.schoolName || '',
+                            email: ''
+                          }}
+                          variant="card"
+                        />
+                      </div>
+                    )}
                     <div className="col-span-2">
                       <span className="text-gray-500">Kurslar:</span>
                       {student.courseIds && student.courseIds.length > 0 ? (

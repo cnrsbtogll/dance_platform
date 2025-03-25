@@ -12,14 +12,13 @@ import {
 import { db } from '../../../api/firebase/firebase';
 import { useAuth } from '../../../contexts/AuthContext';
 import { StudentManagement } from '../../../features/shared/components/students/StudentManagement';
-import InstructorManagement from '../components/InstructorManagement';
 import CourseManagement from '../../../features/shared/components/courses/CourseManagement';
-import AttendanceManagement from '../components/AttendanceManagement';
-import ProgressTracking from '../components/ProgressTracking';
-import BadgeSystem from '../components/BadgeSystem';
-import SchoolSettings from '../components/SchoolSettings';
+import AttendanceManagement from '../../../features/shared/components/attendance/AttendanceManagement';
+import ProgressTracking from '../../../features/shared/components/progress/ProgressTracking';
+import BadgeSystem from '../../../features/shared/components/badges/BadgeSystem';
+import ScheduleManagement from '../../../features/shared/components/schedule/ScheduleManagement';
+import InstructorManagement from '../components/InstructorManagement/InstructorManagement';
 import CustomSelect from '../../../common/components/ui/CustomSelect';
-import { ChatList } from '../../../features/chat/components/ChatList';
 import { User } from '../../../types';
 
 interface Course {
@@ -45,7 +44,16 @@ interface SchoolInfo {
 
 const SchoolAdmin: React.FC = () => {
   const { currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<'profile' | 'courses' | 'students' | 'instructors' | 'schedule' | 'messages' | 'settings'>('profile');
+  const [activeTab, setActiveTab] = useState<
+    'profile' | 
+    'courses' | 
+    'students' | 
+    'instructors' | 
+    'schedule' | 
+    'attendance' | 
+    'progress' | 
+    'badges'
+  >('profile');
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -273,17 +281,43 @@ const SchoolAdmin: React.FC = () => {
               Program
             </button>
             <button
-              onClick={() => setActiveTab('messages')}
+              onClick={() => setActiveTab('attendance')}
               className={`py-3 px-4 text-center font-medium text-sm border-b-2 flex items-center ${
-                activeTab === 'messages'
+                activeTab === 'attendance'
                   ? 'border-indigo-500 text-indigo-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
               <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
-              Mesajlar
+              Yoklama
+            </button>
+            <button
+              onClick={() => setActiveTab('progress')}
+              className={`py-3 px-4 text-center font-medium text-sm border-b-2 flex items-center ${
+                activeTab === 'progress'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              İlerleme
+            </button>
+            <button
+              onClick={() => setActiveTab('badges')}
+              className={`py-3 px-4 text-center font-medium text-sm border-b-2 flex items-center ${
+                activeTab === 'badges'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+              </svg>
+              Rozetler
             </button>
           </div>
         </div>
@@ -342,31 +376,85 @@ const SchoolAdmin: React.FC = () => {
               Program
             </button>
             <button
-              onClick={() => setActiveTab('messages')}
+              onClick={() => setActiveTab('attendance')}
               className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 ${
-                activeTab === 'messages'
+                activeTab === 'attendance'
                   ? 'border-indigo-500 text-indigo-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Mesajlar
+              Yoklama
             </button>
             <button
-              onClick={() => setActiveTab('settings')}
+              onClick={() => setActiveTab('progress')}
               className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 ${
-                activeTab === 'settings'
+                activeTab === 'progress'
                   ? 'border-indigo-500 text-indigo-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Ayarlar
+              İlerleme Takibi
+            </button>
+            <button
+              onClick={() => setActiveTab('badges')}
+              className={`py-4 px-6 text-center font-medium text-sm md:text-base border-b-2 ${
+                activeTab === 'badges'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Rozetler
             </button>
           </nav>
         </div>
 
         <div className="p-4 sm:p-6">
           {activeTab === 'profile' && schoolInfo && (
-            <SchoolSettings schoolInfo={schoolInfo} />
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Okul Profili</h2>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Dans okulunuzun temel bilgilerini görüntüleyin ve düzenleyin
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white shadow-sm border border-gray-200 rounded-lg p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Okul Bilgileri</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Okul Adı</label>
+                        <div className="mt-1 text-gray-900">{schoolInfo.displayName}</div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">E-posta</label>
+                        <div className="mt-1 text-gray-900">{schoolInfo.email || '-'}</div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Telefon</label>
+                        <div className="mt-1 text-gray-900">{schoolInfo.phoneNumber || '-'}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Adres Bilgileri</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Adres</label>
+                        <div className="mt-1 text-gray-900">{schoolInfo.address || '-'}</div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Şehir</label>
+                        <div className="mt-1 text-gray-900">{schoolInfo.city || '-'}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
 
           {activeTab === 'instructors' && schoolInfo && (
@@ -388,125 +476,33 @@ const SchoolAdmin: React.FC = () => {
             </div>
           )}
 
-          {activeTab === 'messages' && (
-            <ChatList />
+          {activeTab === 'attendance' && schoolInfo && (
+            <AttendanceManagement 
+              schoolInfo={schoolInfo} 
+              isAdmin={true}
+            />
           )}
 
-          {activeTab === 'settings' && schoolInfo && (
-            <SchoolSettings schoolInfo={schoolInfo} />
+          {activeTab === 'progress' && schoolInfo && (
+            <ProgressTracking 
+              schoolInfo={schoolInfo}
+              isAdmin={true}
+            />
+          )}
+
+          {activeTab === 'badges' && schoolInfo && (
+            <BadgeSystem 
+              schoolInfo={schoolInfo}
+              isAdmin={true}
+            />
           )}
 
           {activeTab === 'schedule' && (
-            <div>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">Ders Programı</h2>
-                  <p className="text-sm text-gray-600 mt-1">Okulunuzun haftalık ders programını görüntüleyin</p>
-                </div>
-                <div className="w-full sm:w-64 mt-4 sm:mt-0 block sm:hidden">
-                  <CustomSelect
-                    name="selectedDay"
-                    label="Gün Seçin"
-                    value={selectedDay}
-                    onChange={(value: string | string[]) => {
-                      if (typeof value === 'string') {
-                        setSelectedDay(value);
-                        const element = document.getElementById(`day-${value}`);
-                        if (element) {
-                          element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                        }
-                      }
-                    }}
-                    options={[
-                      { value: 'Pazartesi', label: 'Pazartesi' },
-                      { value: 'Salı', label: 'Salı' },
-                      { value: 'Çarşamba', label: 'Çarşamba' },
-                      { value: 'Perşembe', label: 'Perşembe' },
-                      { value: 'Cuma', label: 'Cuma' },
-                      { value: 'Cumartesi', label: 'Cumartesi' },
-                      { value: 'Pazar', label: 'Pazar' }
-                    ]}
-                    fullWidth
-                    allowEmpty
-                  />
-                </div>
-              </div>
-
-              {/* Kurs listesi */}
-              {courses.length > 0 ? (
-                <div className="relative">
-                  <div className="overflow-x-auto sm:overflow-x-visible">
-                    <div className="grid grid-cols-1 sm:grid-cols-7 gap-4 sm:min-w-0">
-                      {['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'].map((day) => (
-                        <div 
-                          key={day} 
-                          id={`day-${day}`}
-                          onClick={() => setSelectedDay(day === selectedDay ? '' : day)}
-                          className={`bg-white rounded-lg shadow-sm border p-3 min-h-[100px] sm:min-h-[200px] cursor-pointer hover:border-indigo-300 hover:ring-1 hover:ring-indigo-300 transition-all ${
-                            selectedDay === day 
-                              ? 'border-indigo-300 ring-1 ring-indigo-300' 
-                              : 'border-gray-200'
-                          } ${
-                            selectedDay && selectedDay !== day ? 'sm:block hidden' : ''
-                          }`}
-                        >
-                          <div className="text-center font-medium py-2 rounded-md mb-3 bg-gray-50 text-gray-700">
-                            {day}
-                          </div>
-                          
-                          <div className="space-y-2">
-                            {courses
-                              .filter(course => course.schedule.some(s => s.day === day))
-                              .map(course => (
-                                <div 
-                                  key={course.id} 
-                                  className="p-3 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 rounded-md transition-colors duration-200"
-                                >
-                                  <div className="font-medium text-indigo-700 truncate mb-1">{course.name}</div>
-                                  {course.schedule
-                                    .filter(s => s.day === day)
-                                    .map((schedule, index) => (
-                                      <div key={index} className="flex items-center text-gray-600 text-sm">
-                                        <svg className="w-4 h-4 mr-1.5 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        <span className="truncate">{schedule.time}</span>
-                                      </div>
-                                    ))}
-                                </div>
-                              ))}
-                            {courses.filter(course => course.schedule.some(s => s.day === day)).length === 0 && (
-                              <div className="text-center text-gray-500 text-sm py-4">
-                                Bu güne ait ders bulunmuyor
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-12 bg-white rounded-lg shadow-sm border border-gray-200">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Henüz Kurs Bulunmuyor</h3>
-                  <p className="text-gray-500 mb-4">
-                    Yeni bir kurs eklemek için "Kurslar" sekmesini kullanabilirsiniz.
-                  </p>
-                  <button
-                    onClick={() => setActiveTab('courses')}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    Yeni Kurs Ekle
-                  </button>
-                </div>
-              )}
-            </div>
+            <ScheduleManagement 
+              courses={courses}
+              onAddCourse={() => setActiveTab('courses')}
+              isAdmin={true}
+            />
           )}
         </div>
       </div>
