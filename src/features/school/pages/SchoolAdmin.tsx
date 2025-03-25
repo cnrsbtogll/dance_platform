@@ -7,7 +7,9 @@ import {
   getDocs, 
   doc, 
   getDoc,
-  orderBy 
+  orderBy,
+  updateDoc,
+  serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../../../api/firebase/firebase';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -20,6 +22,7 @@ import ScheduleManagement from '../../../features/shared/components/schedule/Sch
 import InstructorManagement from '../components/InstructorManagement/InstructorManagement';
 import CustomSelect from '../../../common/components/ui/CustomSelect';
 import { User } from '../../../types';
+import { SchoolProfile } from '../components/SchoolProfile/SchoolProfile';
 
 interface Course {
   id: string;
@@ -33,12 +36,14 @@ interface Course {
 interface SchoolInfo {
   id: string;
   displayName: string;
-  email?: string;
+  email: string;
   photoURL?: string;
   phoneNumber?: string;
   address?: string;
   city?: string;
   description?: string;
+  iban?: string;
+  recipientName?: string;
   [key: string]: any;
 }
 
@@ -115,6 +120,7 @@ const SchoolAdmin: React.FC = () => {
             setSchoolInfo({
               id: schoolDoc.id,
               displayName: schoolData.displayName || 'İsimsiz Okul',
+              email: schoolData.email || '',
               ...schoolData
             });
           }
@@ -123,6 +129,7 @@ const SchoolAdmin: React.FC = () => {
           setSchoolInfo({
             id: userDoc.id,
             displayName: userData.displayName || 'İsimsiz Okul',
+            email: userData.email || '',
             ...userData
           });
         }
@@ -421,38 +428,34 @@ const SchoolAdmin: React.FC = () => {
               </div>
 
               <div className="bg-white shadow-sm border border-gray-200 rounded-lg p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Okul Bilgileri</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Okul Adı</label>
-                        <div className="mt-1 text-gray-900">{schoolInfo.displayName}</div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">E-posta</label>
-                        <div className="mt-1 text-gray-900">{schoolInfo.email || '-'}</div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Telefon</label>
-                        <div className="mt-1 text-gray-900">{schoolInfo.phoneNumber || '-'}</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Adres Bilgileri</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Adres</label>
-                        <div className="mt-1 text-gray-900">{schoolInfo.address || '-'}</div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Şehir</label>
-                        <div className="mt-1 text-gray-900">{schoolInfo.city || '-'}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <SchoolProfile 
+                  school={schoolInfo} 
+                  variant="card"
+                  onUpdate={async (updatedSchool) => {
+                    try {
+                      const schoolRef = doc(db, 'schools', schoolInfo.id);
+                      await updateDoc(schoolRef, {
+                        ...updatedSchool,
+                        updatedAt: serverTimestamp()
+                      });
+                      
+                      // Refresh school info
+                      const updatedDoc = await getDoc(schoolRef);
+                      if (updatedDoc.exists()) {
+                        const updatedData = updatedDoc.data();
+                        setSchoolInfo({
+                          id: updatedDoc.id,
+                          displayName: updatedData.displayName || 'İsimsiz Okul',
+                          email: updatedData.email || '',
+                          ...updatedData
+                        });
+                      }
+                    } catch (error) {
+                      console.error('Error updating school:', error);
+                      throw error;
+                    }
+                  }}
+                />
               </div>
             </div>
           )}

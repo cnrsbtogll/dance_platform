@@ -303,10 +303,12 @@ export interface School {
   id: string;
   displayName: string;
   email: string;
+  photoURL?: string;
   phoneNumber?: string;
   address?: string;
   city?: string;
-  photoURL?: string;
-  createdAt?: any;
-  updatedAt?: any;
+  description?: string;
+  iban?: string;
+  recipientName?: string;
+  [key: string]: any;
 }
