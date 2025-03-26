@@ -248,6 +248,7 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [danceStyles, setDanceStyles] = useState<{ label: string; value: string; }[]>([]);
   const [loadingStyles, setLoadingStyles] = useState<boolean>(true);
+  const [userRole, setUserRole] = useState<string>('');
   const [formData, setFormData] = useState<FormData>({
     name: '',
     description: '',
@@ -669,6 +670,125 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
     }
   };
 
+  // Eğitmen ve okul seçimlerini yönet
+  const handleInstructorSchoolSelection = () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    // Get current user's role
+    const userRef = doc(db, 'users', currentUser.uid);
+    getDoc(userRef).then((userDoc) => {
+      const userData = userDoc.data();
+      const role = userData?.role || '';
+      setUserRole(role);
+
+      if (isAdmin) {
+        // Süper admin: Hem eğitmen hem okul seçebilir
+        fetchInstructors();
+        fetchSchools();
+      } else if (role === 'instructor') {
+        // Eğitmen: Sadece okul seçebilir, eğitmen kendisidir
+        fetchSchools();
+        setFormData(prev => ({
+          ...prev,
+          instructorId: currentUser.uid,
+          instructorName: userData?.displayName || 'Bilinmeyen Eğitmen'
+        }));
+      } else if (role === 'school') {
+        // Okul: Sadece eğitmen seçebilir, okul kendisidir
+        fetchInstructors();
+        setFormData(prev => ({
+          ...prev,
+          schoolId: currentUser.uid,
+          schoolName: userData?.displayName || 'Bilinmeyen Okul'
+        }));
+      }
+    });
+  };
+
+  useEffect(() => {
+    handleInstructorSchoolSelection();
+  }, [isAdmin]);
+
+  // Form render edilirken kullanıcı rolüne göre alanları göster/gizle
+  const renderFormFields = () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return null;
+
+    return (
+      <div className="space-y-4 md:col-span-2">
+        <h3 className="text-lg font-medium text-gray-900">Temel Bilgiler</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <CustomInput
+              type="text"
+              name="name"
+              label="Kurs Adı"
+              value={formData.name}
+              onChange={handleInputChange}
+              required
+            />
+          </div>
+          <div>
+            <CustomSelect
+              name="danceStyle"
+              label="Dans Stili"
+              options={danceStyles}
+              value={formData.danceStyle}
+              onChange={(value) => setFormData({ ...formData, danceStyle: value as string })}
+              placeholder="Dans Stili Seçin"
+              required
+            />
+          </div>
+        </div>
+
+        {/* Eğitmen Seçimi - Sadece süper admin ve okul kullanıcıları için */}
+        {(isAdmin || userRole === 'school') && (
+          <div className="mt-4">
+            <CustomSelect
+              name="instructorId"
+              label="Eğitmen"
+              options={instructors}
+              value={formData.instructorId}
+              onChange={(value) => {
+                const selectedInstructor = instructors.find(i => i.value === value);
+                setFormData({
+                  ...formData,
+                  instructorId: value as string,
+                  instructorName: selectedInstructor?.label || ''
+                });
+              }}
+              placeholder="Eğitmen Seçin"
+              required
+            />
+          </div>
+        )}
+
+        {/* Okul Seçimi - Sadece süper admin ve eğitmen kullanıcıları için */}
+        {(isAdmin || userRole === 'instructor') && (
+          <div className="mt-4">
+            <CustomSelect
+              name="schoolId"
+              label="Okul"
+              options={schools}
+              value={formData.schoolId}
+              onChange={(value) => {
+                const selectedSchool = schools.find(s => s.value === value);
+                setFormData({
+                  ...formData,
+                  schoolId: value as string,
+                  schoolName: selectedSchool?.label || ''
+                });
+              }}
+              placeholder="Okul Seçin"
+              required
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -970,63 +1090,7 @@ function CourseManagement({ instructorId, schoolId, isAdmin = false }: CourseMan
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Form Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-              {/* Temel Bilgiler */}
-              <div className="space-y-4 md:col-span-2">
-                <h3 className="text-lg font-medium text-gray-900">Temel Bilgiler</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <CustomInput
-                      type="text"
-                      name="name"
-                      label="Kurs Adı"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <CustomSelect
-                      name="danceStyle"
-                      label="Dans Stili"
-                      options={danceStyles}
-                      value={formData.danceStyle}
-                      onChange={(value) => setFormData({ ...formData, danceStyle: value as string })}
-                      placeholder="Dans Stili Seçin"
-                      required
-                    />
-                  </div>
-                </div>
-                {/* Eğitmen Seçimi */}
-                <div>
-                  {instructorId ? (
-                    <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-700">Eğitmen</label>
-                      <div className="mt-1 p-3 bg-gray-50 border border-gray-200 rounded-md">
-                        <p className="text-sm text-gray-700">{formData.instructorName}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-4">
-                      <CustomSelect
-                        name="instructorId"
-                        label="Eğitmen"
-                        options={instructors}
-                        value={formData.instructorId}
-                        onChange={(value) => {
-                          const selectedInstructor = instructors.find(i => i.value === value);
-                          setFormData({
-                            ...formData,
-                            instructorId: value as string,
-                            instructorName: selectedInstructor?.label || ''
-                          });
-                        }}
-                        placeholder="Eğitmen Seçin"
-                        required
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
+              {renderFormFields()}
 
               {/* Program ve Kapasite */}
               <div className="space-y-4">

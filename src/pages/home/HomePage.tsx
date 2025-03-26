@@ -7,6 +7,7 @@ import InstructorCard from '../../common/components/instructors/InstructorCard';
 import { getFeaturedDanceCourses } from '../../api/services/courseService';
 import { getFeaturedDanceSchools } from '../../api/services/schoolService';
 import { generateInitialsAvatar } from '../../common/utils/imageUtils';
+import SchoolCard from '../../common/components/schools/SchoolCard';
 
 interface HomePageProps {
   isAuthenticated: boolean;
@@ -294,37 +295,7 @@ function HomePage({ isAuthenticated, user }: HomePageProps) {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {schools.map((school) => (
-              <Link
-                key={school.id}
-                to={`/schools/${school.id}`}
-                className="bg-white rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300 overflow-hidden"
-              >
-                <div className="h-48 bg-gray-200 relative overflow-hidden">
-                  <img
-                    src={school.gorsel || school.logo || school.images?.[0] || generateInitialsAvatar(school.name, 'school')}
-                    alt={school.name}
-                    className="w-full h-full object-cover"
-                    onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                      const target = e.currentTarget;
-                      target.onerror = null;
-                      target.src = generateInitialsAvatar(school.name, 'school');
-                    }}
-                  />
-                </div>
-                <div className="p-4">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-1">{school.name}</h3>
-                  <p className="text-gray-600 text-sm mb-2 line-clamp-2">
-                    {school.aciklama || school.description || 'Bu dans okulu hakkında detaylı bilgi bulunmamaktadır.'}
-                  </p>
-                  <div className="flex items-center text-sm text-gray-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    {school.konum || school.address?.city || 'İstanbul'}, {school.ulke || school.address?.country || 'Türkiye'}
-                  </div>
-                </div>
-              </Link>
+              <SchoolCard key={school.id} school={school} />
             ))}
           </div>
         )}

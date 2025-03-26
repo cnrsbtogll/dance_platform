@@ -2,19 +2,38 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { DanceSchool } from '../../types';
 import { getAllDanceSchools } from '../../api/services/schoolService';
-import { generateInitialsAvatar } from '../../common/utils/imageUtils';
+import SchoolCard from '../../common/components/schools/SchoolCard';
 
 const SchoolsListPage: React.FC = () => {
   const [schools, setSchools] = useState<DanceSchool[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'name' | 'rating' | 'courseCount'>('name');
 
   useEffect(() => {
     const fetchSchools = async () => {
       setLoading(true);
       try {
         const schoolsData = await getAllDanceSchools();
-        setSchools(schoolsData);
+        
+        // Sıralama işlemi
+        const sortedSchools = [...schoolsData].sort((a, b) => {
+          switch (sortBy) {
+            case 'name':
+              // İsim undefined ise boş string olarak değerlendir
+              const nameA = a.name || '';
+              const nameB = b.name || '';
+              return nameA.localeCompare(nameB);
+            case 'rating':
+              return (b.rating || 0) - (a.rating || 0);
+            case 'courseCount':
+              return (b.courseCount || 0) - (a.courseCount || 0);
+            default:
+              return 0;
+          }
+        });
+        
+        setSchools(sortedSchools);
       } catch (err) {
         console.error('Dans okulları yüklenirken hata oluştu:', err);
         setError('Dans okulları yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
@@ -24,7 +43,7 @@ const SchoolsListPage: React.FC = () => {
     };
 
     fetchSchools();
-  }, []);
+  }, [sortBy]);
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -61,20 +80,35 @@ const SchoolsListPage: React.FC = () => {
           </p>
         </div>
 
+        {/* Sıralama Seçenekleri */}
+        <div className="mb-8">
+          <div className="flex justify-end">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'name' | 'rating' | 'courseCount')}
+              className="block w-48 px-3 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+            >
+              <option value="name">İsme Göre</option>
+              <option value="rating">Puana Göre</option>
+              <option value="courseCount">Kurs Sayısına Göre</option>
+            </select>
+          </div>
+        </div>
+
         {/* Yükleniyor */}
         {loading && (
           <div className="flex justify-center items-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-            <span className="ml-3 text-gray-700">Dans okulları yükleniyor...</span>
+            <span className="ml-3 text-gray-600">Dans okulları yükleniyor...</span>
           </div>
         )}
 
-        {/* Hata Mesajı */}
-        {error && !loading && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+        {/* Hata */}
+        {error && (
+          <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-8">
             <div className="flex">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
               </div>
@@ -85,91 +119,23 @@ const SchoolsListPage: React.FC = () => {
           </div>
         )}
 
-        {/* Dans Okulları Grid */}
+        {/* Okul Listesi */}
         {!loading && !error && schools.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {schools.map((school) => (
-              <Link
-                key={school.id}
-                to={`/schools/${school.id}`}
-                className="bg-white rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300 overflow-hidden"
-              >
-                <div className="h-48 bg-gray-200 relative overflow-hidden">
-                  <img
-                    src={school.gorsel || school.logo || school.images?.[0] || generateInitialsAvatar(school.name, 'school')}
-                    alt={school.name}
-                    className="w-full h-full object-cover"
-                    onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                      const target = e.currentTarget;
-                      target.onerror = null;
-                      target.src = generateInitialsAvatar(school.name, 'school');
-                    }}
-                  />
-                </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-semibold text-gray-800 mb-2">{school.name}</h3>
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                    {school.aciklama || school.description || 'Bu dans okulu hakkında detaylı bilgi bulunmamaktadır.'}
-                  </p>
-                  <div className="flex items-center text-sm text-gray-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    {school.konum || school.address?.city || 'İstanbul'}, {school.ulke || school.address?.country || 'Türkiye'}
-                  </div>
-                  
-                  {/* Dans stilleri */}
-                  {school.danceStyles && school.danceStyles.length > 0 && (
-                    <div className="mt-4">
-                      <div className="flex flex-wrap gap-2">
-                        {school.danceStyles.slice(0, 3).map((style, index) => (
-                          <span key={index} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                            {style}
-                          </span>
-                        ))}
-                        {school.danceStyles.length > 3 && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            +{school.danceStyles.length - 3} daha
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="mt-6">
-                    <div className="inline-flex items-center text-indigo-600 font-medium">
-                      Detayları Görüntüle
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </Link>
+              <SchoolCard key={school.id} school={school} />
             ))}
           </div>
         )}
 
         {/* Sonuç Yok */}
         {!loading && !error && schools.length === 0 && (
-          <div className="text-center py-20">
-            <svg
-              className="mx-auto h-12 w-12 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
+          <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
-            <h3 className="mt-2 text-lg font-medium text-gray-900">Dans okulu bulunamadı</h3>
-            <p className="mt-1 text-gray-500">Henüz sistemde kayıtlı dans okulu bulunmuyor.</p>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">Dans Okulu Bulunamadı</h3>
+            <p className="mt-1 text-sm text-gray-500">Henüz sistemde kayıtlı dans okulu bulunmuyor.</p>
           </div>
         )}
       </div>

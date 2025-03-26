@@ -20,20 +20,67 @@ const SCHOOLS_COLLECTION = 'schools';
 export const getAllDanceSchools = async (): Promise<DanceSchool[]> => {
   try {
     const schoolsQuery = query(
-      collection(db, SCHOOLS_COLLECTION), 
+      collection(db, SCHOOLS_COLLECTION),
       orderBy('createdAt', 'desc')
     );
     
     const schoolsSnapshot = await getDocs(schoolsQuery);
     const schools: DanceSchool[] = [];
     
-    schoolsSnapshot.forEach((doc) => {
-      const data = doc.data();
-      schools.push({
+    for (const doc of schoolsSnapshot.docs) {
+      const schoolData = doc.data();
+      
+      // Kurs sayısını hesapla
+      const coursesQuery = query(
+        collection(db, 'courses'),
+        where('schoolId', '==', doc.id)
+      );
+      const coursesSnapshot = await getDocs(coursesQuery);
+      const courseCount = coursesSnapshot.size;
+      
+      // Okul değerlendirmelerini hesapla
+      const ratingsQuery = query(
+        collection(db, 'ratings'),
+        where('schoolId', '==', doc.id)
+      );
+      const ratingsSnapshot = await getDocs(ratingsQuery);
+      let totalRating = 0;
+      let ratingCount = 0;
+      
+      ratingsSnapshot.forEach(ratingDoc => {
+        const rating = ratingDoc.data().rating;
+        if (rating) {
+          totalRating += rating;
+          ratingCount++;
+        }
+      });
+      
+      const rating = ratingCount > 0 ? totalRating / ratingCount : 0;
+      
+      // Okul verilerini DanceSchool tipine dönüştür
+      const schoolWithData: DanceSchool = {
         id: doc.id,
-        ...data
-      } as DanceSchool);
-    });
+        displayName: schoolData.displayName || schoolData.name || 'İsimsiz Okul',
+        name: schoolData.name,
+        description: schoolData.description || 'Açıklama bulunmuyor',
+        address: schoolData.address || '',
+        city: schoolData.city || '',
+        district: schoolData.district || '',
+        phone: schoolData.phone || '',
+        email: schoolData.email || '',
+        website: schoolData.website,
+        photoURL: schoolData.photoURL || schoolData.logo || schoolData.images?.[0],
+        socialMedia: schoolData.socialMedia,
+        danceStyles: schoolData.danceStyles || [],
+        images: schoolData.images,
+        createdAt: schoolData.createdAt,
+        updatedAt: schoolData.updatedAt,
+        courseCount: courseCount,
+        rating: Number(rating.toFixed(1))
+      };
+      
+      schools.push(schoolWithData);
+    }
     
     return schools;
   } catch (error) {
@@ -69,26 +116,19 @@ export const getDanceSchoolById = async (schoolId: string): Promise<DanceSchool 
  */
 export const getFeaturedDanceSchools = async (count: number = 4): Promise<DanceSchool[]> => {
   try {
-    // Şimdilik basitçe son eklenen okulları getiriyoruz,
-    // daha sonra öne çıkan okullar için bir alan eklenebilir (isFeatured gibi)
-    const schoolsQuery = query(
-      collection(db, SCHOOLS_COLLECTION), 
-      orderBy('createdAt', 'desc'),
-      limit(count)
-    );
+    const schools = await getAllDanceSchools();
     
-    const schoolsSnapshot = await getDocs(schoolsQuery);
-    const schools: DanceSchool[] = [];
-    
-    schoolsSnapshot.forEach((doc) => {
-      const data = doc.data();
-      schools.push({
-        id: doc.id,
-        ...data
-      } as DanceSchool);
-    });
-    
-    return schools;
+    // Okulları kurs sayısı ve değerlendirme puanına göre sırala
+    return schools
+      .sort((a, b) => {
+        // Önce kurs sayısına göre sırala
+        const courseCountDiff = (b.courseCount || 0) - (a.courseCount || 0);
+        if (courseCountDiff !== 0) return courseCountDiff;
+        
+        // Kurs sayıları eşitse değerlendirme puanına göre sırala
+        return (b.rating || 0) - (a.rating || 0);
+      })
+      .slice(0, count);
   } catch (error) {
     console.error('Öne çıkan dans okulları getirilirken hata:', error);
     throw error;
