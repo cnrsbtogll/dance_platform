@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { FirebaseApp } from 'firebase/app';
+import { Toaster } from 'react-hot-toast';
 import PartnerSearchPage from './pages/partners/PartnerSearchPage';
 import ProgressPage from './pages/progress/ProgressPage';
 import AdminPanel from './features/admin/pages/AdminPanel';
@@ -370,6 +371,31 @@ function App(): JSX.Element {
       <AuthProvider>
         <Router>
           <NotificationsCenter />
+          <Toaster 
+            position="top-center"
+            toastOptions={{
+              duration: 3000,
+              style: {
+                background: '#363636',
+                color: '#fff',
+                fontSize: '16px',
+                padding: '12px 24px',
+                borderRadius: '8px',
+              },
+              success: {
+                iconTheme: {
+                  primary: '#4ade80',
+                  secondary: '#fff',
+                },
+              },
+              error: {
+                iconTheme: {
+                  primary: '#ef4444',
+                  secondary: '#fff',
+                },
+              },
+            }}
+          />
           <div className="min-h-screen bg-gray-50">
             {isAuthenticated && <InstructorRedirect user={user} />}
             {isOffline && (

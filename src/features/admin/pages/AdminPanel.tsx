@@ -28,7 +28,7 @@ const requestTypeOptions = [
 ];
 
 interface AdminPanelProps {
-  user: User;
+  user?: User | null;
 }
 
 function AdminPanel({ user }: AdminPanelProps): JSX.Element {
