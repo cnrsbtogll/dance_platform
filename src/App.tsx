@@ -40,7 +40,8 @@ console.log('🔍 Firebase auth durumu:', auth ? 'Tanımlı' : 'Tanımsız', aut
 const InstructorRedirect: React.FC<{ user: any }> = ({ user }) => {
   const location = useLocation();
   
-  if (!user?.role?.includes('instructor')) {
+  // Eğer kullanıcı eğitmen değilse, hiçbir şey yapma
+  if (user?.role !== 'instructor') {
     return null;
   }
 
@@ -368,6 +369,12 @@ function App(): JSX.Element {
                 <Route path="/festivals" element={<Festivals />} />
                 <Route path="/nights" element={<Nights />} />
                 <Route 
+                  path="/progress" 
+                  element={
+                    isAuthenticated ? <ProgressPage /> : <Navigate to="/signin" />
+                  } 
+                />
+                <Route 
                   path="/admin" 
                   element={
                     isAuthenticated ? <AdminPanel user={user} /> : <Navigate to="/signin" />
@@ -413,7 +420,17 @@ function App(): JSX.Element {
                 <Route 
                   path="/profile" 
                   element={
-                    isAuthenticated ? <ProfilePage user={user} /> : <Navigate to="/signin" />
+                    isAuthenticated ? (
+                      <ProfilePage 
+                        user={user} 
+                        onUpdate={(updatedUser) => {
+                          console.log('Profil güncellendi:', updatedUser);
+                          // Profil güncellendiğinde yapılacak işlemler
+                        }} 
+                      />
+                    ) : (
+                      <Navigate to="/signin" />
+                    )
                   } 
                 />
                 <Route path="/signin" element={isAuthenticated ? <Navigate to="/" /> : <SignIn />} />

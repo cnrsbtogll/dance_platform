@@ -64,6 +64,28 @@ const ProgressPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   
+  // Sayfa yüklendiğinde loglama
+  useEffect(() => {
+    console.log('📄 ProgressPage yükleniyor:', {
+      timestamp: new Date().toISOString(),
+      authDurumu: {
+        user: {
+          id: user?.id,
+          email: user?.email,
+          role: user?.role,
+          displayName: user?.displayName
+        },
+        authLoading
+      },
+      sayfaDurumu: {
+        loading,
+        error,
+        progressSummaryVar: !!progressSummary,
+        badgeCount: allBadges.length
+      }
+    });
+  }, [user, authLoading, loading, error, progressSummary, allBadges]);
+  
   useEffect(() => {
     const fetchData = async () => {
       console.log("fetchData başlıyor, auth durumu:", { authLoading, userExists: !!user });
@@ -79,7 +101,7 @@ const ProgressPage: React.FC = () => {
         return;
       }
       
-      console.log("Kullanıcı bilgileri:", { userId: user.uid, email: user.email });
+      console.log("Kullanıcı bilgileri:", { userId: user.id, email: user.email });
       
       setLoading(true);
       setError(null);
@@ -91,9 +113,9 @@ const ProgressPage: React.FC = () => {
         console.log("Getirilen rozet sayısı:", badges.length);
         setAllBadges(badges);
         
-        console.log("Kullanıcı ilerleme özeti getirme işlemi başlıyor, userId:", user.uid);
+        console.log("Kullanıcı ilerleme özeti getirme işlemi başlıyor, userId:", user.id);
         // Kullanıcının ilerleme özetini getir
-        const summary = await getUserProgressSummary(user.uid);
+        const summary = await getUserProgressSummary(user.id);
         console.log("Kullanıcı ilerleme özeti:", { 
           completedCourses: summary.completedCourses,
           earnedAchievements: summary.earnedAchievements.length,

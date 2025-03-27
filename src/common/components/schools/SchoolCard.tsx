@@ -26,7 +26,7 @@ const SchoolCard: React.FC<SchoolCardProps> = ({ school, className = '' }) => {
         ) : (
           <div className="w-full h-full">
             <img
-              src={generateInitialsAvatar(school.displayName)}
+              src={generateInitialsAvatar(school.displayName, 'school')}
               alt={school.displayName}
               className="w-full h-full object-cover"
             />

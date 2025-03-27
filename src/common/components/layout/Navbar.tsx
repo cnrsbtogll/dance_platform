@@ -23,6 +23,28 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const customNavigate = (path: string) => {
+    console.log('🧭 Yönlendirme başlatılıyor:', {
+      hedefYol: path,
+      mevcutYol: location.pathname,
+      timestamp: new Date().toISOString()
+    });
+
+    try {
+      navigate(path);
+      console.log('✅ Yönlendirme başarılı:', {
+        hedefYol: path,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('❌ Yönlendirme hatası:', {
+        hedefYol: path,
+        hata: error,
+        timestamp: new Date().toISOString()
+      });
+    }
+  };
+
   const hasInstructorRole = user?.role === 'instructor';
   const hasSchoolAdminRole = user?.role === 'school_admin';
   const hasSchoolRole = user?.role === 'school';
@@ -466,8 +488,28 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                               <button
                                 className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-150"
                                 onClick={() => {
-                                  if (handleProtectedFeatureClick('progress')) {
-                                    navigate('/progress');
+                                  console.log('🎯 İlerleme Durumum butonuna tıklandı:', {
+                                    isAuthenticated,
+                                    user: {
+                                      id: user?.id,
+                                      email: user?.email,
+                                      role: user?.role,
+                                      displayName: user?.displayName
+                                    },
+                                    hasStudentRole,
+                                    timestamp: new Date().toISOString()
+                                  });
+
+                                  const result = handleProtectedFeatureClick('progress');
+                                  console.log('🔒 handleProtectedFeatureClick sonucu:', {
+                                    result,
+                                    timestamp: new Date().toISOString()
+                                  });
+
+                                  if (result) {
+                                    console.log('🚀 /progress sayfasına yönlendiriliyor...');
+                                    customNavigate('/progress');
+                                    console.log('📱 Menü kapatılıyor...');
                                     setIsProfileMenuOpen(false);
                                   }
                                 }}
@@ -699,8 +741,28 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
                         <button
                           className="block w-full text-left px-3 py-1 rounded-md text-base font-medium text-gray-700 hover:text-indigo-700 hover:bg-indigo-50 transition-colors duration-150"
                           onClick={() => {
-                            if (handleProtectedFeatureClick('progress')) {
-                              navigate('/progress');
+                            console.log('🎯 İlerleme Durumum butonuna tıklandı:', {
+                              isAuthenticated,
+                              user: {
+                                id: user?.id,
+                                email: user?.email,
+                                role: user?.role,
+                                displayName: user?.displayName
+                              },
+                              hasStudentRole,
+                              timestamp: new Date().toISOString()
+                            });
+
+                            const result = handleProtectedFeatureClick('progress');
+                            console.log('🔒 handleProtectedFeatureClick sonucu:', {
+                              result,
+                              timestamp: new Date().toISOString()
+                            });
+
+                            if (result) {
+                              console.log('🚀 /progress sayfasına yönlendiriliyor...');
+                              customNavigate('/progress');
+                              console.log('📱 Menü kapatılıyor...');
                               setIsMenuOpen(false);
                             }
                           }}

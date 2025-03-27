@@ -132,48 +132,27 @@ export interface DanceClass {
 
 export interface DanceSchool {
   id: string;
-  name: string;
-  description?: string;
-  aciklama?: string; // Türkçe alternatif - description
-  logo?: string;
-  gorsel?: string; // Türkçe alternatif - logo
-  images?: string[];
-  address?: {
-    street: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    country: string;
-    latitude?: number;
-    longitude?: number;
-  };
-  konum?: string; // Türkçe alternatif - city
-  ulke?: string; // Türkçe alternatif - country
-  contactInfo?: {
-    phone: string;
-    email: string;
-    website?: string;
-  };
-  iletisim?: string; // Türkçe alternatif - email
-  telefon?: string; // Türkçe alternatif - phone
+  displayName: string;
+  name?: string;
+  description: string;
+  address: string;
+  city: string;
+  district: string;
+  phone: string;
+  email: string;
+  website?: string;
+  photoURL?: string;
   socialMedia?: {
     facebook?: string;
     instagram?: string;
     youtube?: string;
-    tiktok?: string;
   };
-  danceStyles?: DanceStyle[];
-  instructors?: string[]; // Instructor IDs
+  danceStyles?: string[];
+  images?: string[];
+  createdAt: Date;
+  updatedAt: Date;
+  courseCount?: number;
   rating?: number;
-  reviewCount?: number;
-  established?: number; // Kuruluş yılı
-  adminId?: string; // Okul yöneticisi kullanıcı ID'si
-  userId?: string; // Alternatif yönetici ID alanı
-  createdAt?: any; // Firestore Timestamp
-  updatedAt?: any; // Firestore Timestamp
-  status?: 'active' | 'pending' | 'inactive';
-  features?: string[]; // Okuldaki imkanlar (ör: "Ücretsiz Park", "Duş", "Soyunma Odası")
-  businessHours?: Record<string, { open: string; close: string; }>;
 }
 
 export interface Course {
