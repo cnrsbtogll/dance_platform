@@ -9,6 +9,11 @@ import CustomSelect from '../../common/components/ui/CustomSelect';
 import CustomPhoneInput from '../../common/components/ui/CustomPhoneInput';
 import Button from '../../common/components/ui/Button';
 import ImageUploader from '../../common/components/ui/ImageUploader';
+import { writeBatch, doc } from 'firebase/firestore';
+import { updateProfile } from 'firebase/auth';
+import { auth } from '../../api/firebase/firebase';
+import { generateInitialsAvatar } from '../../common/utils/imageUtils';
+import { eventBus, EVENTS } from '../../common/utils/eventBus';
 
 interface ProfileEditorProps {
   user: User | null;
@@ -77,11 +82,47 @@ const ProfilePage: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
     }));
   };
 
-  const handlePhotoUploadSuccess = (base64Image: string | null) => {
-    if (base64Image) {
+  const handlePhotoUploadSuccess = async (base64Image: string | null) => {
+    if (!base64Image || !user) return;
+
+    try {
+      // UI state'ini güncelle
       setFormData(prev => ({
         ...prev,
         photoURL: base64Image
+      }));
+
+      // Firebase'e kaydet
+      const batch = writeBatch(db);
+      const userRef = doc(db, 'users', user.id);
+
+      const updateTimestamp = new Date();
+      const updates = {
+        photoURL: base64Image,
+        updatedAt: updateTimestamp
+      };
+
+      batch.update(userRef, updates);
+      await batch.commit();
+
+      // Parent component'i bilgilendir
+      onUpdate({
+        ...user,
+        ...updates
+      });
+
+      // Navbar'ı bilgilendir
+      eventBus.emit(EVENTS.PROFILE_PHOTO_UPDATED);
+
+      console.log('✅ Profil fotoğrafı güncellendi:', {
+        firestore: 'Base64 image saved to Firestore'
+      });
+    } catch (error) {
+      console.error('❌ Photo upload failed:', error);
+      // Hata durumunda UI'ı eski haline getir
+      setFormData(prev => ({
+        ...prev,
+        photoURL: user.photoURL || ''
       }));
     }
   };
@@ -133,7 +174,7 @@ const ProfilePage: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
       </div>
       
       <ImageUploader
-        currentPhotoURL={user?.photoURL}
+        currentPhotoURL={formData.photoURL}
         onImageChange={handlePhotoUploadSuccess}
         displayName={user?.displayName || ''}
         userType="student"

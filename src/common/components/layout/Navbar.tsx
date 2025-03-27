@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { signOut } from '../../../pages/auth/services/authService';
 import { User as UserType } from '../../../types';
@@ -6,6 +6,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../../api/firebase/firebase';
 import { generateInitialsAvatar } from '../../utils/imageUtils';
 import LoginRequiredModal from '../modals/LoginRequiredModal';
+import { eventBus, EVENTS } from '../../utils/eventBus';
 
 // Navbar bileşeni için prop tipleri
 interface NavbarProps {
@@ -186,57 +187,71 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
   }, [user, hasInstructorRole, hasSchoolAdminRole, hasSchoolRole, hasSuperAdminRole, hasStudentRole, isAuthenticated]);
 
   // Profil fotoğrafını Firestore'dan getir
-  useEffect(() => {
-    const fetchProfilePhoto = async () => {
-      if (!user || !user.id) {
-        setProfilePhotoURL(generateInitialsAvatar('?', 'student'));
+  const fetchProfilePhoto = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      // Önce Firestore'dan kontrol et
+      const userDoc = await getDoc(doc(db, 'users', user.id));
+
+      console.log('🔍 Firestore profil fotoğrafı kontrolü:', {
+        userId: user.id,
+        firestoreExists: userDoc.exists(),
+        firestoreData: userDoc.exists() ? userDoc.data() : null,
+        firestorePhotoURL: userDoc.exists() ? userDoc.data().photoURL : null,
+        timestamp: new Date().toISOString()
+      });
+
+      // Firestore'da photoURL varsa kullan
+      if (userDoc.exists() && userDoc.data().photoURL) {
+        console.log('✅ Firestore profil fotoğrafı bulundu:', userDoc.data().photoURL);
+        setProfilePhotoURL(userDoc.data().photoURL);
         return;
       }
-      
-      try {
-        // Konsola yazdırma
-        console.log('👤 Kullanıcı profil fotoğrafı kontrolü:', {
-          photoURL: user.photoURL,
-          isPlaceholder: user.photoURL?.startsWith('profile-photo:')
-        });
-        
-        // Firebase Auth'dan gelen photoURL kontrol et
-        if (user.photoURL && !user.photoURL.startsWith('profile-photo:')) {
-          console.log('✅ Firebase Auth profil fotoğrafı kullanılıyor');
-          setProfilePhotoURL(user.photoURL);
-          return;
-        }
-        
-        // Firestore'dan kullanıcı dokümanını kontrol et
-        const userDoc = await getDoc(doc(db, 'users', user.id));
-        
-        // Firestore'da photoURL varsa kullan
-        if (userDoc.exists() && userDoc.data().photoURL) {
-          console.log('✅ Firestore profil fotoğrafı bulundu!');
-          
-          // Önbellekleme sorunlarını önlemek için zaman damgası ekle
-          const photoURL = userDoc.data().photoURL;
-          setProfilePhotoURL(`${photoURL}${photoURL.includes('?') ? '&' : '?'}t=${Date.now()}`);
-        } else {
-          console.log('⚠️ Kullanıcı henüz profil fotoğrafı yüklememiş, baş harf avatarı gösteriliyor');
-          // Kullanıcı tipine göre avatar oluştur
-          const userType = hasInstructorRole ? 'instructor' : hasSchoolRole ? 'school' : 'student';
-          setProfilePhotoURL(generateInitialsAvatar(user.displayName || '?', userType));
-        }
-      } catch (error) {
-        console.error("⛔ Profil fotoğrafı getirme hatası:", error);
-        setProfilePhotoURL(generateInitialsAvatar(user?.displayName || '?', 'student'));
+
+      // Firestore'da yoksa Firebase Auth'dan gelen photoURL'i kontrol et
+      console.log('🔄 Firebase Auth profil fotoğrafı kontrolü:', {
+        authPhotoURL: user.photoURL,
+        isAssetURL: user.photoURL?.startsWith('/assets/'),
+        timestamp: new Date().toISOString()
+      });
+
+      if (user.photoURL && !user.photoURL.startsWith('/assets/')) {
+        console.log('✅ Firebase Auth profil fotoğrafı kullanılıyor:', user.photoURL);
+        setProfilePhotoURL(user.photoURL);
+        return;
       }
+
+      // Hiçbir yerde fotoğraf yoksa baş harf avatarı göster
+      console.log('⚠️ Profil fotoğrafı bulunamadı, baş harf avatarı gösteriliyor');
+      const userType = hasInstructorRole ? 'instructor' : hasSchoolRole ? 'school' : 'student';
+      const initialsAvatar = generateInitialsAvatar(user.displayName || '?', userType);
+      console.log('🎨 Oluşturulan baş harf avatarı:', initialsAvatar);
+      setProfilePhotoURL(initialsAvatar);
+    } catch (error) {
+      console.error("⛔ Profil fotoğrafı getirme hatası:", error);
+      const userType = hasInstructorRole ? 'instructor' : hasSchoolRole ? 'school' : 'student';
+      setProfilePhotoURL(generateInitialsAvatar(user?.displayName || '?', userType));
+    }
+  }, [user, hasInstructorRole, hasSchoolRole]);
+
+  // Event listener'ı ekle
+  useEffect(() => {
+    const handleProfilePhotoUpdate = () => {
+      console.log('🔄 Profil fotoğrafı güncelleme eventi alındı, fotoğraf yenileniyor...');
+      fetchProfilePhoto();
     };
 
-    // Profil fotoğrafı değiştiğinde hemen getir
+    eventBus.on(EVENTS.PROFILE_PHOTO_UPDATED, handleProfilePhotoUpdate);
+
+    // Component mount olduğunda fotoğrafı getir
+    console.log('🔄 Component mount oldu, ilk fotoğraf yüklemesi başlatılıyor...');
     fetchProfilePhoto();
-    
-    // Her 30 saniyede bir profil fotoğrafını kontrol et (opsiyonel - önbellekleme sorunlarını çözmek için)
-    const intervalId = setInterval(fetchProfilePhoto, 30000);
-    
-    return () => clearInterval(intervalId);
-  }, [user?.id, user?.photoURL, user?.displayName, hasInstructorRole, hasSchoolRole]);
+
+    return () => {
+      eventBus.off(EVENTS.PROFILE_PHOTO_UPDATED, handleProfilePhotoUpdate);
+    };
+  }, [user?.id, fetchProfilePhoto]);
 
   const handleLogout = async (): Promise<void> => {
     try {
