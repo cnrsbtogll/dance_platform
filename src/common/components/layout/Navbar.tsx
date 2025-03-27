@@ -7,6 +7,7 @@ import { db } from '../../../api/firebase/firebase';
 import { generateInitialsAvatar } from '../../utils/imageUtils';
 import LoginRequiredModal from '../modals/LoginRequiredModal';
 import { eventBus, EVENTS } from '../../utils/eventBus';
+import { useAuth } from '../../../contexts/AuthContext';
 
 // Navbar bileşeni için prop tipleri
 interface NavbarProps {
@@ -15,6 +16,7 @@ interface NavbarProps {
 }
 
 function Navbar({ isAuthenticated, user }: NavbarProps) {
+  const { currentUser, logout: authLogout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState<boolean>(false);
   const [profilePhotoURL, setProfilePhotoURL] = useState<string>("");
@@ -242,7 +244,20 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
       fetchProfilePhoto();
     };
 
+    const handleProfileUpdate = (updatedUser: UserType) => {
+      console.log('🔄 Profil güncelleme eventi alındı:', updatedUser);
+      // Kullanıcı bilgilerini güncelle
+      if (user && updatedUser) {
+        const updatedUserInfo = { ...user, ...updatedUser };
+        // Burada kendi state yönetiminize göre user'ı güncellemeniz gerekiyor
+        // Örneğin: setUser(updatedUserInfo) veya dispatch(updateUser(updatedUserInfo))
+        // Şu an için sadece fotoğrafı güncelliyoruz
+        fetchProfilePhoto();
+      }
+    };
+
     eventBus.on(EVENTS.PROFILE_PHOTO_UPDATED, handleProfilePhotoUpdate);
+    eventBus.on(EVENTS.PROFILE_UPDATED, handleProfileUpdate);
 
     // Component mount olduğunda fotoğrafı getir
     console.log('🔄 Component mount oldu, ilk fotoğraf yüklemesi başlatılıyor...');
@@ -250,6 +265,7 @@ function Navbar({ isAuthenticated, user }: NavbarProps) {
 
     return () => {
       eventBus.off(EVENTS.PROFILE_PHOTO_UPDATED, handleProfilePhotoUpdate);
+      eventBus.off(EVENTS.PROFILE_UPDATED, handleProfileUpdate);
     };
   }, [user?.id, fetchProfilePhoto]);
 

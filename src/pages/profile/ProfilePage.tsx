@@ -14,6 +14,10 @@ import { updateProfile } from 'firebase/auth';
 import { auth } from '../../api/firebase/firebase';
 import { generateInitialsAvatar } from '../../common/utils/imageUtils';
 import { eventBus, EVENTS } from '../../common/utils/eventBus';
+import AgeInput from '../../common/components/ui/AgeInput';
+import CitySelect from '../../common/components/ui/CitySelect';
+import { toast, Toaster } from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ProfileEditorProps {
   user: User | null;
@@ -38,8 +42,10 @@ interface FormData {
 const ProfilePage: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { updateUserProfile: updateAuthProfile } = useAuth();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
   const [formData, setFormData] = useState<FormData>({
     displayName: user?.displayName || '',
     gender: user?.gender || '',
@@ -117,6 +123,13 @@ const ProfilePage: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
       console.log('✅ Profil fotoğrafı güncellendi:', {
         firestore: 'Base64 image saved to Firestore'
       });
+
+      // Show success toast
+      toast.success('Profil fotoğrafı güncellendi!', {
+        duration: 2000,
+        position: 'top-center',
+        icon: '✅',
+      });
     } catch (error) {
       console.error('❌ Photo upload failed:', error);
       // Hata durumunda UI'ı eski haline getir
@@ -124,6 +137,13 @@ const ProfilePage: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
         ...prev,
         photoURL: user.photoURL || ''
       }));
+
+      // Show error toast
+      toast.error('Fotoğraf yüklenirken bir hata oluştu. Lütfen tekrar deneyin.', {
+        duration: 3000,
+        position: 'top-center',
+        icon: '❌',
+      });
     }
   };
 
@@ -132,8 +152,37 @@ const ProfilePage: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
     // TODO: Show error message to user
   };
 
+  const validateBasicInfo = (): boolean => {
+    const newErrors: Partial<Record<keyof FormData, string>> = {};
+
+    if (!formData.displayName.trim()) {
+      newErrors.displayName = 'İsim alanı zorunludur';
+    }
+
+    if (!formData.gender) {
+      newErrors.gender = 'Cinsiyet seçimi zorunludur';
+    }
+
+    if (!formData.age) {
+      newErrors.age = 'Yaş alanı zorunludur';
+    }
+
+    if (!formData.level) {
+      newErrors.level = 'Dans seviyesi seçimi zorunludur';
+    }
+
+    if (!formData.city) {
+      newErrors.city = 'Şehir seçimi zorunludur';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const nextStep = () => {
-    setStep(prev => prev + 1);
+    if (validateBasicInfo()) {
+      setStep(prev => prev + 1);
+    }
   };
 
   const prevStep = () => {
@@ -144,20 +193,52 @@ const ProfilePage: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
     e.preventDefault();
     if (!user) return;
 
+    if (!validateBasicInfo()) {
+      setStep(1); // Eğer hatalar varsa ilk adıma dön
+      return;
+    }
+
     setIsSubmitting(true);
     try {
+      // Prepare user data without photo URL for Firebase Auth
+      const { photoURL, ...profileData } = formData;
+      
       const updatedUserData: Partial<User> = {
-        ...formData,
+        ...profileData,
         id: user.id,
         email: user.email,
         createdAt: user.createdAt,
         updatedAt: new Date()
       };
+
+      // Update user profile in Firestore
       const updatedUser = await updateUserProfile(user.id, updatedUserData);
       onUpdate(updatedUser);
+      
+      // Update auth context with only display name
+      await updateAuthProfile(formData.displayName);
+      
+      // Başarılı mesajı göster
+      toast.success('Profiliniz başarıyla güncellendi!', {
+        duration: 3000,
+        position: 'top-center',
+        icon: '✅',
+      });
+
+      // Navbar'ı güncelle
+      eventBus.emit(EVENTS.PROFILE_UPDATED, updatedUser);
+
+      // 1 saniye bekleyip anasayfaya yönlendir
+      setTimeout(() => {
+        navigate('/');
+      }, 1000);
     } catch (error) {
       console.error('Profile update failed:', error);
-      // Show error message
+      toast.error('Profil güncellenirken bir hata oluştu. Lütfen tekrar deneyin.', {
+        duration: 4000,
+        position: 'top-center',
+        icon: '❌',
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -190,6 +271,8 @@ const ProfilePage: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
           value={formData.displayName}
           onChange={handleInputChange}
           required
+          error={!!errors.displayName}
+          helperText={errors.displayName}
         />
       </div>
       
@@ -205,20 +288,17 @@ const ProfilePage: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
             { value: 'other', label: 'Diğer' }
           ]}
           required
+          error={errors.gender ? 'error' : ''}
         />
       </div>
       
       <div>
-        <CustomInput
-          type="text"
-          name="age"
-          label="Yaş"
-          value={formData.age?.toString() || ''}
-          onChange={(e) => {
-            const value = e.target.value ? parseInt(e.target.value) : undefined;
-            handleInputChange({ target: { name: 'age', value } });
-          }}
+        <AgeInput
+          value={formData.age}
+          onChange={(value: number | undefined) => handleInputChange({ target: { name: 'age', value } })}
           required
+          error={!!errors.age}
+          helperText={errors.age}
         />
       </div>
       
@@ -235,24 +315,24 @@ const ProfilePage: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
             { value: 'professional', label: 'Profesyonel' }
           ]}
           required
+          error={errors.level ? 'error' : ''}
         />
       </div>
       
       <div>
-        <CustomInput
-          name="city"
-          label="Şehir"
+        <CitySelect
           value={formData.city}
-          onChange={handleInputChange}
+          onChange={(value: string) => handleInputChange({ target: { name: 'city', value } })}
           required
-          placeholder="Örn: İstanbul, Ankara"
+          error={!!errors.city}
+          helperText={errors.city}
         />
       </div>
       
       <div>
         <CustomPhoneInput
           name="phoneNumber"
-          label="Telefon Numarası"
+          label="Telefon Numarası (İsteğe Bağlı)"
           countryCode="+90"
           phoneNumber={formData.phoneNumber}
           onPhoneNumberChange={(value: string) => handleInputChange({ target: { name: 'phoneNumber', value } })}
@@ -329,9 +409,38 @@ const ProfilePage: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
   );
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-2xl mx-auto p-6">
-      {step === 1 ? renderBasicInfoForm() : renderPhysicalAttributesForm()}
-    </form>
+    <>
+      <Toaster 
+        position="top-center"
+        toastOptions={{
+          style: {
+            background: '#363636',
+            color: '#fff',
+            fontSize: '14px',
+            padding: '16px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          },
+          success: {
+            duration: 3000,
+            iconTheme: {
+              primary: '#22C55E',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            duration: 4000,
+            iconTheme: {
+              primary: '#EF4444',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
+      <form onSubmit={handleSubmit} className="max-w-2xl mx-auto p-6">
+        {step === 1 ? renderBasicInfoForm() : renderPhysicalAttributesForm()}
+      </form>
+    </>
   );
 };
 

@@ -32,6 +32,8 @@ import { collection, query, where, onSnapshot, writeBatch, getDocs } from 'fireb
 import { db } from './api/firebase/firebase';
 import { ChatDialog } from './features/chat/components/ChatDialog';
 import { ChatList } from './features/chat/components/ChatList';
+import { eventBus, EVENTS } from './common/utils/eventBus';
+import { User } from './types';
 
 console.log('🔍 App bileşeni yükleniyor');
 console.log('🔍 Firebase auth durumu:', auth ? 'Tanımlı' : 'Tanımsız', auth);
@@ -64,6 +66,7 @@ function App(): JSX.Element {
   console.log('🔍 App bileşeni render ediliyor');
   
   const { user, loading, error, isOffline } = useAuth();
+  const [currentUser, setCurrentUser] = useState<User | null>(user);
   console.log('🔍 useAuth hook sonuçları:', { user: !!user, loading, error, isOffline });
   
   const isAuthenticated = !!user;
@@ -71,6 +74,32 @@ function App(): JSX.Element {
   const [resetTrigger, setResetTrigger] = useState<number>(0);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showChatList, setShowChatList] = useState(false);
+
+  useEffect(() => {
+    setCurrentUser(user);
+  }, [user]);
+
+  useEffect(() => {
+    const handleProfileUpdate = (updatedUser: User) => {
+      console.log('Profile updated:', updatedUser);
+      setCurrentUser(updatedUser);
+    };
+
+    const handleProfilePhotoUpdate = () => {
+      console.log('Profile photo updated');
+      if (user) {
+        setCurrentUser({ ...user });
+      }
+    };
+
+    eventBus.on(EVENTS.PROFILE_UPDATED, handleProfileUpdate);
+    eventBus.on(EVENTS.PROFILE_PHOTO_UPDATED, handleProfilePhotoUpdate);
+
+    return () => {
+      eventBus.off(EVENTS.PROFILE_UPDATED, handleProfileUpdate);
+      eventBus.off(EVENTS.PROFILE_PHOTO_UPDATED, handleProfilePhotoUpdate);
+    };
+  }, [user]);
 
   // Profil fotoğrafının güncellendiğini log'la (debug için)
   useEffect(() => {
@@ -337,9 +366,9 @@ function App(): JSX.Element {
   }
 
   return (
-    <Router>
+    <ThemeProvider theme={theme}>
       <AuthProvider>
-        <ThemeProvider theme={theme}>
+        <Router>
           <NotificationsCenter />
           <div className="min-h-screen bg-gray-50">
             {isAuthenticated && <InstructorRedirect user={user} />}
@@ -355,10 +384,10 @@ function App(): JSX.Element {
               </div>
             )}
             
-            <Navbar isAuthenticated={isAuthenticated} user={user} />
+            <Navbar isAuthenticated={!!currentUser} user={currentUser} />
             <div className="pt-16">
               <Routes>
-                <Route path="/" element={<HomePage isAuthenticated={isAuthenticated} user={user} />} />
+                <Route path="/" element={<HomePage isAuthenticated={isAuthenticated} user={currentUser} />} />
                 <Route path="/partners" element={<PartnerSearchPage />} />
                 <Route path="/courses" element={<CourseSearchPage />} />
                 <Route path="/courses/:id" element={<CourseDetailPage />} />
@@ -377,21 +406,21 @@ function App(): JSX.Element {
                 <Route 
                   path="/admin" 
                   element={
-                    isAuthenticated ? <AdminPanel user={user} /> : <Navigate to="/signin" />
+                    isAuthenticated ? <AdminPanel user={currentUser} /> : <Navigate to="/signin" />
                   } 
                 />
                 
                 <Route 
                   path="/instructor" 
                   element={
-                    isAuthenticated && user?.role?.includes('instructor') ? 
-                    <InstructorPanel user={user} /> : <Navigate to="/signin" />
+                    isAuthenticated && currentUser?.role?.includes('instructor') ? 
+                    <InstructorPanel user={currentUser} /> : <Navigate to="/signin" />
                   } 
                 />
                 <Route 
                   path="/school-admin" 
                   element={
-                    isAuthenticated && user?.role?.includes('school') ? 
+                    isAuthenticated && currentUser?.role?.includes('school') ? 
                     <SchoolAdmin /> : <Navigate to="/signin" />
                   } 
                 />
@@ -407,9 +436,9 @@ function App(): JSX.Element {
                         console.log('🎯 /become-school route render:', {
                           isAuthenticated,
                           user: {
-                            id: user?.id,
-                            email: user?.email,
-                            role: user?.role
+                            id: currentUser?.id,
+                            email: currentUser?.email,
+                            role: currentUser?.role
                           },
                           timestamp: new Date().toISOString()
                         });
@@ -422,7 +451,7 @@ function App(): JSX.Element {
                   element={
                     isAuthenticated ? (
                       <ProfilePage 
-                        user={user} 
+                        user={currentUser} 
                         onUpdate={(updatedUser) => {
                           console.log('Profil güncellendi:', updatedUser);
                           // Profil güncellendiğinde yapılacak işlemler
@@ -511,7 +540,7 @@ function App(): JSX.Element {
             </footer>
 
             {/* Floating Chat Button */}
-            {user && (
+            {currentUser && (
               <>
                 <button
                   onClick={() => setShowChatList(true)}
@@ -564,9 +593,9 @@ function App(): JSX.Element {
               </>
             )}
           </div>
-        </ThemeProvider>
+        </Router>
       </AuthProvider>
-    </Router>
+    </ThemeProvider>
   );
 }
 

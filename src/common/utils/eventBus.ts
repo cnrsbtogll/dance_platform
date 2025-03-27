@@ -25,5 +25,6 @@ export const eventBus = new EventBus();
 
 // Event constants
 export const EVENTS = {
-  PROFILE_PHOTO_UPDATED: 'PROFILE_PHOTO_UPDATED'
+  PROFILE_PHOTO_UPDATED: 'PROFILE_PHOTO_UPDATED' as const,
+  PROFILE_UPDATED: 'PROFILE_UPDATED' as const,
 } as const; 
