@@ -103,6 +103,102 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     reader.readAsDataURL(file);
   };
 
+  const calculateBase64Size = (base64String: string): number => {
+    // Remove data URI prefix and get only the base64 part
+    const base64Data = base64String.split(',')[1] || base64String;
+    return Math.ceil((base64Data.length * 3) / 4);
+  };
+
+  const compressImage = async (file: File): Promise<string> => {
+    const FIRESTORE_LIMIT = 1000000; // Setting slightly below actual limit for safety
+    
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+
+        img.onload = async () => {
+          let currentWidth = img.width;
+          let currentHeight = img.height;
+
+          // Initial scaling based on max dimensions
+          if (currentWidth > maxWidth || currentHeight > maxHeight) {
+            const scale = Math.min(maxWidth / currentWidth, maxHeight / currentHeight);
+            currentWidth = Math.floor(currentWidth * scale);
+            currentHeight = Math.floor(currentHeight * scale);
+          }
+
+          const compress = async (width: number, height: number, quality: number): Promise<string> => {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('Canvas context not available');
+            
+            ctx.drawImage(img, 0, 0, width, height);
+            return canvas.toDataURL('image/jpeg', quality);
+          };
+
+          // Progressive compression strategy
+          const compressionSteps = [
+            { scale: 1, quality: 0.7 },
+            { scale: 1, quality: 0.5 },
+            { scale: 0.8, quality: 0.4 },
+            { scale: 0.6, quality: 0.3 },
+            { scale: 0.4, quality: 0.3 },
+            { scale: 0.2, quality: 0.3 }
+          ];
+
+          for (const step of compressionSteps) {
+            const stepWidth = Math.floor(currentWidth * step.scale);
+            const stepHeight = Math.floor(currentHeight * step.scale);
+            
+            try {
+              const base64 = await compress(stepWidth, stepHeight, step.quality);
+              const size = calculateBase64Size(base64);
+              
+              if (size <= FIRESTORE_LIMIT) {
+                resolve(base64);
+                return;
+              }
+            } catch (err) {
+              console.error('Compression step failed:', err);
+            }
+          }
+
+          // If all steps fail, try one last time with minimum settings
+          try {
+            const finalWidth = Math.min(800, currentWidth);
+            const finalHeight = Math.floor((finalWidth * currentHeight) / currentWidth);
+            const base64 = await compress(finalWidth, finalHeight, 0.1);
+            const size = calculateBase64Size(base64);
+            
+            if (size <= FIRESTORE_LIMIT) {
+              resolve(base64);
+              return;
+            }
+          } catch (err) {
+            console.error('Final compression attempt failed:', err);
+          }
+
+          reject(new Error('Görüntü boyutu Firestore limitine uygun şekilde sıkıştırılamadı. Lütfen daha küçük bir görüntü seçin.'));
+        };
+
+        img.onerror = () => {
+          reject(new Error('Görüntü yüklenirken hata oluştu'));
+        };
+      };
+
+      reader.onerror = () => {
+        reject(new Error('Dosya okunamadı'));
+      };
+    });
+  };
+
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -111,26 +207,31 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       setIsUploading(true);
       setError(null);
 
-      // Validate file
-      const validationResult = validateImage(file);
-      if (!validationResult.valid) {
-        setError(validationResult.error || 'Geçersiz dosya.');
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-        setIsUploading(false);
+      if (!file.type.startsWith('image/')) {
+        setError('Lütfen geçerli bir görüntü dosyası seçin.');
         return;
       }
 
-      validateAndSetImage(file);
+      const compressedBase64 = await compressImage(file);
+      const finalSize = calculateBase64Size(compressedBase64);
+
+      if (finalSize > 1000000) {
+        setError('Görüntü boyutu çok büyük. Lütfen daha küçük bir görüntü seçin.');
+        return;
+      }
+
+      setPreviewURL(compressedBase64);
+      setError(null);
+
     } catch (err) {
-      setError('Fotoğraf yüklenirken bir hata oluştu.');
+      const errorMessage = err instanceof Error ? err.message : 'Fotoğraf yüklenirken bir hata oluştu.';
+      setError(errorMessage);
       console.error('Fotoğraf yükleme hatası:', err);
+    } finally {
+      setIsUploading(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-    } finally {
-      setIsUploading(false);
     }
   };
 
