@@ -1,3 +1,61 @@
+### **DANS PLATFORMU – TÜM ÖZELLİKLER**  
+
+Dans Platformu, eğitmenler, dans okulları ve öğrenciler için özel olarak tasarlanmış, dans dünyasını bir araya getiren yenilikçi bir platformdur. İşte platformun sunduğu tüm özellikler:  
+
+---
+
+## **🧑‍🏫 EĞİTMENLER İÇİN ÖZELLİKLER**  
+Eğitmenler, derslerini yönetebilir, öğrenci takibi yapabilir ve gelir elde edebilir.  
+
+✅ **Eğitmen Paneli** – Kendi kurslarını, öğrencilerini ve takvimini yönet.  
+✅ **Kurs Oluşturma & Satış** – Dilediğin dans kurslarını aç, öğrenci al ve kurslarını sat.  
+✅ **Öğrenci Takibi** – Kurslarına katılan öğrencilerin ilerlemelerini kontrol et.  
+✅ **Yoklama Alma** – Derslere katılımı sistem üzerinden kolayca takip et.  
+✅ **Rozet & Başarı Sistemi** – Öğrencilere gelişimlerini ödüllendirmek için rozetler tanımla.  
+✅ **Takvim & Ders Programı** – Ders programını oluştur ve yönet.  
+✅ **Özel & Grup Dersleri** – Hem bireysel hem de grup dersleri oluştur.  
+✅ **Festivaller ve Dans Geceleri** – Etkinlik oluştur, dans festivallerine katıl.  
+✅ **Özel Mesajlaşma (Chat)** – Öğrencilerin ve diğer eğitmenlerle iletişim kur.  
+✅ **Ödeme Sistemi Entegrasyonu** – Kurslarını satarak gelir elde et.  
+
+---
+
+## **🏫 OKULLAR İÇİN ÖZELLİKLER**  
+Dans okulları, eğitmenlerini ve derslerini tek bir çatı altında yönetebilir.  
+
+✅ **Okul Yönetici Paneli** – Tüm okul içi süreçleri yönet.  
+✅ **Eğitmen & Öğrenci Yönetimi** – Okulundaki eğitmenleri ve öğrencileri takip et.  
+✅ **Ders Programı & Takvim** – Tüm dersleri organize et ve öğrencilere duyur.  
+✅ **Kurs Satışı** – Okulun kurslarını platform üzerinden sat.  
+✅ **Öğrenci Takip Sistemi** – Katılım ve ilerleme takibi yap.  
+✅ **Yoklama Alma** – Derslere katılım durumlarını kaydet.  
+✅ **Özel & Grup Dersleri** – Hem bireysel hem de toplu dersler planla.  
+✅ **Festivaller & Dans Geceleri Yönetimi** – Etkinlikler düzenle ve duyur.  
+✅ **Bilet Satışı & Organizasyon** – Festival ve dans geceleri için bilet satışı yap.  
+✅ **Özel Mesajlaşma (Chat)** – Eğitmenler ve öğrencilerle doğrudan iletişim kur.  
+✅ **İndirim & Kampanya Yönetimi** – Kurs ve etkinlikler için indirimler tanımla.  
+
+---
+
+## **💃 ÖĞRENCİLER İÇİN ÖZELLİKLER**  
+Öğrenciler, dans derslerine katılabilir, eğitmenlerle ve diğer dans severlerle bağlantı kurabilir.  
+
+✅ **Kurs Kaydı & Katılım** – Dilediğin eğitmenin kurslarına kaydol ve dans etmeye başla.  
+✅ **Özel Dersler & Grup Dersleri** – İster birebir ister grup halinde ders al.  
+✅ **İlerleme Takibi & Rozetler** – Derslerdeki başarılarını ve gelişimini takip et.  
+✅ **Eğitmenlerle İletişim (Chat)** – Eğitmeninle platform üzerinden doğrudan mesajlaş.  
+✅ **Partner Bulma** – Kendine uygun dans partneri bul ve iletişime geç.  
+✅ **Festivaller & Dans Geceleri** – Katılmak istediğin etkinlikleri keşfet ve bilet al.  
+✅ **Bilet Alım & Satım** – Festival biletlerini satın al veya kullanmayacağın bileti devret.  
+✅ **Dans Okulları & Eğitmenleri Keşfet** – Şehrindeki en iyi dans eğitmenleri ve okullarını bul.  
+✅ **Özel Etkinlikler & İndirimler** – Platformdaki özel kampanya ve etkinliklerden yararlan.  
+
+---
+
+🎯 **Dans Platformu ile dans dünyasını keşfet, gelişimini takip et ve dans etmeye hemen başla!**  
+📌 **Hemen dene:** [https://dance-platform.vercel.app/](https://dance-platform.vercel.app/)
+
+
 # Dans Platformu React Template
 
 ## Yeni Klasör Yapısı Rehberi
