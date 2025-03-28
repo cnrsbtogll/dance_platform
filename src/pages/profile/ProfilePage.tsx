@@ -1,8 +1,7 @@
 import React, { useEffect, useState, ChangeEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { updateUserProfile } from '../../api/services/userService';
-import { DanceLevel, DanceStyle, User, UserRole } from '../../types';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { DanceStyle, User, UserRole } from '../../types';
 import { db } from '../../api/firebase/firebase';
 import CustomInput from '../../common/components/ui/CustomInput';
 import CustomSelect from '../../common/components/ui/CustomSelect';
@@ -10,14 +9,13 @@ import CustomPhoneInput from '../../common/components/ui/CustomPhoneInput';
 import Button from '../../common/components/ui/Button';
 import ImageUploader from '../../common/components/ui/ImageUploader';
 import { writeBatch, doc } from 'firebase/firestore';
-import { updateProfile } from 'firebase/auth';
-import { auth } from '../../api/firebase/firebase';
-import { generateInitialsAvatar } from '../../common/utils/imageUtils';
 import { eventBus, EVENTS } from '../../common/utils/eventBus';
 import AgeInput from '../../common/components/ui/AgeInput';
 import CitySelect from '../../common/components/ui/CitySelect';
 import { toast, Toaster } from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
+import DanceStyleSelect from '../../common/components/ui/DanceStyleSelect';
+import AvailableTimesSelect from '../../common/components/ui/AvailableTimesSelect';
 
 interface ProfileEditorProps {
   user: User | null;
@@ -28,7 +26,6 @@ interface FormData {
   displayName: string;
   gender: string;
   age: number | undefined;
-  level: DanceLevel;
   city: string;
   phoneNumber: string;
   height?: number;
@@ -50,7 +47,6 @@ const ProfilePage: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
     displayName: user?.displayName || '',
     gender: user?.gender || '',
     age: user?.age,
-    level: user?.level || 'beginner',
     city: user?.city || '',
     phoneNumber: user?.phoneNumber || '',
     height: user?.height,
@@ -165,10 +161,6 @@ const ProfilePage: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
 
     if (!formData.age) {
       newErrors.age = 'Yaş alanı zorunludur';
-    }
-
-    if (!formData.level) {
-      newErrors.level = 'Dans seviyesi seçimi zorunludur';
     }
 
     if (!formData.city) {
@@ -303,23 +295,6 @@ const ProfilePage: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
       </div>
       
       <div>
-        <CustomSelect
-          name="level"
-          label="Dans Seviyesi"
-          value={formData.level}
-          onChange={(value: string | string[]) => handleInputChange({ target: { name: 'level', value: value as DanceLevel } })}
-          options={[
-            { value: 'beginner', label: 'Başlangıç' },
-            { value: 'intermediate', label: 'Orta Seviye' },
-            { value: 'advanced', label: 'İleri Seviye' },
-            { value: 'professional', label: 'Profesyonel' }
-          ]}
-          required
-          error={errors.level ? 'error' : ''}
-        />
-      </div>
-      
-      <div>
         <CitySelect
           value={formData.city}
           onChange={(value: string) => handleInputChange({ target: { name: 'city', value } })}
@@ -337,6 +312,20 @@ const ProfilePage: React.FC<ProfileEditorProps> = ({ user, onUpdate }) => {
           phoneNumber={formData.phoneNumber}
           onPhoneNumberChange={(value: string) => handleInputChange({ target: { name: 'phoneNumber', value } })}
           onCountryCodeChange={() => {}}
+        />
+      </div>
+
+      <div>
+        <DanceStyleSelect
+          value={formData.danceStyles}
+          onChange={handleDanceStyleChange}
+        />
+      </div>
+
+      <div>
+        <AvailableTimesSelect
+          value={formData.availableTimes}
+          onChange={handleTimeChange}
         />
       </div>
       
